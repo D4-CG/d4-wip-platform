@@ -1762,12 +1762,15 @@ export default function WIPPlatform() {
       {tab === "escalation" && role === "supervisor" && (
         <EscalationQueue arScored={arForRole} dnfbScored={dnfbForRole} />
       )}
-      {tab !== "escalation" && <div style={{ padding: "24px 32px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
-          <MetricCard label="Total WIP" value={fmt(totalWIP)} sub={`${current.length} accounts`} />
-          <MetricCard label="Expected recovery" value={fmt(totalEV)} sub={`${Math.round(totalEV/totalWIP*100)}% collection rate`} accent="#2563eb" />
-          <MetricCard label="Critical holds" value={critCount} sub="require immediate action" accent="#b91c1c" />
+      {tab !== "escalation" && ( 
+        <div style={{ padding: "24px 32px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+            <MetricCard label="Total WIP" value={fmt(totalWIP)} sub={`${current.length} accounts`} />
+            <MetricCard label="Expected recovery" value={fmt(totalEV)} sub={`${Math.round(totalEV/totalWIP*100)}% collection rate`} accent="#2563eb" />
+            <MetricCard label="Critical holds" value={critCount} sub="require immediate action" accent="#b91c1c" />
+          </div>
         </div>
+      )}
 
         {role === "cfo" && (
           <div style={{ marginBottom: 20 }}>
