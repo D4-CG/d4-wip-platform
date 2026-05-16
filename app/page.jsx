@@ -1,6 +1,6 @@
 "use client";
-import WIPPlatform from "../components/WIPPlatform";
+import WIPScoringEngine from "../components/wip-scoring-engine-v8";
 
 export default function Page() {
-  return <WIPPlatform />;
+  return <WIPScoringEngine />;
 }
