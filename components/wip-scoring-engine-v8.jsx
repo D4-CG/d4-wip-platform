@@ -1822,7 +1822,7 @@ export default function WIPPlatform() {
         <span>D4 Consulting Group — Proprietary</span>
         <span>WIP Intelligence Platform v2.0 · Human-in-the-loop · Phase 1 Internal</span>
       </div>
-      </div>}
+      </div>
     </div>
   );
 }
