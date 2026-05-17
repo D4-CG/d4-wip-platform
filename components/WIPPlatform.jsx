@@ -1079,7 +1079,7 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc }) {
   );
 }
 
-function BillerAccountCard({ acc }) {
+function BillerAccountCard({ acc, onSeverityFilter }) {
   const [open, setOpen] = useState(false);
   const [outcome, setOutcome] = useState("");
   const [logged, setLogged] = useState(false);
@@ -1093,7 +1093,7 @@ function BillerAccountCard({ acc }) {
       <div onClick={() => setOpen(o => !o)} style={{ padding: "14px 18px", cursor: "pointer", display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 16, alignItems: "center" }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 10, fontWeight: 600, background: sev.bg, color: sev.text, border: `1px solid ${sev.border}`, padding: "1px 7px", borderRadius: 4 }}>{acc.cfg.severity}</span>
+            <span onClick={e => { e.stopPropagation(); if (acc.cfg.severity === "CRITICAL" || acc.cfg.severity === "URGENT") { onSeverityFilter && onSeverityFilter(prev => prev === acc.cfg.severity ? null : acc.cfg.severity); } }} style={{ fontSize: 10, fontWeight: 600, background: sev.bg, color: sev.text, border: `1px solid ${sev.border}`, padding: "1px 7px", borderRadius: 4, cursor: acc.cfg.severity === "CRITICAL" || acc.cfg.severity === "URGENT" ? "pointer" : "default" }} title={acc.cfg.severity === "CRITICAL" || acc.cfg.severity === "URGENT" ? "Click to filter by " + acc.cfg.severity : ""}>{acc.cfg.severity}</span>
             <span style={{ fontSize: 10, fontWeight: 600, background: acc.cfg.color + "12", color: acc.cfg.color, border: `1px solid ${acc.cfg.color}30`, padding: "1px 7px", borderRadius: 4 }}>{acc.area === 'Collections' ? acc.cfg.label.split(' — ')[0].toUpperCase() : acc.area.toUpperCase()}</span>
             {logged && <span style={{ fontSize: 10, fontWeight: 600, background: "#dcfce7", color: "#16a34a", border: "1px solid #bbf7d0", padding: "1px 7px", borderRadius: 4 }}>✓ LOGGED</span>}
           </div>
@@ -1588,12 +1588,24 @@ function DonutChart({ accounts, onFilter, activeFilter }) {
   const total = Object.values(byArea).reduce((s,v) => s+v, 0) || 1;
   const areaColors = { "Coding":"#6d28d9","Physician/Doc":"#1d4ed8","Charge Capture":"#be185d","Credentialing":"#9f1239","Authorization":"#c2410c","Clinical/HIM":"#0369a1","Billing/Scrubber":"#0f766e","Pending":"#374151" };
   const sorted = Object.entries(byArea).sort((a,b) => b[1]-a[1]);
-  const r = 58, cx = 70, cy = 70, sw = 22, circ = 2 * Math.PI * r;
-  let offset = 0;
+  const cx = 70, cy = 70, outerR = 56, innerR = 34;
+  const toXY = (r, deg) => {
+    const rad = (deg - 90) * Math.PI / 180;
+    return [+(cx + r * Math.cos(rad)).toFixed(3), +(cy + r * Math.sin(rad)).toFixed(3)];
+  };
+  const arcPath = (startDeg, endDeg) => {
+    const [ox1, oy1] = toXY(outerR, startDeg);
+    const [ox2, oy2] = toXY(outerR, endDeg);
+    const [ix2, iy2] = toXY(innerR, endDeg);
+    const [ix1, iy1] = toXY(innerR, startDeg);
+    const large = (endDeg - startDeg) > 180 ? 1 : 0;
+    return `M${ox1} ${oy1} A${outerR} ${outerR} 0 ${large} 1 ${ox2} ${oy2} L${ix2} ${iy2} A${innerR} ${innerR} 0 ${large} 0 ${ix1} ${iy1}Z`;
+  };
+  let angle = 0;
   const segs = sorted.map(([area, amount]) => {
-    const dash = (amount / total) * circ;
-    const s = { area, amount, dash, offset, pct: Math.round(amount/total*100) };
-    offset += dash;
+    const sweep = (amount / total) * 359.99;
+    const s = { area, amount, startDeg: angle, endDeg: angle + sweep, pct: Math.round(amount/total*100) };
+    angle += sweep;
     return s;
   });
   return (
@@ -1602,20 +1614,21 @@ function DonutChart({ accounts, onFilter, activeFilter }) {
       <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
         <div style={{ flexShrink: 0 }}>
           <svg width="140" height="140" viewBox="0 0 140 140">
-            <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f1f5f9" strokeWidth={sw} />
-            {segs.map(s => (
-              <circle key={s.area} cx={cx} cy={cy} r={r} fill="none"
-                stroke={areaColors[s.area] || "#64748b"}
-                strokeWidth={activeFilter === s.area ? sw + 4 : sw}
-                strokeDasharray={`${s.dash} ${circ}`}
-                strokeDashoffset={-s.offset + circ * 0.25}
-                opacity={activeFilter && activeFilter !== s.area ? 0.3 : 1}
-                style={{ transition: "all 0.2s", cursor: "pointer" }}
-                onClick={() => onFilter && onFilter(activeFilter === s.area ? null : s.area)}
-              />
-            ))}
-            <text x={cx} y={cy - 6} textAnchor="middle" fontSize="9" fill="#94a3b8" fontFamily="system-ui">TOTAL WIP</text>
-            <text x={cx} y={cx + 8} textAnchor="middle" fontSize="13" fontWeight="700" fill="#0f172a" fontFamily="system-ui">${(total/1000).toFixed(0)}K</text>
+            {segs.length === 0 && <circle cx={cx} cy={cy} r={(outerR+innerR)/2} fill="none" stroke="#f1f5f9" strokeWidth={outerR-innerR} />}
+            {segs.map(s => {
+              const isActive = activeFilter === s.area;
+              return (
+                <path key={s.area} d={arcPath(s.startDeg, s.endDeg)}
+                  fill={areaColors[s.area] || "#64748b"}
+                  stroke="#fff" strokeWidth={2}
+                  opacity={activeFilter && !isActive ? 0.25 : 1}
+                  style={{ cursor: "pointer", transition: "opacity 0.2s" }}
+                  onClick={() => onFilter && onFilter(isActive ? null : s.area)}
+                />
+              );
+            })}
+            <text x={cx} y={cy - 7} textAnchor="middle" fontSize="9" fill="#94a3b8" fontFamily="system-ui">TOTAL WIP</text>
+            <text x={cx} y={cy + 9} textAnchor="middle" fontSize="13" fontWeight="700" fill="#0f172a" fontFamily="system-ui">${(total/1000).toFixed(0)}K</text>
           </svg>
         </div>
         <div style={{ flex: 1 }}>
@@ -1636,6 +1649,7 @@ function DonutChart({ accounts, onFilter, activeFilter }) {
     </div>
   );
 }
+
 
 function CFOEscalationSection() {
   const [open, setOpen] = useState(false);
@@ -1741,12 +1755,49 @@ function CFOEscalationSection() {
 }
 
 
+
+function CFOCriticalHolds({ accounts }) {
+  const [open, setOpen] = useState(false);
+  const crits = accounts.filter(a => a.cfg.severity === "CRITICAL");
+  if (crits.length === 0) return null;
+  return (
+    <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, marginBottom: 16, overflow: "hidden" }}>
+      <div onClick={() => setOpen(o => !o)} style={{ padding: "12px 18px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, background: "#fee2e2", color: "#b91c1c", border: "1px solid #fca5a5", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.08em" }}>CRITICAL</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{crits.length} critical hold{crits.length > 1 ? "s" : ""} — {fmt(crits.reduce((s,a) => s+a.amount, 0))} at risk</span>
+        </div>
+        <span style={{ fontSize: 11, color: "#94a3b8" }}>{open ? "▲ hide" : "▼ view all"}</span>
+      </div>
+      {open && (
+        <div style={{ borderTop: "1px solid #fed7aa", padding: "10px 18px" }}>
+          {crits.map(a => (
+            <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #fff7ed" }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: "#0f172a" }}>{a.patient}</div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>{a.id} · {a.payer} · {a.vertical} · {a.daysOut}d</div>
+                <div style={{ fontSize: 11, color: "#c2410c", marginTop: 2 }}>{a.cfg.label}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{fmt(a.amount)}</div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>EV: {fmt(a.expectedValue)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function WIPPlatform() {
   const [tab, setTab] = useState("ar");
   const [role, setRole] = useState("commercial_collector");
   const [areaFilter, setAreaFilter] = useState(null);
+  const [severityFilter, setSeverityFilter] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [aiText, setAiText] = useState(null);
+  const [critFilter, setCritFilter] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
 
   const dnfb = useMemo(() => DNFB_DATA.map(a => score(a, "dnfb")).sort((a,b) => b.expectedValue - a.expectedValue), []);
@@ -1812,7 +1863,7 @@ export default function WIPPlatform() {
   };
 
   const seg = (label, val) => (
-    <button onClick={() => { setRole(val); setAiText(null); setSearchQuery(""); setAreaFilter(null); }} style={{ padding: "6px 14px", cursor: "pointer", fontSize: 11, fontWeight: role === val ? 600 : 400, border: "none", borderRadius: 6, fontFamily: "inherit", background: role === val ? "#2563eb" : "transparent", color: role === val ? "#fff" : "#64748b" }}>{label}</button>
+    <button onClick={() => { setRole(val); setAiText(null); setSearchQuery(""); setAreaFilter(null); setSeverityFilter(null); }} style={{ padding: "6px 14px", cursor: "pointer", fontSize: 11, fontWeight: role === val ? 600 : 400, border: "none", borderRadius: 6, fontFamily: "inherit", background: role === val ? "#2563eb" : "transparent", color: role === val ? "#fff" : "#64748b" }}>{label}</button>
   );
 
   const tabStyle = active => ({ padding: "12px 20px", cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 400, border: "none", borderBottom: active ? "2px solid #2563eb" : "2px solid transparent", background: "transparent", color: active ? "#2563eb" : "#64748b", fontFamily: "inherit" });
@@ -1925,14 +1976,20 @@ export default function WIPPlatform() {
 
       <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex" }}>
-          {(role === "supervisor" || role === "cfo") && (
-            <button style={tabStyle(tab === "dnfb")} onClick={() => { setTab("dnfb"); setAreaFilter(null); setSearchQuery(""); setAiText(null); }}>DNFB Report ({dnfbForRole.length})</button>
+          {role === "cfo" && (
+            <button style={tabStyle(tab === "metrics")} onClick={() => setTab("metrics")}>Metrics</button>
           )}
-          {role !== "biller" && (
-            <button style={tabStyle(tab === "ar")} onClick={() => { setTab("ar"); setAreaFilter(null); setSearchQuery(""); setAiText(null); }}>Collections Queue ({arForRole.length})</button>
+          {(role === "supervisor" || role === "cfo") && (
+            <button style={tabStyle(tab === "dnfb")} onClick={() => { setTab("dnfb"); setAreaFilter(null); setSeverityFilter(null); setSearchQuery(""); setAiText(null); }}>Billing WIP ({dnfbForRole.length})</button>
+          )}
+          {role !== "biller" && role !== "cfo" && (
+            <button style={tabStyle(tab === "ar")} onClick={() => { setTab("ar"); setAreaFilter(null); setSeverityFilter(null); setSearchQuery(""); setAiText(null); }}>Collections WIP ({arForRole.length})</button>
+          )}
+          {role === "cfo" && (
+            <button style={tabStyle(tab === "ar")} onClick={() => { setTab("ar"); setAreaFilter(null); setSeverityFilter(null); setSearchQuery(""); setAiText(null); }}>Collections WIP ({arForRole.length})</button>
           )}
           {role === "biller" && (
-            <button style={tabStyle(tab === "dnfb")} onClick={() => { setTab("dnfb"); setAreaFilter(null); setSearchQuery(""); setAiText(null); }}>DNFB Report — Read Only ({dnfbForRole.length})</button>
+            <button style={tabStyle(tab === "dnfb")} onClick={() => { setTab("dnfb"); setAreaFilter(null); setSeverityFilter(null); setSearchQuery(""); setAiText(null); }}>Billing WIP — Read Only ({dnfbForRole.length})</button>
           )}
           {role === "supervisor" && (
             <button style={{...tabStyle(tab === "escalation"), color: tab === "escalation" ? "#dc2626" : "#64748b", borderBottomColor: tab === "escalation" ? "#dc2626" : "transparent"}} onClick={() => { setTab("escalation"); setAreaFilter(null); setSearchQuery(""); }}>
@@ -1946,13 +2003,45 @@ export default function WIPPlatform() {
         </div>
       </div>
 
+      {(tab === "escalation" && role === "supervisor") || (tab === "metrics" && role === "cfo" && false) ? null : null}
       {tab === "escalation" && role === "supervisor" && (
         <EscalationQueue arScored={arForRole} dnfbScored={dnfbForRole} />
       )}
       {tab !== "escalation" && (
       <div style={{ padding: "24px 32px" }}>
-        {role === "cfo" ? (
+        {role === "cfo" && tab === "metrics" ? (
           <div>
+            {/* AI Executive Summary — top of metrics */}
+            <div style={{ marginBottom: 16 }}>
+              <button onClick={runAI} disabled={aiLoading} style={{ padding: "10px 20px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, color: "#2563eb", cursor: aiLoading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
+                {aiLoading ? "Analyzing..." : "✦ Generate AI Executive Summary"}
+              </button>
+              {aiText !== null && typeof aiText === "object" && (
+                <div style={{ background: "#fff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "18px 20px", marginTop: 10 }}>
+                  <div style={{ fontSize: 10, letterSpacing: "0.1em", color: "#2563eb", textTransform: "uppercase", marginBottom: 14, fontWeight: 700 }}>AI Executive Analysis</div>
+                  {aiText.status && <div style={{ fontSize: 13, color: "#1e3a5f", lineHeight: 1.7, marginBottom: 14, padding: "10px 14px", background: "#f8fbff", borderRadius: 8, borderLeft: "3px solid #2563eb" }}>{aiText.status}</div>}
+                  {aiText.priorities?.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#0369a1", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>⚡ Top Priorities</div>
+                      {aiText.priorities.map((p, i) => <div key={i} style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginBottom: 4, paddingLeft: 12, borderLeft: "2px solid #bfdbfe" }}>{p}</div>)}
+                    </div>
+                  )}
+                  {aiText.risks?.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#c2410c", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>⚠️ Risk Flags</div>
+                      {aiText.risks.map((r, i) => <div key={i} style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginBottom: 4, paddingLeft: 12, borderLeft: "2px solid #fed7aa" }}>{r}</div>)}
+                    </div>
+                  )}
+                  {aiText.decisions?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#b91c1c", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>✋ Decisions Required</div>
+                      {aiText.decisions.map((d, i) => <div key={i} style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginBottom: 4, paddingLeft: 12, borderLeft: "2px solid #fca5a5" }}>{d}</div>)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <CFOCriticalHolds accounts={arForRole} />
             {/* Headline KPIs */}
             {(() => {
               const grossAR = ar.reduce((s,a) => s+a.amount, 0);
@@ -1961,11 +2050,16 @@ export default function WIPPlatform() {
               const arDaysColor = arDays < 40 ? "#16a34a" : arDays < 55 ? "#2563eb" : arDays < 65 ? "#d97706" : "#dc2626";
               const arDaysLabel = arDays < 40 ? "Excellent" : arDays < 55 ? "Good" : arDays < 65 ? "Needs attention" : "Critical";
               return (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Net Patient Revenue (est.)</div>
                     <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(annualNPR)}</div>
                     <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Annualized · 82% net revenue factor · from accounting system in production</div>
+                  </div>
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Total AR</div>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(grossAR)}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{ar.length} billed accounts</div>
                   </div>
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>AR Days Outstanding</div>
@@ -1973,16 +2067,57 @@ export default function WIPPlatform() {
                       <div style={{ fontSize: 28, fontWeight: 700, color: arDaysColor, letterSpacing: "-0.02em" }}>{arDays}</div>
                       <div style={{ fontSize: 13, color: arDaysColor, fontWeight: 600 }}>days · {arDaysLabel}</div>
                     </div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Dollar-weighted average age · Benchmarks: &lt;40 excellent, &lt;55 good, &lt;65 watch</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Dollar-weighted average age · &lt;40 excellent, &lt;55 good, &lt;65 watch</div>
                   </div>
                 </div>
               );
             })()}
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 8 }}>
-              <MetricCard label="Total AR" value={fmt(ar.reduce((s,a) => s+a.amount, 0))} sub={`${ar.length} billed accounts`} />
-              <MetricCard label="WIP — Collections Past Due" value={fmt(ar.filter(a => daysSince(a.lastContact) >= 21).reduce((s,a) => s+a.amount, 0))} sub={`${ar.filter(a => daysSince(a.lastContact) >= 21).length} accounts overdue for follow-up · DNFB: ${dnfbForRole.length} unbilled holds`} accent="#c2410c" />
-              <MetricCard label="Expected recovery" value={fmt(totalEV)} sub="probability-weighted — see breakdown below" accent="#2563eb" />
+            {/* Billing WIP + Follow-up WIP side by side */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+              {/* Billing WIP */}
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 16px" }}>
+                <div style={{ fontSize: 10, color: "#1d4ed8", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>Billing WIP — DNFB</div>
+                {(() => {
+                  const tiers = [
+                    { label: "Normal (1–3 days)", accs: dnfbForRole.filter(a => a.daysInDNFB <= 3), color: "#16a34a" },
+                    { label: "Watch (3–5 days)",  accs: dnfbForRole.filter(a => a.daysInDNFB > 3 && a.daysInDNFB < 6), color: "#d97706" },
+                    { label: "Flag (6+ days)",    accs: dnfbForRole.filter(a => a.daysInDNFB >= 6), color: "#dc2626" },
+                  ];
+                  return tiers.map((t, i) => (
+                    <div key={t.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 7, marginBottom: 7, borderBottom: i < 2 ? "1px solid #f1f5f9" : "none" }}>
+                      <div style={{ fontSize: 12, color: "#475569", fontWeight: 500 }}>{t.label}</div>
+                      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                        <span style={{ fontSize: 11, color: "#94a3b8" }}>{t.accs.length} accts</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: t.color }}>{fmt(t.accs.reduce((s,a) => s+a.amount, 0))}</span>
+                      </div>
+                    </div>
+                  ));
+                })()}
+                <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 4 }}>Total unbilled: {fmt(dnfbForRole.reduce((s,a) => s+a.amount, 0))} · {dnfbForRole.length} accounts</div>
+              </div>
+              {/* Follow-up WIP */}
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 16px" }}>
+                <div style={{ fontSize: 10, color: "#c2410c", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>Follow-up WIP — Collections</div>
+                {(() => {
+                  const pastDue = ar.filter(a => daysSince(a.lastContact) >= 21);
+                  const tiers = [
+                    { label: "$10K+",    accs: pastDue.filter(a => a.amount >= 10000), color: "#b91c1c" },
+                    { label: "$1K–$10K", accs: pastDue.filter(a => a.amount >= 1000 && a.amount < 10000), color: "#c2410c" },
+                    { label: "<$1K",     accs: pastDue.filter(a => a.amount < 1000), color: "#64748b" },
+                  ];
+                  return tiers.map((t, i) => (
+                    <div key={t.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 7, marginBottom: 7, borderBottom: i < 2 ? "1px solid #f1f5f9" : "none" }}>
+                      <div style={{ fontSize: 12, color: "#475569", fontWeight: 500 }}>{t.label}</div>
+                      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                        <span style={{ fontSize: 11, color: "#94a3b8" }}>{t.accs.length} accts</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: t.color }}>{fmt(t.accs.reduce((s,a) => s+a.amount, 0))}</span>
+                      </div>
+                    </div>
+                  ));
+                })()}
+                <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 4 }}>Accounts &gt;21 days without contact · {ar.filter(a => daysSince(a.lastContact) >= 21).length} total past due</div>
+              </div>
             </div>
             {(() => {
               const groups = {
@@ -2011,13 +2146,13 @@ export default function WIPPlatform() {
                       const gap = bm.min - rate;
                       const color = rate >= bm.min ? "#16a34a" : gap <= 10 ? "#d97706" : "#dc2626";
                       const statusLabel = rate >= bm.min ? "On target" : "";
-                      const statusIcon = rate >= bm.min ? "✓" : gap <= 10 ? "⚠" : "✕";
+                      const statusIcon = rate >= bm.min ? "✓" : gap <= 10 ? "⚠" : "";
                       return (
                         <div key={key} style={{ padding: "12px 14px", background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0" }}>
                           <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>{g.label}</div>
                           <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
                             <div style={{ fontSize: 28, fontWeight: 700, color, letterSpacing: "-0.02em", lineHeight: 1 }}>{rate}%</div>
-                            <div style={{ fontSize: 11, color, fontWeight: 600 }}>{statusIcon} {statusLabel}</div>
+                            <div style={{ fontSize: 11, color, fontWeight: 600 }}>{rate >= bm.min ? "✓ On target" : ""}</div>
                           </div>
                           <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 8 }}>{fmt(ev)} recovered of {fmt(bal)}</div>
                           {/* Progress bar with benchmark marker */}
@@ -2044,7 +2179,7 @@ export default function WIPPlatform() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
             <MetricCard label="Total WIP" value={fmt(totalWIP)} sub={`${current.length} accounts`} />
             <MetricCard label="Expected recovery" value={fmt(totalEV)} sub={`${Math.round(totalEV/totalWIP*100)}% collection rate`} accent="#2563eb" />
-            <MetricCard label="Critical holds" value={critCount} sub="require immediate action" accent="#b91c1c" />
+            <div onClick={() => setCritFilter(f => !f)} style={{ cursor: "pointer" }}><MetricCard label="Critical holds" value={critCount} sub={critFilter ? "click to clear filter" : "click to filter worklist"} accent="#b91c1c" /></div>
           </div>
         )}
 
@@ -2105,8 +2240,14 @@ export default function WIPPlatform() {
           <div style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(filtered.reduce((s,a) => s + a.expectedValue, 0))} expected recovery</div>
         </div>
 
-        {role === "cfo" && <CFOEscalationSection />}
+        {role === "cfo" && tab === "metrics" && <CFOEscalationSection />}
 
+        {critFilter && (
+          <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 14px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "#b91c1c" }}>
+            <span>⚡ Showing CRITICAL accounts only — {filtered.length} accounts</span>
+            <button onClick={() => setCritFilter(false)} style={{ fontSize: 11, color: "#b91c1c", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>Clear filter</button>
+          </div>
+        )}
         {filtered.length === 0 && searchQuery && (
           <div style={{ background: "#fefce8", border: "1px solid #fde68a", borderRadius: 8, padding: "14px 18px", fontSize: 13, color: "#854d0e" }}>
             No accounts found for "{searchQuery}" — try account ID, patient name, payer, or site.
@@ -2114,7 +2255,7 @@ export default function WIPPlatform() {
         )}
 
         {filtered.map(acc => (
-          <BillerAccountCard key={acc.id} acc={acc} />
+          <BillerAccountCard key={acc.id} acc={acc} onSeverityFilter={setSeverityFilter} />
         ))}
       </div>
       )}
