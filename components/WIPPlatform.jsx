@@ -62,9 +62,10 @@ const PAYER_CATEGORY = {
 const ROLE_DEFS = {
   commercial_collector: { label: "Commercial Collector", paneLabel: "Commercial accounts only", filter: ["commercial"], mode: "collector" },
   medicare_bc:          { label: "Medicare B/C",          paneLabel: "Medicare only — portal workflow", filter: ["medicare"], mode: "medicare_bc" },
-  medicaid:             { label: "Medicaid Specialist",    paneLabel: "Medicaid accounts only", filter: ["medicaid"], mode: "biller" },
-  wc:                   { label: "Worker's Comp",          paneLabel: "Worker's Comp accounts only", filter: ["workers_comp"], mode: "biller" },
+  medicaid:             { label: "Medicaid Specialist",    paneLabel: "Medicaid accounts only", filter: ["medicaid"], mode: "collector" },
+  wc:                   { label: "Worker's Comp",          paneLabel: "Worker's Comp accounts only", filter: ["workers_comp"], mode: "collector" },
   biller:               { label: "Biller — All Payers",    paneLabel: "All payer types", filter: ["all"], mode: "biller" },
+  self_pay:             { label: "Self-Pay Specialist",    paneLabel: "Patient accounts — 30-day hold active", filter: ["self_pay"], mode: "self_pay" },
   supervisor:           { label: "Supervisor",             paneLabel: "All payer types", filter: ["all"], mode: "supervisor" },
   cfo:                  { label: "CFO",                    paneLabel: "All payer types", filter: ["all"], mode: "cfo" },
 };
@@ -197,106 +198,106 @@ const DNFB_DATA = [
 ];
 
 const AR_DATA = [
-  { id:"AR-001", patient:"Summit Ophthalmology", payer:"Blue Shield", amount:38000, daysOut:206, serviceDate:"2025-10-09", lastContact:"2026-01-07", denialCode:"CO-50", site:"Site 5", vertical:"Ophthalmology" },
-  { id:"AR-002", patient:"Legacy Hospice Group", payer:"Blue Cross", amount:8000, daysOut:72, serviceDate:"2026-02-25", lastContact:"2026-03-29", denialCode:null, site:"Site 11", vertical:"Hospice" },
-  { id:"AR-003", patient:"Harbor Home Health", payer:"Medicaid", amount:171000, daysOut:109, serviceDate:"2026-01-21", lastContact:"2026-05-10", denialCode:"CO-97", site:"Site 1", vertical:"Home Health" },
-  { id:"AR-004", patient:"Serenity Hospice", payer:"Medicaid", amount:109000, daysOut:76, serviceDate:"2026-02-23", lastContact:"2026-04-18", denialCode:null, site:"Site 8", vertical:"Hospice" },
-  { id:"AR-005", patient:"Metro Behavioral Health", payer:"Cigna", amount:37000, daysOut:206, serviceDate:"2025-10-17", lastContact:"2025-11-01", denialCode:"CO-50", site:"Site 9", vertical:"Behavioral Health" },
-  { id:"AR-006", patient:"ClearVision Partners", payer:"Cigna", amount:49000, daysOut:72, serviceDate:"2026-02-28", lastContact:"2026-03-23", denialCode:"CO-4", site:"Site 9", vertical:"Ophthalmology" },
-  { id:"AR-007", patient:"MedCore Infusion", payer:"Medicaid", amount:136000, daysOut:156, serviceDate:"2025-12-03", lastContact:"2026-01-07", denialCode:null, site:"Site 4", vertical:"Infusion" },
-  { id:"AR-008", patient:"Regional Cardiac Group", payer:"Medicaid", amount:20000, daysOut:127, serviceDate:"2025-12-29", lastContact:"2026-02-17", denialCode:"CO-4", site:"Site 2", vertical:"Cardiology" },
-  { id:"AR-009", patient:"Premier Dental Group", payer:"Worker Comp", amount:115000, daysOut:30, serviceDate:"2026-04-10", lastContact:"2026-05-02", denialCode:null, site:"Site 8", vertical:"Dental" },
-  { id:"AR-010", patient:"Legacy Hospice Group", payer:"Medicaid", amount:111000, daysOut:191, serviceDate:"2025-10-30", lastContact:"2026-01-26", denialCode:null, site:"Site 6", vertical:"Hospice" },
-  { id:"AR-011", patient:"Summit Mental Health", payer:"United Health", amount:31000, daysOut:152, serviceDate:"2025-12-09", lastContact:"2026-01-12", denialCode:null, site:"Site 4", vertical:"Behavioral Health" },
-  { id:"AR-012", patient:"Genesis Home Health", payer:"Worker Comp", amount:162000, daysOut:177, serviceDate:"2025-11-15", lastContact:"2026-05-08", denialCode:null, site:"Site 3", vertical:"Home Health" },
-  { id:"AR-013", patient:"Coastal Infusion Center", payer:"Blue Shield", amount:163000, daysOut:17, serviceDate:"2026-04-23", lastContact:"2026-05-01", denialCode:"CO-22", site:"Site 11", vertical:"Infusion" },
-  { id:"AR-014", patient:"Regional Urology Associates", payer:"Medicaid", amount:74000, daysOut:60, serviceDate:"2026-03-10", lastContact:"2026-04-18", denialCode:null, site:"Site 2", vertical:"Urology" },
-  { id:"AR-015", patient:"Smile Partners DSO", payer:"Blue Shield", amount:79000, daysOut:88, serviceDate:"2026-02-12", lastContact:"2026-03-13", denialCode:"CO-97", site:"Site 12", vertical:"Dental" },
-  { id:"AR-016", patient:"Heartland Hospice", payer:"Humana", amount:34000, daysOut:108, serviceDate:"2026-01-23", lastContact:"2026-04-24", denialCode:"CO-97", site:"Site 10", vertical:"Hospice" },
-  { id:"AR-017", patient:"Comfort Home Services", payer:"Blue Shield", amount:135000, daysOut:167, serviceDate:"2025-11-24", lastContact:"2026-02-15", denialCode:"CO-16", site:"Site 6", vertical:"Home Health" },
-  { id:"AR-018", patient:"Regional Urology Associates", payer:"Medicaid", amount:169000, daysOut:167, serviceDate:"2025-11-15", lastContact:"2026-02-24", denialCode:null, site:"Site 3", vertical:"Urology" },
-  { id:"AR-019", patient:"Advanced Urology Partners", payer:"Cigna", amount:134000, daysOut:170, serviceDate:"2025-11-22", lastContact:"2026-03-13", denialCode:"CO-16", site:"Site 12", vertical:"Urology" },
-  { id:"AR-020", patient:"Alliance Infusion Services", payer:"Worker Comp", amount:169000, daysOut:207, serviceDate:"2025-10-14", lastContact:"2025-11-25", denialCode:null, site:"Site 12", vertical:"Infusion" },
-  { id:"AR-021", patient:"VitalCaring Home", payer:"United Health", amount:54000, daysOut:99, serviceDate:"2026-01-25", lastContact:"2026-04-09", denialCode:null, site:"Site 7", vertical:"Home Health" },
-  { id:"AR-022", patient:"Peak MSK Partners", payer:"Blue Cross", amount:120000, daysOut:94, serviceDate:"2026-02-06", lastContact:"2026-05-09", denialCode:"CO-50", site:"Site 7", vertical:"Orthopedics" },
-  { id:"AR-023", patient:"Summit Mental Health", payer:"Aetna", amount:145000, daysOut:191, serviceDate:"2025-10-31", lastContact:"2026-03-03", denialCode:"CO-22", site:"Site 4", vertical:"Behavioral Health" },
-  { id:"AR-024", patient:"Comfort Care Partners", payer:"Blue Cross", amount:97000, daysOut:22, serviceDate:"2026-04-19", lastContact:"2026-04-30", denialCode:null, site:"Site 1", vertical:"Hospice" },
-  { id:"AR-025", patient:"ClearVision Partners", payer:"Blue Cross", amount:90000, daysOut:39, serviceDate:"2026-04-01", lastContact:"2026-04-11", denialCode:null, site:"Site 6", vertical:"Ophthalmology" },
-  { id:"AR-026", patient:"Regional Urology Associates", payer:"Medicaid", amount:39000, daysOut:21, serviceDate:"2026-04-20", lastContact:"2026-05-06", denialCode:"CO-22", site:"Site 4", vertical:"Urology" },
-  { id:"AR-027", patient:"Harbor Home Health", payer:"Cigna", amount:136000, daysOut:106, serviceDate:"2026-01-17", lastContact:"2026-05-11", denialCode:"CO-97", site:"Site 11", vertical:"Home Health" },
-  { id:"AR-028", patient:"Summit Ophthalmology", payer:"Humana", amount:103000, daysOut:91, serviceDate:"2026-02-06", lastContact:"2026-02-16", denialCode:null, site:"Site 8", vertical:"Ophthalmology" },
-  { id:"AR-029", patient:"Valley Eye Care", payer:"Blue Cross", amount:174000, daysOut:80, serviceDate:"2026-02-13", lastContact:"2026-02-27", denialCode:null, site:"Site 12", vertical:"Ophthalmology" },
-  { id:"AR-030", patient:"Summit Orthopedics", payer:"Blue Shield", amount:178000, daysOut:205, serviceDate:"2025-10-18", lastContact:"2026-04-13", denialCode:null, site:"Site 2", vertical:"Orthopedics" },
-  { id:"AR-031", patient:"Summit Ophthalmology", payer:"Cigna", amount:68000, daysOut:34, serviceDate:"2026-04-07", lastContact:"2026-04-14", denialCode:"CO-97", site:"Site 9", vertical:"Ophthalmology" },
-  { id:"AR-032", patient:"Comfort Home Services", payer:"Medicaid", amount:36000, daysOut:39, serviceDate:"2026-04-01", lastContact:"2026-05-04", denialCode:"CO-50", site:"Site 12", vertical:"Home Health" },
-  { id:"AR-033", patient:"Smile Partners DSO", payer:"Blue Shield", amount:135000, daysOut:62, serviceDate:"2026-03-09", lastContact:"2026-03-26", denialCode:null, site:"Site 3", vertical:"Dental" },
-  { id:"AR-034", patient:"Summit Ophthalmology", payer:"Worker Comp", amount:161000, daysOut:27, serviceDate:"2026-04-13", lastContact:"2026-05-03", denialCode:"CO-22", site:"Site 12", vertical:"Ophthalmology" },
-  { id:"AR-035", patient:"Regional Orthopedic Group", payer:"Blue Cross", amount:124000, daysOut:179, serviceDate:"2025-11-11", lastContact:"2025-12-25", denialCode:null, site:"Site 11", vertical:"Orthopedics" },
-  { id:"AR-036", patient:"Regional Eye Associates", payer:"Blue Cross", amount:55000, daysOut:167, serviceDate:"2025-11-23", lastContact:"2025-12-06", denialCode:"CO-97", site:"Site 5", vertical:"Ophthalmology" },
-  { id:"AR-037", patient:"Metro Urology Group", payer:"Aetna", amount:160000, daysOut:41, serviceDate:"2026-03-26", lastContact:"2026-04-23", denialCode:null, site:"Site 7", vertical:"Urology" },
-  { id:"AR-038", patient:"Valley Eye Care", payer:"Cigna", amount:124000, daysOut:36, serviceDate:"2026-03-29", lastContact:"2026-04-30", denialCode:"CO-50", site:"Site 3", vertical:"Ophthalmology" },
-  { id:"AR-039", patient:"Summit Mental Health", payer:"Humana", amount:112000, daysOut:68, serviceDate:"2026-03-02", lastContact:"2026-04-05", denialCode:null, site:"Site 4", vertical:"Behavioral Health" },
-  { id:"AR-040", patient:"Metro Behavioral Health", payer:"Humana", amount:122000, daysOut:66, serviceDate:"2026-03-02", lastContact:"2026-03-31", denialCode:null, site:"Site 1", vertical:"Behavioral Health" },
-  { id:"AR-041", patient:"Premier Dental Group", payer:"Medicaid", amount:142000, daysOut:7, serviceDate:"2026-05-01", lastContact:"2026-05-01", denialCode:"CO-97", site:"Site 3", vertical:"Dental" },
-  { id:"AR-042", patient:"Summit Ophthalmology", payer:"Cigna", amount:107000, daysOut:18, serviceDate:"2026-04-21", lastContact:"2026-05-06", denialCode:"CO-4", site:"Site 2", vertical:"Ophthalmology" },
-  { id:"AR-043", patient:"Metro Heart Institute", payer:"Worker Comp", amount:164000, daysOut:179, serviceDate:"2025-11-12", lastContact:"2026-04-21", denialCode:"CO-97", site:"Site 7", vertical:"Cardiology" },
-  { id:"AR-044", patient:"Metro Heart Institute", payer:"United Health", amount:9000, daysOut:99, serviceDate:"2026-01-22", lastContact:"2026-05-01", denialCode:null, site:"Site 7", vertical:"Cardiology" },
-  { id:"AR-045", patient:"Lakeside Behavioral", payer:"Blue Cross", amount:9000, daysOut:117, serviceDate:"2026-01-08", lastContact:"2026-04-26", denialCode:"CO-50", site:"Site 7", vertical:"Behavioral Health" },
-  { id:"AR-046", patient:"Comfort Home Services", payer:"United Health", amount:130000, daysOut:86, serviceDate:"2026-02-03", lastContact:"2026-03-05", denialCode:"CO-50", site:"Site 12", vertical:"Home Health" },
-  { id:"AR-047", patient:"Summit Ophthalmology", payer:"United Health", amount:59000, daysOut:56, serviceDate:"2026-03-08", lastContact:"2026-04-01", denialCode:null, site:"Site 5", vertical:"Ophthalmology" },
-  { id:"AR-048", patient:"Premier Infusion Partners", payer:"Aetna", amount:176000, daysOut:140, serviceDate:"2025-12-19", lastContact:"2026-05-02", denialCode:"CO-4", site:"Site 2", vertical:"Infusion" },
-  { id:"AR-049", patient:"Metro Behavioral Health", payer:"United Health", amount:159000, daysOut:32, serviceDate:"2026-04-05", lastContact:"2026-05-01", denialCode:null, site:"Site 11", vertical:"Behavioral Health" },
-  { id:"AR-050", patient:"Harbor Home Health", payer:"Cigna", amount:122000, daysOut:170, serviceDate:"2025-11-20", lastContact:"2026-05-12", denialCode:"CO-22", site:"Site 12", vertical:"Home Health" },
-  { id:"AR-051", patient:"ClearVision Partners", payer:"Medicare", amount:124000, daysOut:83, serviceDate:"2026-02-14", lastContact:"2026-03-12", denialCode:"CO-16", site:"Site 12", vertical:"Ophthalmology" },
-  { id:"AR-052", patient:"Summit Ophthalmology", payer:"Worker Comp", amount:142000, daysOut:210, serviceDate:"2025-10-07", lastContact:"2026-03-13", denialCode:null, site:"Site 11", vertical:"Ophthalmology" },
-  { id:"AR-053", patient:"Harborview BH", payer:"Worker Comp", amount:56000, daysOut:151, serviceDate:"2025-12-10", lastContact:"2026-02-21", denialCode:null, site:"Site 9", vertical:"Behavioral Health" },
-  { id:"AR-054", patient:"Summit Ophthalmology", payer:"Medicaid", amount:101000, daysOut:25, serviceDate:"2026-04-14", lastContact:"2026-05-12", denialCode:null, site:"Site 3", vertical:"Ophthalmology" },
-  { id:"AR-055", patient:"Heartland Hospice", payer:"Aetna", amount:122000, daysOut:93, serviceDate:"2026-02-05", lastContact:"2026-04-21", denialCode:"CO-50", site:"Site 12", vertical:"Hospice" },
-  { id:"AR-056", patient:"Harborview BH", payer:"Humana", amount:9000, daysOut:66, serviceDate:"2026-03-06", lastContact:"2026-05-03", denialCode:null, site:"Site 10", vertical:"Behavioral Health" },
-  { id:"AR-057", patient:"Regional Urology Associates", payer:"Medicare", amount:16000, daysOut:107, serviceDate:"2026-01-21", lastContact:"2026-03-07", denialCode:"CO-50", site:"Site 4", vertical:"Urology" },
-  { id:"AR-058", patient:"Regional Orthopedic Group", payer:"Aetna", amount:86000, daysOut:152, serviceDate:"2025-12-07", lastContact:"2026-02-27", denialCode:null, site:"Site 3", vertical:"Orthopedics" },
-  { id:"AR-059", patient:"Regional Cardiac Group", payer:"Humana", amount:43000, daysOut:81, serviceDate:"2026-02-17", lastContact:"2026-03-08", denialCode:null, site:"Site 8", vertical:"Cardiology" },
-  { id:"AR-060", patient:"Cardiology Associates", payer:"Humana", amount:70000, daysOut:57, serviceDate:"2026-03-05", lastContact:"2026-05-10", denialCode:"CO-50", site:"Site 8", vertical:"Cardiology" },
-  { id:"AR-061", patient:"Harborview BH", payer:"Blue Cross", amount:155000, daysOut:190, serviceDate:"2025-10-30", lastContact:"2026-03-23", denialCode:"CO-50", site:"Site 6", vertical:"Behavioral Health" },
-  { id:"AR-062", patient:"Metro Urology Group", payer:"Blue Cross", amount:86000, daysOut:57, serviceDate:"2026-03-10", lastContact:"2026-04-19", denialCode:null, site:"Site 1", vertical:"Urology" },
-  { id:"AR-063", patient:"Smile Partners DSO", payer:"Aetna", amount:63000, daysOut:102, serviceDate:"2026-01-22", lastContact:"2026-03-06", denialCode:null, site:"Site 11", vertical:"Dental" },
-  { id:"AR-064", patient:"Metro Urology Group", payer:"Medicare", amount:168000, daysOut:175, serviceDate:"2025-11-02", lastContact:"2026-05-11", denialCode:null, site:"Site 1", vertical:"Urology" },
-  { id:"AR-065", patient:"Summit Orthopedics", payer:"Medicaid", amount:170000, daysOut:205, serviceDate:"2025-10-09", lastContact:"2026-04-21", denialCode:null, site:"Site 9", vertical:"Orthopedics" },
-  { id:"AR-066", patient:"VitalCaring Home", payer:"Medicaid", amount:16000, daysOut:24, serviceDate:"2026-04-09", lastContact:"2026-04-27", denialCode:"CO-97", site:"Site 11", vertical:"Home Health" },
-  { id:"AR-067", patient:"Regional Orthopedic Group", payer:"Medicare", amount:155000, daysOut:41, serviceDate:"2026-03-30", lastContact:"2026-04-26", denialCode:"CO-50", site:"Site 3", vertical:"Orthopedics" },
-  { id:"AR-068", patient:"Metro Behavioral Health", payer:"Humana", amount:24000, daysOut:92, serviceDate:"2026-01-27", lastContact:"2026-04-04", denialCode:"CO-50", site:"Site 1", vertical:"Behavioral Health" },
-  { id:"AR-069", patient:"Alliance Infusion Services", payer:"Aetna", amount:26000, daysOut:73, serviceDate:"2026-02-24", lastContact:"2026-04-26", denialCode:"CO-16", site:"Site 12", vertical:"Infusion" },
-  { id:"AR-070", patient:"Metro Heart Institute", payer:"Blue Cross", amount:27000, daysOut:95, serviceDate:"2026-02-03", lastContact:"2026-02-28", denialCode:"CO-4", site:"Site 6", vertical:"Cardiology" },
-  { id:"AR-071", patient:"Summit Orthopedics", payer:"Blue Shield", amount:75000, daysOut:112, serviceDate:"2026-01-12", lastContact:"2026-02-04", denialCode:null, site:"Site 2", vertical:"Orthopedics" },
-  { id:"AR-072", patient:"Coastal Recovery", payer:"Cigna", amount:102000, daysOut:210, serviceDate:"2025-10-06", lastContact:"2026-02-19", denialCode:null, site:"Site 7", vertical:"Behavioral Health" },
-  { id:"AR-073", patient:"Comfort Home Services", payer:"Humana", amount:105000, daysOut:98, serviceDate:"2026-02-01", lastContact:"2026-03-01", denialCode:"CO-97", site:"Site 9", vertical:"Home Health" },
-  { id:"AR-074", patient:"Genesis Home Health", payer:"United Health", amount:109000, daysOut:177, serviceDate:"2025-11-11", lastContact:"2025-12-04", denialCode:"CO-16", site:"Site 5", vertical:"Home Health" },
-  { id:"AR-075", patient:"Premier Infusion Partners", payer:"Cigna", amount:170000, daysOut:161, serviceDate:"2025-11-30", lastContact:"2026-02-20", denialCode:"CO-22", site:"Site 7", vertical:"Infusion" },
-  { id:"AR-076", patient:"Cardiology Associates", payer:"Medicaid", amount:105000, daysOut:123, serviceDate:"2026-01-06", lastContact:"2026-05-12", denialCode:null, site:"Site 8", vertical:"Cardiology" },
-  { id:"AR-077", patient:"Premier Dental Group", payer:"Blue Cross", amount:41000, daysOut:94, serviceDate:"2026-02-01", lastContact:"2026-03-18", denialCode:"CO-16", site:"Site 4", vertical:"Dental" },
-  { id:"AR-078", patient:"Metro Heart Institute", payer:"Medicaid", amount:108000, daysOut:166, serviceDate:"2025-11-25", lastContact:"2025-12-03", denialCode:"CO-50", site:"Site 11", vertical:"Cardiology" },
-  { id:"AR-079", patient:"Regional Eye Associates", payer:"Medicaid", amount:49000, daysOut:177, serviceDate:"2025-11-06", lastContact:"2025-12-15", denialCode:null, site:"Site 2", vertical:"Ophthalmology" },
-  { id:"AR-080", patient:"Peak MSK Partners", payer:"Humana", amount:129000, daysOut:167, serviceDate:"2025-11-21", lastContact:"2026-04-03", denialCode:"CO-22", site:"Site 8", vertical:"Orthopedics" },
-  { id:"AR-081", patient:"Coastal Infusion Center", payer:"Aetna", amount:13000, daysOut:75, serviceDate:"2026-02-21", lastContact:"2026-04-24", denialCode:"CO-97", site:"Site 8", vertical:"Infusion" },
-  { id:"AR-082", patient:"Lakeside Dental Group", payer:"Medicaid", amount:94000, daysOut:27, serviceDate:"2026-04-01", lastContact:"2026-05-12", denialCode:"CO-97", site:"Site 4", vertical:"Dental" },
-  { id:"AR-083", patient:"Summit Ophthalmology", payer:"Blue Shield", amount:40000, daysOut:205, serviceDate:"2025-10-12", lastContact:"2026-03-24", denialCode:null, site:"Site 1", vertical:"Ophthalmology" },
-  { id:"AR-084", patient:"Premier Dental Group", payer:"Humana", amount:24000, daysOut:167, serviceDate:"2025-11-24", lastContact:"2026-01-04", denialCode:null, site:"Site 12", vertical:"Dental" },
-  { id:"AR-085", patient:"Bright Dental Alliance", payer:"United Health", amount:145000, daysOut:152, serviceDate:"2025-12-06", lastContact:"2026-01-11", denialCode:null, site:"Site 6", vertical:"Dental" },
-  { id:"AR-086", patient:"Metro Behavioral Health", payer:"Medicaid", amount:36000, daysOut:45, serviceDate:"2026-03-20", lastContact:"2026-05-15", denialCode:"CO-4", site:"Site 7", vertical:"Behavioral Health" },
-  { id:"AR-087", patient:"Regional Orthopedic Group", payer:"Blue Shield", amount:28000, daysOut:172, serviceDate:"2025-11-16", lastContact:"2026-04-24", denialCode:"CO-97", site:"Site 6", vertical:"Orthopedics" },
-  { id:"AR-088", patient:"Premier Infusion Partners", payer:"Aetna", amount:179000, daysOut:118, serviceDate:"2026-01-13", lastContact:"2026-02-15", denialCode:null, site:"Site 6", vertical:"Infusion" },
-  { id:"AR-089", patient:"Comfort Care Partners", payer:"Medicaid", amount:63000, daysOut:103, serviceDate:"2026-01-26", lastContact:"2026-05-02", denialCode:"CO-16", site:"Site 2", vertical:"Hospice" },
-  { id:"AR-090", patient:"Lakeside Behavioral", payer:"Blue Shield", amount:94000, daysOut:189, serviceDate:"2025-10-29", lastContact:"2026-04-07", denialCode:null, site:"Site 7", vertical:"Behavioral Health" },
-  { id:"AR-091", patient:"Coastal Infusion Center", payer:"Cigna", amount:38000, daysOut:104, serviceDate:"2026-01-22", lastContact:"2026-03-07", denialCode:null, site:"Site 11", vertical:"Infusion" },
-  { id:"AR-092", patient:"Coastal Infusion Center", payer:"United Health", amount:15000, daysOut:20, serviceDate:"2026-04-13", lastContact:"2026-05-06", denialCode:"CO-50", site:"Site 11", vertical:"Infusion" },
-  { id:"AR-093", patient:"Cardiology Associates", payer:"United Health", amount:84000, daysOut:25, serviceDate:"2026-04-10", lastContact:"2026-05-11", denialCode:"CO-16", site:"Site 9", vertical:"Cardiology" },
-  { id:"AR-094", patient:"Premier Dental Group", payer:"Aetna", amount:67000, daysOut:27, serviceDate:"2026-04-13", lastContact:"2026-05-01", denialCode:"CO-4", site:"Site 10", vertical:"Dental" },
-  { id:"AR-095", patient:"Smile Partners DSO", payer:"Blue Cross", amount:40000, daysOut:184, serviceDate:"2025-11-08", lastContact:"2026-01-08", denialCode:"CO-4", site:"Site 6", vertical:"Dental" },
-  { id:"AR-096", patient:"Summit Orthopedics", payer:"Worker Comp", amount:62000, daysOut:87, serviceDate:"2026-02-07", lastContact:"2026-04-05", denialCode:null, site:"Site 5", vertical:"Orthopedics" },
-  { id:"AR-097", patient:"Valley Eye Care", payer:"Worker Comp", amount:50000, daysOut:62, serviceDate:"2026-03-09", lastContact:"2026-05-11", denialCode:"CO-4", site:"Site 8", vertical:"Ophthalmology" },
-  { id:"AR-098", patient:"Smile Partners DSO", payer:"Medicaid", amount:156000, daysOut:131, serviceDate:"2025-12-26", lastContact:"2026-03-14", denialCode:null, site:"Site 3", vertical:"Dental" },
-  { id:"AR-099", patient:"Serenity Hospice", payer:"Aetna", amount:93000, daysOut:167, serviceDate:"2025-11-25", lastContact:"2026-05-15", denialCode:null, site:"Site 11", vertical:"Hospice" },
-  { id:"AR-100", patient:"Summit Ophthalmology", payer:"United Health", amount:24000, daysOut:56, serviceDate:"2026-03-12", lastContact:"2026-05-09", denialCode:"CO-50", site:"Site 3", vertical:"Ophthalmology" }
+  { id:"AR-001", patient:"Betty Allen", payer:"Aetna", amount:50000, daysOut:9, serviceDate:"2026-05-01", lastContact:"2026-05-11", denialCode:null, site:"Site 12", vertical:"Hospice" },
+  { id:"AR-002", patient:"Carol Scott", payer:"Aetna", amount:161000, daysOut:56, serviceDate:"2026-03-11", lastContact:"2026-03-24", denialCode:null, site:"Site 7", vertical:"Home Health" },
+  { id:"AR-003", patient:"Sandra White", payer:"Cigna", amount:140000, daysOut:63, serviceDate:"2026-03-02", lastContact:"2026-04-25", denialCode:"CO-16", site:"Site 7", vertical:"Behavioral Health" },
+  { id:"AR-004", patient:"Sandra Adams", payer:"Aetna", amount:123000, daysOut:192, serviceDate:"2025-10-29", lastContact:"2026-05-02", denialCode:null, site:"Site 12", vertical:"Orthopedics" },
+  { id:"AR-005", patient:"Brian Hill", payer:"Medicare", amount:158000, daysOut:95, serviceDate:"2026-01-27", lastContact:"2026-04-19", denialCode:"CO-22", site:"Site 2", vertical:"Infusion" },
+  { id:"AR-006", patient:"Jennifer Clark", payer:"Blue Shield", amount:109000, daysOut:11, serviceDate:"2026-04-22", lastContact:"2026-05-10", denialCode:"CO-22", site:"Site 8", vertical:"Home Health" },
+  { id:"AR-007", patient:"Patricia Hall", payer:"Blue Shield", amount:133000, daysOut:23, serviceDate:"2026-04-18", lastContact:"2026-05-05", denialCode:"CO-16", site:"Site 4", vertical:"Hospice" },
+  { id:"AR-008", patient:"Margaret Young", payer:"Humana", amount:99000, daysOut:36, serviceDate:"2026-04-05", lastContact:"2026-04-22", denialCode:null, site:"Site 12", vertical:"Hospice" },
+  { id:"AR-009", patient:"William Lewis", payer:"Aetna", amount:103000, daysOut:29, serviceDate:"2026-04-11", lastContact:"2026-05-01", denialCode:"CO-50", site:"Site 7", vertical:"Dental" },
+  { id:"AR-010", patient:"Paul Clark", payer:"Cigna", amount:141000, daysOut:13, serviceDate:"2026-04-22", lastContact:"2026-05-11", denialCode:null, site:"Site 7", vertical:"Orthopedics" },
+  { id:"AR-011", patient:"Anthony Mitchell", payer:"Medicaid", amount:102000, daysOut:11, serviceDate:"2026-04-25", lastContact:"2026-05-15", denialCode:"CO-50", site:"Site 11", vertical:"Ophthalmology" },
+  { id:"AR-012", patient:"Joseph Jackson", payer:"United Health", amount:64000, daysOut:58, serviceDate:"2026-03-09", lastContact:"2026-04-03", denialCode:null, site:"Site 7", vertical:"Behavioral Health" },
+  { id:"AR-013", patient:"Paul Baker", payer:"Aetna", amount:138000, daysOut:26, serviceDate:"2026-04-13", lastContact:"2026-04-29", denialCode:"CO-4", site:"Site 8", vertical:"Home Health" },
+  { id:"AR-014", patient:"Joseph Johnson", payer:"Blue Cross", amount:24000, daysOut:32, serviceDate:"2026-04-03", lastContact:"2026-05-06", denialCode:"CO-97", site:"Site 6", vertical:"Cardiology" },
+  { id:"AR-015", patient:"Charles Lopez", payer:"Cigna", amount:38000, daysOut:176, serviceDate:"2025-11-10", lastContact:"2026-04-19", denialCode:"CO-22", site:"Site 9", vertical:"Orthopedics" },
+  { id:"AR-016", patient:"Andrew Garcia", payer:"Medicaid", amount:8000, daysOut:30, serviceDate:"2026-04-04", lastContact:"2026-05-13", denialCode:null, site:"Site 6", vertical:"Behavioral Health" },
+  { id:"AR-017", patient:"Richard Anderson", payer:"Medicare", amount:14000, daysOut:21, serviceDate:"2026-04-17", lastContact:"2026-04-28", denialCode:null, site:"Site 5", vertical:"Orthopedics" },
+  { id:"AR-018", patient:"Linda Hernandez", payer:"Aetna", amount:34000, daysOut:39, serviceDate:"2026-03-29", lastContact:"2026-04-22", denialCode:"CO-50", site:"Site 2", vertical:"Cardiology" },
+  { id:"AR-019", patient:"Rebecca Gonzalez", payer:"Blue Shield", amount:172000, daysOut:155, serviceDate:"2025-12-06", lastContact:"2026-03-29", denialCode:null, site:"Site 11", vertical:"Infusion" },
+  { id:"AR-020", patient:"Kenneth Wright", payer:"Blue Cross", amount:47000, daysOut:102, serviceDate:"2026-01-25", lastContact:"2026-04-25", denialCode:"CO-22", site:"Site 10", vertical:"Behavioral Health" },
+  { id:"AR-021", patient:"Carol Thompson", payer:"Worker Comp", amount:177000, daysOut:14, serviceDate:"2026-04-21", lastContact:"2026-05-09", denialCode:"CO-22", site:"Site 9", vertical:"Home Health" },
+  { id:"AR-022", patient:"Kimberly Hernandez", payer:"Medicare", amount:66000, daysOut:66, serviceDate:"2026-02-25", lastContact:"2026-05-09", denialCode:"CO-50", site:"Site 7", vertical:"Behavioral Health" },
+  { id:"AR-023", patient:"Paul Young", payer:"Medicaid", amount:47000, daysOut:41, serviceDate:"2026-03-25", lastContact:"2026-05-07", denialCode:"CO-16", site:"Site 8", vertical:"Infusion" },
+  { id:"AR-024", patient:"Dorothy Perez", payer:"Aetna", amount:39000, daysOut:59, serviceDate:"2026-03-10", lastContact:"2026-05-04", denialCode:"CO-22", site:"Site 11", vertical:"Dental" },
+  { id:"AR-025", patient:"Amanda Adams", payer:"Worker Comp", amount:24000, daysOut:21, serviceDate:"2026-04-17", lastContact:"2026-05-02", denialCode:null, site:"Site 7", vertical:"Cardiology" },
+  { id:"AR-026", patient:"Sarah Martinez", payer:"Cigna", amount:90000, daysOut:34, serviceDate:"2026-03-28", lastContact:"2026-05-14", denialCode:null, site:"Site 1", vertical:"Hospice" },
+  { id:"AR-027", patient:"Daniel Harris", payer:"Medicare", amount:52000, daysOut:26, serviceDate:"2026-04-11", lastContact:"2026-05-15", denialCode:"CO-97", site:"Site 10", vertical:"Cardiology" },
+  { id:"AR-028", patient:"Jennifer Rodriguez", payer:"Worker Comp", amount:55000, daysOut:31, serviceDate:"2026-04-05", lastContact:"2026-05-08", denialCode:"CO-97", site:"Site 3", vertical:"Infusion" },
+  { id:"AR-029", patient:"Andrew Thomas", payer:"Blue Cross", amount:12000, daysOut:12, serviceDate:"2026-04-24", lastContact:"2026-05-06", denialCode:"CO-4", site:"Site 5", vertical:"Infusion" },
+  { id:"AR-030", patient:"Dorothy Taylor", payer:"Humana", amount:99000, daysOut:48, serviceDate:"2026-03-18", lastContact:"2026-04-10", denialCode:"CO-16", site:"Site 11", vertical:"Dental" },
+  { id:"AR-031", patient:"Michael Brown", payer:"Aetna", amount:88000, daysOut:69, serviceDate:"2026-02-27", lastContact:"2026-04-06", denialCode:"CO-97", site:"Site 10", vertical:"Home Health" },
+  { id:"AR-032", patient:"Donald Wright", payer:"Worker Comp", amount:159000, daysOut:63, serviceDate:"2026-03-03", lastContact:"2026-05-08", denialCode:"CO-4", site:"Site 12", vertical:"Behavioral Health" },
+  { id:"AR-033", patient:"Christopher Young", payer:"Aetna", amount:156000, daysOut:150, serviceDate:"2025-12-05", lastContact:"2026-04-24", denialCode:"CO-16", site:"Site 10", vertical:"Infusion" },
+  { id:"AR-034", patient:"Nancy White", payer:"Humana", amount:166000, daysOut:13, serviceDate:"2026-04-20", lastContact:"2026-05-11", denialCode:null, site:"Site 5", vertical:"Orthopedics" },
+  { id:"AR-035", patient:"George Taylor", payer:"Medicare", amount:22000, daysOut:17, serviceDate:"2026-04-22", lastContact:"2026-05-06", denialCode:null, site:"Site 10", vertical:"Urology" },
+  { id:"AR-036", patient:"Rebecca Green", payer:"United Health", amount:69000, daysOut:51, serviceDate:"2026-03-19", lastContact:"2026-04-16", denialCode:null, site:"Site 5", vertical:"Orthopedics" },
+  { id:"AR-037", patient:"Margaret Green", payer:"Blue Shield", amount:63000, daysOut:80, serviceDate:"2026-02-12", lastContact:"2026-05-11", denialCode:null, site:"Site 4", vertical:"Cardiology" },
+  { id:"AR-038", patient:"Joseph Taylor", payer:"Blue Shield", amount:84000, daysOut:22, serviceDate:"2026-04-09", lastContact:"2026-04-25", denialCode:"CO-97", site:"Site 4", vertical:"Infusion" },
+  { id:"AR-039", patient:"Daniel Johnson", payer:"Aetna", amount:108000, daysOut:6, serviceDate:"2026-04-28", lastContact:"2026-04-28", denialCode:"CO-97", site:"Site 11", vertical:"Dental" },
+  { id:"AR-040", patient:"Andrew Perez", payer:"Cigna", amount:94000, daysOut:27, serviceDate:"2026-04-09", lastContact:"2026-04-23", denialCode:"CO-50", site:"Site 9", vertical:"Home Health" },
+  { id:"AR-041", patient:"Ryan Adams", payer:"Humana", amount:46000, daysOut:78, serviceDate:"2026-02-20", lastContact:"2026-03-30", denialCode:null, site:"Site 9", vertical:"Cardiology" },
+  { id:"AR-042", patient:"Melissa Gonzalez", payer:"United Health", amount:49000, daysOut:53, serviceDate:"2026-03-18", lastContact:"2026-03-30", denialCode:null, site:"Site 9", vertical:"Dental" },
+  { id:"AR-043", patient:"Kevin Lee", payer:"Humana", amount:167000, daysOut:10, serviceDate:"2026-04-21", lastContact:"2026-05-14", denialCode:"CO-50", site:"Site 8", vertical:"Hospice" },
+  { id:"AR-044", patient:"Andrew Baker", payer:"Humana", amount:156000, daysOut:90, serviceDate:"2026-02-04", lastContact:"2026-04-29", denialCode:null, site:"Site 2", vertical:"Home Health" },
+  { id:"AR-045", patient:"Karen Hernandez", payer:"Blue Shield", amount:175000, daysOut:174, serviceDate:"2025-11-16", lastContact:"2026-04-27", denialCode:"CO-22", site:"Site 12", vertical:"Behavioral Health" },
+  { id:"AR-046", patient:"David Lopez", payer:"Blue Cross", amount:148000, daysOut:162, serviceDate:"2025-11-25", lastContact:"2026-03-27", denialCode:null, site:"Site 12", vertical:"Cardiology" },
+  { id:"AR-047", patient:"Michael Williams", payer:"Aetna", amount:120000, daysOut:21, serviceDate:"2026-04-13", lastContact:"2026-04-30", denialCode:"CO-4", site:"Site 11", vertical:"Behavioral Health" },
+  { id:"AR-048", patient:"George Brown", payer:"Aetna", amount:168000, daysOut:59, serviceDate:"2026-03-11", lastContact:"2026-03-21", denialCode:"CO-22", site:"Site 9", vertical:"Urology" },
+  { id:"AR-049", patient:"Ryan Brown", payer:"Aetna", amount:105000, daysOut:115, serviceDate:"2026-01-09", lastContact:"2026-03-28", denialCode:null, site:"Site 3", vertical:"Dental" },
+  { id:"AR-050", patient:"Thomas White", payer:"Medicare", amount:140000, daysOut:100, serviceDate:"2026-01-27", lastContact:"2026-04-25", denialCode:"CO-22", site:"Site 7", vertical:"Ophthalmology" },
+  { id:"AR-051", patient:"Emily Carter", payer:"Blue Shield", amount:59000, daysOut:56, serviceDate:"2026-03-10", lastContact:"2026-04-24", denialCode:null, site:"Site 7", vertical:"Cardiology" },
+  { id:"AR-052", patient:"Ryan Garcia", payer:"Humana", amount:67000, daysOut:68, serviceDate:"2026-02-27", lastContact:"2026-05-10", denialCode:"CO-22", site:"Site 3", vertical:"Behavioral Health" },
+  { id:"AR-053", patient:"Amanda Gonzalez", payer:"Humana", amount:169000, daysOut:39, serviceDate:"2026-03-31", lastContact:"2026-05-06", denialCode:null, site:"Site 8", vertical:"Ophthalmology" },
+  { id:"AR-054", patient:"Steven Wright", payer:"Medicaid", amount:121000, daysOut:76, serviceDate:"2026-02-15", lastContact:"2026-04-07", denialCode:"CO-22", site:"Site 5", vertical:"Cardiology" },
+  { id:"AR-055", patient:"Emily King", payer:"Worker Comp", amount:33000, daysOut:28, serviceDate:"2026-04-10", lastContact:"2026-05-11", denialCode:"CO-4", site:"Site 4", vertical:"Dental" },
+  { id:"AR-056", patient:"Matthew Davis", payer:"Medicare", amount:14000, daysOut:24, serviceDate:"2026-04-14", lastContact:"2026-05-09", denialCode:"CO-50", site:"Site 9", vertical:"Behavioral Health" },
+  { id:"AR-057", patient:"Sandra Martinez", payer:"Medicaid", amount:98000, daysOut:15, serviceDate:"2026-04-23", lastContact:"2026-05-11", denialCode:null, site:"Site 1", vertical:"Urology" },
+  { id:"AR-058", patient:"Richard Carter", payer:"Medicare", amount:107000, daysOut:139, serviceDate:"2025-12-18", lastContact:"2026-04-24", denialCode:"CO-50", site:"Site 3", vertical:"Urology" },
+  { id:"AR-059", patient:"William Johnson", payer:"Humana", amount:5000, daysOut:16, serviceDate:"2026-04-20", lastContact:"2026-05-06", denialCode:null, site:"Site 6", vertical:"Dental" },
+  { id:"AR-060", patient:"Stephanie Martinez", payer:"Humana", amount:159000, daysOut:112, serviceDate:"2026-01-15", lastContact:"2026-03-23", denialCode:"CO-22", site:"Site 9", vertical:"Infusion" },
+  { id:"AR-061", patient:"Kevin Hill", payer:"Blue Cross", amount:179000, daysOut:16, serviceDate:"2026-04-19", lastContact:"2026-05-02", denialCode:"CO-16", site:"Site 6", vertical:"Home Health" },
+  { id:"AR-062", patient:"Linda Anderson", payer:"Worker Comp", amount:148000, daysOut:57, serviceDate:"2026-03-05", lastContact:"2026-05-15", denialCode:"CO-97", site:"Site 6", vertical:"Ophthalmology" },
+  { id:"AR-063", patient:"Anthony Robinson", payer:"Medicaid", amount:48000, daysOut:158, serviceDate:"2025-11-24", lastContact:"2026-05-14", denialCode:"CO-22", site:"Site 11", vertical:"Behavioral Health" },
+  { id:"AR-064", patient:"Linda Anderson", payer:"United Health", amount:153000, daysOut:15, serviceDate:"2026-04-23", lastContact:"2026-05-15", denialCode:null, site:"Site 4", vertical:"Dental" },
+  { id:"AR-065", patient:"Patricia Mitchell", payer:"Blue Cross", amount:50000, daysOut:23, serviceDate:"2026-04-08", lastContact:"2026-05-09", denialCode:null, site:"Site 6", vertical:"Urology" },
+  { id:"AR-066", patient:"Lisa Anderson", payer:"Aetna", amount:114000, daysOut:105, serviceDate:"2026-01-22", lastContact:"2026-04-19", denialCode:"CO-50", site:"Site 4", vertical:"Urology" },
+  { id:"AR-067", patient:"Sandra Martin", payer:"Blue Cross", amount:14000, daysOut:11, serviceDate:"2026-04-26", lastContact:"2026-05-09", denialCode:null, site:"Site 1", vertical:"Infusion" },
+  { id:"AR-068", patient:"Richard Johnson", payer:"Aetna", amount:36000, daysOut:7, serviceDate:"2026-05-04", lastContact:"2026-05-04", denialCode:"CO-16", site:"Site 12", vertical:"Dental" },
+  { id:"AR-069", patient:"Rebecca Hall", payer:"Blue Shield", amount:103000, daysOut:44, serviceDate:"2026-03-26", lastContact:"2026-04-15", denialCode:null, site:"Site 4", vertical:"Cardiology" },
+  { id:"AR-070", patient:"Joshua Brown", payer:"Aetna", amount:16000, daysOut:41, serviceDate:"2026-03-21", lastContact:"2026-04-30", denialCode:"CO-50", site:"Site 10", vertical:"Urology" },
+  { id:"AR-071", patient:"Karen Gonzalez", payer:"Humana", amount:36000, daysOut:20, serviceDate:"2026-04-20", lastContact:"2026-05-10", denialCode:"CO-50", site:"Site 4", vertical:"Orthopedics" },
+  { id:"AR-072", patient:"Ryan King", payer:"Blue Cross", amount:72000, daysOut:12, serviceDate:"2026-04-26", lastContact:"2026-05-07", denialCode:null, site:"Site 9", vertical:"Behavioral Health" },
+  { id:"AR-073", patient:"Melissa Mitchell", payer:"Medicaid", amount:74000, daysOut:69, serviceDate:"2026-02-23", lastContact:"2026-04-17", denialCode:null, site:"Site 3", vertical:"Cardiology" },
+  { id:"AR-074", patient:"Kimberly Carter", payer:"Humana", amount:9000, daysOut:10, serviceDate:"2026-04-21", lastContact:"2026-05-10", denialCode:"CO-97", site:"Site 10", vertical:"Behavioral Health" },
+  { id:"AR-075", patient:"Joshua Harris", payer:"Worker Comp", amount:97000, daysOut:9, serviceDate:"2026-04-22", lastContact:"2026-05-08", denialCode:"CO-97", site:"Site 6", vertical:"Urology" },
+  { id:"AR-076", patient:"Margaret Hall", payer:"Aetna", amount:176000, daysOut:12, serviceDate:"2026-04-20", lastContact:"2026-05-07", denialCode:"CO-50", site:"Site 10", vertical:"Infusion" },
+  { id:"AR-077", patient:"Brian Nelson", payer:"Blue Shield", amount:76000, daysOut:75, serviceDate:"2026-02-23", lastContact:"2026-05-02", denialCode:null, site:"Site 10", vertical:"Dental" },
+  { id:"AR-078", patient:"Kimberly Lopez", payer:"United Health", amount:98000, daysOut:17, serviceDate:"2026-04-22", lastContact:"2026-05-07", denialCode:"CO-4", site:"Site 9", vertical:"Infusion" },
+  { id:"AR-079", patient:"Anthony Green", payer:"Blue Shield", amount:100000, daysOut:5, serviceDate:"2026-04-28", lastContact:"2026-04-28", denialCode:null, site:"Site 2", vertical:"Urology" },
+  { id:"AR-080", patient:"Joshua King", payer:"United Health", amount:107000, daysOut:119, serviceDate:"2026-01-04", lastContact:"2026-03-29", denialCode:null, site:"Site 8", vertical:"Behavioral Health" },
+  { id:"AR-081", patient:"Jessica Allen", payer:"Medicaid", amount:19000, daysOut:23, serviceDate:"2026-04-17", lastContact:"2026-05-13", denialCode:"CO-97", site:"Site 7", vertical:"Orthopedics" },
+  { id:"AR-082", patient:"Brian Perez", payer:"Blue Shield", amount:150000, daysOut:40, serviceDate:"2026-03-31", lastContact:"2026-05-10", denialCode:"CO-50", site:"Site 2", vertical:"Ophthalmology" },
+  { id:"AR-083", patient:"Betty Garcia", payer:"Worker Comp", amount:126000, daysOut:22, serviceDate:"2026-04-14", lastContact:"2026-04-27", denialCode:"CO-97", site:"Site 7", vertical:"Ophthalmology" },
+  { id:"AR-084", patient:"Donald Anderson", payer:"Aetna", amount:109000, daysOut:39, serviceDate:"2026-03-28", lastContact:"2026-04-21", denialCode:"CO-22", site:"Site 6", vertical:"Infusion" },
+  { id:"AR-085", patient:"Jessica Scott", payer:"Worker Comp", amount:10000, daysOut:59, serviceDate:"2026-03-07", lastContact:"2026-04-11", denialCode:null, site:"Site 1", vertical:"Home Health" },
+  { id:"AR-086", patient:"Donald Carter", payer:"Humana", amount:9000, daysOut:7, serviceDate:"2026-05-01", lastContact:"2026-05-01", denialCode:null, site:"Site 9", vertical:"Hospice" },
+  { id:"AR-087", patient:"David Thompson", payer:"Cigna", amount:171000, daysOut:114, serviceDate:"2026-01-07", lastContact:"2026-04-23", denialCode:null, site:"Site 12", vertical:"Infusion" },
+  { id:"AR-088", patient:"Melissa Jackson", payer:"Medicare", amount:154000, daysOut:47, serviceDate:"2026-03-20", lastContact:"2026-04-13", denialCode:"CO-16", site:"Site 5", vertical:"Urology" },
+  { id:"AR-089", patient:"Stephanie Brown", payer:"Medicaid", amount:45000, daysOut:120, serviceDate:"2026-01-01", lastContact:"2026-04-21", denialCode:"CO-22", site:"Site 6", vertical:"Behavioral Health" },
+  { id:"AR-090", patient:"Robert Harris", payer:"Blue Cross", amount:140000, daysOut:10, serviceDate:"2026-04-24", lastContact:"2026-05-10", denialCode:null, site:"Site 2", vertical:"Urology" },
+  { id:"AR-091", patient:"Donald Mitchell", payer:"Blue Shield", amount:140000, daysOut:12, serviceDate:"2026-04-26", lastContact:"2026-05-11", denialCode:"CO-4", site:"Site 12", vertical:"Orthopedics" },
+  { id:"AR-092", patient:"Maria Martinez", payer:"United Health", amount:125000, daysOut:103, serviceDate:"2026-01-21", lastContact:"2026-04-09", denialCode:null, site:"Site 5", vertical:"Infusion" },
+  { id:"AR-093", patient:"Timothy Moore", payer:"Medicare", amount:95000, daysOut:41, serviceDate:"2026-03-27", lastContact:"2026-04-29", denialCode:null, site:"Site 3", vertical:"Infusion" },
+  { id:"AR-094", patient:"Kevin Davis", payer:"United Health", amount:141000, daysOut:18, serviceDate:"2026-04-15", lastContact:"2026-05-12", denialCode:"CO-16", site:"Site 5", vertical:"Cardiology" },
+  { id:"AR-095", patient:"Sandra Thompson", payer:"Blue Shield", amount:97000, daysOut:71, serviceDate:"2026-02-21", lastContact:"2026-04-29", denialCode:"CO-22", site:"Site 7", vertical:"Infusion" },
+  { id:"AR-096", patient:"Donna Scott", payer:"Blue Shield", amount:169000, daysOut:79, serviceDate:"2026-02-17", lastContact:"2026-03-20", denialCode:null, site:"Site 8", vertical:"Infusion" },
+  { id:"AR-097", patient:"Richard Mitchell", payer:"Medicare", amount:63000, daysOut:19, serviceDate:"2026-04-14", lastContact:"2026-05-09", denialCode:"CO-16", site:"Site 10", vertical:"Hospice" },
+  { id:"AR-098", patient:"Susan Harris", payer:"Medicaid", amount:91000, daysOut:30, serviceDate:"2026-04-04", lastContact:"2026-04-18", denialCode:null, site:"Site 2", vertical:"Behavioral Health" },
+  { id:"AR-099", patient:"Margaret Young", payer:"United Health", amount:81000, daysOut:7, serviceDate:"2026-05-02", lastContact:"2026-05-02", denialCode:"CO-50", site:"Site 10", vertical:"Behavioral Health" },
+  { id:"AR-100", patient:"Daniel Nelson", payer:"Cigna", amount:54000, daysOut:27, serviceDate:"2026-04-08", lastContact:"2026-05-10", denialCode:null, site:"Site 4", vertical:"Behavioral Health" }
 ];
 
 const fmt = n => "$" + n.toLocaleString();
@@ -442,446 +443,156 @@ function FollowUpPreview({ outcome }) {
 }
 
 const SAMPLE_NOTES = {
-  "DNFB-006": [
-      { date:"2026-04-25", user:"M.Williams", outcome:"resubmitted", text:"payer confirmed receipt. ref #33041778753." }
-  ],
-  "DNFB-012": [
-      { date:"2026-04-21", user:"M.Williams", outcome:"needs_documentation", text:"credentialing team notified." }
-  ],
-  "DNFB-015": [
-      { date:"2026-04-19", user:"K.Brown", outcome:"promised_payment", text:"called. left vm." }
-  ],
-  "DNFB-021": [
-      { date:"2026-05-12", user:"S.Chen", outcome:"promised_payment", text:"called. denied CO-4. need to appeal." }
-  ],
-  "DNFB-023": [
-      { date:"2026-05-09", user:"R.Garcia", outcome:"left_voicemail", text:"payer confirmed receipt. ref #31726673616." }
-  ],
-  "DNFB-024": [
-      { date:"2026-05-11", user:"J.Smith", outcome:"physician_query", text:"called. denied CO-4. need to appeal." }
-  ],
-  "DNFB-029": [
-      { date:"2026-05-06", user:"K.Brown", outcome:"coding_assigned", text:"called. in adjudication. est 30 days." }
-  ],
-  "DNFB-031": [
-      { date:"2026-05-14", user:"M.Williams", outcome:"left_voicemail", text:"called. left vm." }
-  ],
-  "DNFB-035": [
-      { date:"2026-05-15", user:"K.Brown", outcome:"appeal_filed", text:"called. in adjudication. est 30 days." }
-  ],
-  "DNFB-036": [
-      { date:"2026-05-06", user:"J.Smith", outcome:"appeal_filed", text:"payer confirmed receipt. ref #41042286266." }
-  ],
-  "DNFB-040": [
-      { date:"2026-04-29", user:"M.Williams", outcome:"needs_documentation", text:"called. rep said claim processing. ref #68698858057." }
-  ],
-  "DNFB-043": [
-      { date:"2026-04-29", user:"M.Williams", outcome:"no_response", text:"credentialing team notified." }
-  ],
-  "DNFB-052": [
-      { date:"2026-05-08", user:"J.Smith", outcome:"needs_documentation", text:"called. rep said claim processing. ref #76296410718." }
-  ],
-  "DNFB-060": [
-      { date:"2026-05-15", user:"R.Garcia", outcome:"resubmitted", text:"payer confirmed receipt. ref #24990302189." }
-  ],
-  "DNFB-061": [
-      { date:"2026-05-01", user:"M.Williams", outcome:"appeal_filed", text:"appeal filed. waiting response." }
-  ],
-  "DNFB-078": [
-      { date:"2026-05-01", user:"R.Garcia", outcome:"resubmitted", text:"called. left vm." }
-  ],
-  "DNFB-079": [
-      { date:"2026-04-27", user:"S.Chen", outcome:"promised_payment", text:"called. no answer." }
-  ],
-  "DNFB-083": [
-      { date:"2026-04-28", user:"R.Garcia", outcome:"promised_payment", text:"called. in adjudication. est 30 days." }
-  ],
-  "DNFB-087": [
-      { date:"2026-05-11", user:"M.Williams", outcome:"resubmitted", text:"resubmitted with modifier." }
-  ],
-  "DNFB-091": [
-      { date:"2026-05-05", user:"S.Chen", outcome:"left_voicemail", text:"credentialing team notified." }
-  ],
-  "AR-001": [
-      { date:"2026-03-11", user:"K.Brown", outcome:"resubmitted", text:"called. out of timely filing window per payer." },
-      { date:"2026-04-16", user:"T.Jones", outcome:"appeal_filed", text:"resubmitted with modifier." }
-  ],
-  "AR-002": [
-      { date:"2026-03-16", user:"M.Williams", outcome:"physician_query", text:"called. no answer." },
-      { date:"2026-03-28", user:"K.Brown", outcome:"appeal_filed", text:"payer confirmed receipt. ref #24480369027." }
-  ],
   "AR-003": [
-      { date:"2026-03-13", user:"S.Chen", outcome:"in_adjudication", text:"called. left vm." },
-      { date:"2026-03-27", user:"S.Chen", outcome:"in_adjudication", text:"resubmitted with modifier." }
+    { date:"2026-04-10", user:"M.Williams", outcome:"no_response", text:"called. no answer." }
   ],
   "AR-004": [
-      { date:"2026-03-07", user:"R.Garcia", outcome:"escalated", text:"called. out of timely filing window per payer." },
-      { date:"2026-04-15", user:"K.Brown", outcome:"resubmitted", text:"payer confirmed receipt. ref #24442626586." },
-      { date:"2026-04-21", user:"J.Smith", outcome:"appeal_filed", text:"called. left vm." }
-  ],
-  "AR-005": [
-      { date:"2025-12-16", user:"T.Jones", outcome:"physician_query", text:"called. denied CO-50. need to appeal." },
-      { date:"2026-04-17", user:"T.Jones", outcome:"left_voicemail", text:"credentialing team notified." },
-      { date:"2026-05-15", user:"M.Williams", outcome:"in_adjudication", text:"called. rep said claim processing. ref #83572755989." }
+    { date:"2026-01-22", user:"J.Smith", outcome:"left_voicemail", text:"payer confirmed receipt. ref #15050980057." },
+    { date:"2026-01-22", user:"T.Jones", outcome:"resubmitted", text:"called. rep said claim processing. ref #63882387328." },
+    { date:"2026-04-02", user:"R.Garcia", outcome:"no_response", text:"resubmitted with modifier." },
+    { date:"2026-04-09", user:"R.Garcia", outcome:"resubmitted", text:"called. rep said claim processing. ref #12651673637." },
+    { date:"2026-04-11", user:"J.Smith", outcome:"appeal_filed", text:"escalated to clinical denials." }
   ],
   "AR-008": [
-      { date:"2026-02-13", user:"J.Smith", outcome:"resubmitted", text:"called. out of timely filing window per payer." },
-      { date:"2026-02-23", user:"S.Chen", outcome:"coding_assigned", text:"physician query sent re documentation." },
-      { date:"2026-02-27", user:"M.Williams", outcome:"physician_query", text:"called. in adjudication. est 30 days." }
+    { date:"2026-05-01", user:"T.Jones", outcome:"escalated", text:"called. rep said claim processing. ref #99565452851." }
   ],
-  "AR-010": [
-      { date:"2025-11-25", user:"K.Brown", outcome:"needs_documentation", text:"called. left vm." },
-      { date:"2026-02-09", user:"J.Smith", outcome:"no_response", text:"called. in adjudication. est 30 days." },
-      { date:"2026-04-22", user:"T.Jones", outcome:"coding_assigned", text:"appeal filed. waiting response." },
-      { date:"2026-04-30", user:"S.Chen", outcome:"resubmitted", text:"physician query sent re documentation." }
-  ],
-  "AR-011": [
-      { date:"2026-02-15", user:"J.Smith", outcome:"escalated", text:"payer confirmed receipt. ref #59633782273." }
-  ],
-  "AR-012": [
-      { date:"2025-12-04", user:"R.Garcia", outcome:"needs_documentation", text:"called. no answer." },
-      { date:"2026-01-19", user:"M.Williams", outcome:"resubmitted", text:"called. payer requested EOB." },
-      { date:"2026-02-25", user:"J.Smith", outcome:"in_adjudication", text:"called. out of timely filing window per payer." },
-      { date:"2026-04-09", user:"J.Smith", outcome:"in_adjudication", text:"physician query sent re documentation." }
+  "AR-013": [
+    { date:"2026-04-22", user:"S.Chen", outcome:"escalated", text:"appeal filed. waiting response." }
   ],
   "AR-014": [
-      { date:"2026-04-02", user:"S.Chen", outcome:"escalated", text:"credentialing team notified." },
-      { date:"2026-05-13", user:"J.Smith", outcome:"appeal_filed", text:"called. denied CO-4. need to appeal." }
+    { date:"2026-05-09", user:"R.Garcia", outcome:"in_adjudication", text:"called. left vm." }
   ],
   "AR-015": [
-      { date:"2026-03-12", user:"J.Smith", outcome:"needs_documentation", text:"escalated to clinical denials." },
-      { date:"2026-04-23", user:"K.Brown", outcome:"appeal_filed", text:"called. in adjudication. est 30 days." },
-      { date:"2026-05-10", user:"J.Smith", outcome:"resubmitted", text:"appeal filed. waiting response." }
+    { date:"2026-03-12", user:"S.Chen", outcome:"needs_documentation", text:"called. denied CO-22. need to appeal." },
+    { date:"2026-03-29", user:"T.Jones", outcome:"no_response", text:"resubmitted with modifier." }
   ],
   "AR-016": [
-      { date:"2026-01-29", user:"J.Smith", outcome:"needs_documentation", text:"charge capture alerted." },
-      { date:"2026-05-02", user:"R.Garcia", outcome:"coding_assigned", text:"called. denied CO-97. need to appeal." },
-      { date:"2026-05-05", user:"K.Brown", outcome:"resubmitted", text:"appeal filed. waiting response." }
-  ],
-  "AR-017": [
-      { date:"2025-12-12", user:"T.Jones", outcome:"promised_payment", text:"called. in adjudication. est 30 days." },
-      { date:"2026-03-16", user:"T.Jones", outcome:"in_adjudication", text:"called. left vm." }
-  ],
-  "AR-018": [
-      { date:"2025-12-15", user:"J.Smith", outcome:"escalated", text:"called. no answer." },
-      { date:"2026-01-06", user:"S.Chen", outcome:"left_voicemail", text:"appeal filed. waiting response." },
-      { date:"2026-01-17", user:"M.Williams", outcome:"escalated", text:"resubmitted with modifier." },
-      { date:"2026-01-20", user:"K.Brown", outcome:"appeal_filed", text:"called. out of timely filing window per payer." },
-      { date:"2026-02-22", user:"T.Jones", outcome:"left_voicemail", text:"physician query sent re documentation." },
-      { date:"2026-04-26", user:"S.Chen", outcome:"physician_query", text:"credentialing team notified." },
-      { date:"2026-04-28", user:"M.Williams", outcome:"escalated", text:"resubmitted with modifier." }
+    { date:"2026-04-25", user:"R.Garcia", outcome:"escalated", text:"called. no answer." }
   ],
   "AR-019": [
-      { date:"2025-11-29", user:"T.Jones", outcome:"physician_query", text:"charge capture alerted." },
-      { date:"2025-12-13", user:"K.Brown", outcome:"resubmitted", text:"called. no answer." },
-      { date:"2026-01-23", user:"T.Jones", outcome:"resubmitted", text:"escalated to clinical denials." },
-      { date:"2026-02-09", user:"R.Garcia", outcome:"resubmitted", text:"called. out of timely filing window per payer." },
-      { date:"2026-03-04", user:"T.Jones", outcome:"resubmitted", text:"called. rep said claim processing. ref #95497090876." },
-      { date:"2026-04-25", user:"M.Williams", outcome:"escalated", text:"physician query sent re documentation." },
-      { date:"2026-04-29", user:"K.Brown", outcome:"needs_documentation", text:"called. payer requested EOB." }
+    { date:"2026-01-02", user:"J.Smith", outcome:"appeal_filed", text:"called. no answer." },
+    { date:"2026-01-04", user:"T.Jones", outcome:"in_adjudication", text:"appeal filed. waiting response." },
+    { date:"2026-02-17", user:"R.Garcia", outcome:"appeal_filed", text:"called. no answer." },
+    { date:"2026-02-26", user:"T.Jones", outcome:"promised_payment", text:"called. in adjudication. est 30 days." },
+    { date:"2026-04-13", user:"J.Smith", outcome:"left_voicemail", text:"called. in adjudication. est 30 days." }
   ],
   "AR-020": [
-      { date:"2025-11-23", user:"M.Williams", outcome:"promised_payment", text:"charge capture alerted." },
-      { date:"2026-01-11", user:"J.Smith", outcome:"escalated", text:"called. denied CO-4. need to appeal." },
-      { date:"2026-02-08", user:"K.Brown", outcome:"physician_query", text:"called. in adjudication. est 30 days." },
-      { date:"2026-04-03", user:"R.Garcia", outcome:"resubmitted", text:"charge capture alerted." },
-      { date:"2026-04-20", user:"K.Brown", outcome:"coding_assigned", text:"escalated to clinical denials." },
-      { date:"2026-04-22", user:"S.Chen", outcome:"resubmitted", text:"credentialing team notified." },
-      { date:"2026-05-06", user:"T.Jones", outcome:"physician_query", text:"credentialing team notified." },
-      { date:"2026-05-11", user:"T.Jones", outcome:"resubmitted", text:"called. payer requested EOB." }
-  ],
-  "AR-021": [
-      { date:"2026-03-09", user:"T.Jones", outcome:"physician_query", text:"appeal filed. waiting response." },
-      { date:"2026-03-29", user:"K.Brown", outcome:"coding_assigned", text:"escalated to clinical denials." },
-      { date:"2026-04-28", user:"K.Brown", outcome:"promised_payment", text:"payer confirmed receipt. ref #15368722928." },
-      { date:"2026-04-30", user:"R.Garcia", outcome:"coding_assigned", text:"called. rep said claim processing. ref #45048274619." }
+    { date:"2026-03-05", user:"R.Garcia", outcome:"needs_documentation", text:"called. rep said claim processing. ref #24130881830." },
+    { date:"2026-03-26", user:"J.Smith", outcome:"escalated", text:"called. no answer." },
+    { date:"2026-04-03", user:"R.Garcia", outcome:"escalated", text:"called. payer requested EOB." },
+    { date:"2026-05-06", user:"S.Chen", outcome:"resubmitted", text:"called. no answer." }
   ],
   "AR-022": [
-      { date:"2026-02-14", user:"J.Smith", outcome:"no_response", text:"resubmitted with modifier." },
-      { date:"2026-03-29", user:"T.Jones", outcome:"left_voicemail", text:"called. denied CO-50. need to appeal." },
-      { date:"2026-04-05", user:"M.Williams", outcome:"in_adjudication", text:"called. out of timely filing window per payer." },
-      { date:"2026-04-28", user:"K.Brown", outcome:"in_adjudication", text:"called. no answer." }
+    { date:"2026-04-13", user:"J.Smith", outcome:"left_voicemail", text:"called. in adjudication. est 30 days." },
+    { date:"2026-05-12", user:"M.Williams", outcome:"left_voicemail", text:"called. denied CO-50. need to appeal." }
   ],
   "AR-023": [
-      { date:"2026-01-18", user:"S.Chen", outcome:"coding_assigned", text:"called. left vm." },
-      { date:"2026-03-02", user:"M.Williams", outcome:"appeal_filed", text:"appeal filed. waiting response." },
-      { date:"2026-04-14", user:"K.Brown", outcome:"physician_query", text:"called. no answer." },
-      { date:"2026-05-11", user:"T.Jones", outcome:"in_adjudication", text:"credentialing team notified." }
-  ],
-  "AR-024": [
-      { date:"2026-05-04", user:"M.Williams", outcome:"no_response", text:"called. rep said claim processing. ref #13209700340." }
+    { date:"2026-04-13", user:"T.Jones", outcome:"no_response", text:"called. in adjudication. est 30 days." }
   ],
   "AR-027": [
-      { date:"2026-04-09", user:"M.Williams", outcome:"no_response", text:"called. payer requested EOB." }
+    { date:"2026-05-09", user:"M.Williams", outcome:"needs_documentation", text:"called. payer requested EOB." }
   ],
   "AR-028": [
-      { date:"2026-03-10", user:"K.Brown", outcome:"needs_documentation", text:"called. rep said claim processing. ref #22030839426." },
-      { date:"2026-05-05", user:"S.Chen", outcome:"escalated", text:"appeal filed. waiting response." }
-  ],
-  "AR-029": [
-      { date:"2026-03-31", user:"M.Williams", outcome:"left_voicemail", text:"physician query sent re documentation." },
-      { date:"2026-04-24", user:"R.Garcia", outcome:"left_voicemail", text:"charge capture alerted." },
-      { date:"2026-05-06", user:"M.Williams", outcome:"coding_assigned", text:"credentialing team notified." }
+    { date:"2026-05-15", user:"R.Garcia", outcome:"appeal_filed", text:"called. payer requested EOB." }
   ],
   "AR-030": [
-      { date:"2025-12-01", user:"S.Chen", outcome:"left_voicemail", text:"called. payer requested EOB." },
-      { date:"2025-12-12", user:"M.Williams", outcome:"resubmitted", text:"called. in adjudication. est 30 days." },
-      { date:"2026-01-22", user:"T.Jones", outcome:"coding_assigned", text:"coding supervisor escalated." }
-  ],
-  "AR-031": [
-      { date:"2026-05-08", user:"K.Brown", outcome:"promised_payment", text:"called. rep said claim processing. ref #47688185477." }
+    { date:"2026-03-31", user:"M.Williams", outcome:"appeal_filed", text:"called. payer requested EOB." }
   ],
   "AR-032": [
-      { date:"2026-05-10", user:"S.Chen", outcome:"escalated", text:"coding supervisor escalated." }
+    { date:"2026-04-14", user:"T.Jones", outcome:"no_response", text:"resubmitted with modifier." }
   ],
   "AR-033": [
-      { date:"2026-03-26", user:"S.Chen", outcome:"physician_query", text:"resubmitted with modifier." }
+    { date:"2026-03-27", user:"S.Chen", outcome:"left_voicemail", text:"appeal filed. waiting response." },
+    { date:"2026-04-11", user:"R.Garcia", outcome:"no_response", text:"called. rep said claim processing. ref #35762567738." },
+    { date:"2026-04-18", user:"M.Williams", outcome:"in_adjudication", text:"called. no answer." },
+    { date:"2026-05-10", user:"T.Jones", outcome:"needs_documentation", text:"called. no answer." },
+    { date:"2026-05-10", user:"T.Jones", outcome:"appeal_filed", text:"called. left vm." }
   ],
-  "AR-034": [
-      { date:"2026-04-29", user:"S.Chen", outcome:"no_response", text:"appeal filed. waiting response." }
+  "AR-037": [
+    { date:"2026-04-27", user:"R.Garcia", outcome:"no_response", text:"payer confirmed receipt. ref #52951114166." },
+    { date:"2026-05-05", user:"T.Jones", outcome:"escalated", text:"called. no answer." },
+    { date:"2026-05-14", user:"R.Garcia", outcome:"no_response", text:"appeal filed. waiting response." }
   ],
-  "AR-035": [
-      { date:"2026-04-06", user:"M.Williams", outcome:"appeal_filed", text:"called. rep said claim processing. ref #32182033264." },
-      { date:"2026-04-12", user:"J.Smith", outcome:"coding_assigned", text:"appeal filed. waiting response." }
-  ],
-  "AR-036": [
-      { date:"2026-01-08", user:"M.Williams", outcome:"escalated", text:"called. out of timely filing window per payer." },
-      { date:"2026-01-12", user:"M.Williams", outcome:"promised_payment", text:"called. denied CO-97. need to appeal." },
-      { date:"2026-02-18", user:"J.Smith", outcome:"left_voicemail", text:"payer confirmed receipt. ref #91277659280." },
-      { date:"2026-03-23", user:"S.Chen", outcome:"left_voicemail", text:"coding supervisor escalated." },
-      { date:"2026-04-06", user:"K.Brown", outcome:"physician_query", text:"called. in adjudication. est 30 days." },
-      { date:"2026-04-22", user:"S.Chen", outcome:"physician_query", text:"escalated to clinical denials." },
-      { date:"2026-04-25", user:"S.Chen", outcome:"escalated", text:"called. no answer." },
-      { date:"2026-04-27", user:"R.Garcia", outcome:"needs_documentation", text:"charge capture alerted." }
-  ],
-  "AR-039": [
-      { date:"2026-03-13", user:"M.Williams", outcome:"promised_payment", text:"escalated to clinical denials." }
-  ],
-  "AR-043": [
-      { date:"2025-12-12", user:"J.Smith", outcome:"left_voicemail", text:"escalated to clinical denials." },
-      { date:"2026-01-19", user:"M.Williams", outcome:"physician_query", text:"called. in adjudication. est 30 days." },
-      { date:"2026-02-18", user:"T.Jones", outcome:"appeal_filed", text:"escalated to clinical denials." },
-      { date:"2026-02-23", user:"S.Chen", outcome:"resubmitted", text:"called. in adjudication. est 30 days." },
-      { date:"2026-05-06", user:"R.Garcia", outcome:"coding_assigned", text:"called. in adjudication. est 30 days." }
+  "AR-041": [
+    { date:"2026-04-29", user:"S.Chen", outcome:"resubmitted", text:"appeal filed. waiting response." },
+    { date:"2026-05-13", user:"M.Williams", outcome:"in_adjudication", text:"called. no answer." }
   ],
   "AR-044": [
-      { date:"2026-02-12", user:"T.Jones", outcome:"coding_assigned", text:"called. no answer." },
-      { date:"2026-02-24", user:"T.Jones", outcome:"appeal_filed", text:"charge capture alerted." },
-      { date:"2026-04-06", user:"S.Chen", outcome:"promised_payment", text:"coding supervisor escalated." },
-      { date:"2026-04-12", user:"S.Chen", outcome:"appeal_filed", text:"credentialing team notified." }
+    { date:"2026-03-01", user:"S.Chen", outcome:"escalated", text:"called. denied CO-4. need to appeal." },
+    { date:"2026-04-28", user:"R.Garcia", outcome:"resubmitted", text:"called. left vm." }
   ],
   "AR-045": [
-      { date:"2026-02-26", user:"S.Chen", outcome:"escalated", text:"resubmitted with modifier." },
-      { date:"2026-03-07", user:"K.Brown", outcome:"escalated", text:"called. payer requested EOB." },
-      { date:"2026-03-09", user:"S.Chen", outcome:"resubmitted", text:"appeal filed. waiting response." },
-      { date:"2026-03-10", user:"K.Brown", outcome:"promised_payment", text:"called. denied CO-50. need to appeal." },
-      { date:"2026-04-19", user:"K.Brown", outcome:"in_adjudication", text:"appeal filed. waiting response." }
-  ],
-  "AR-046": [
-      { date:"2026-04-09", user:"R.Garcia", outcome:"resubmitted", text:"called. left vm." },
-      { date:"2026-04-27", user:"K.Brown", outcome:"no_response", text:"called. rep said claim processing. ref #48835379845." }
+    { date:"2026-01-01", user:"M.Williams", outcome:"needs_documentation", text:"escalated to clinical denials." },
+    { date:"2026-01-05", user:"T.Jones", outcome:"needs_documentation", text:"escalated to clinical denials." },
+    { date:"2026-01-13", user:"S.Chen", outcome:"left_voicemail", text:"called. left vm." },
+    { date:"2026-02-06", user:"R.Garcia", outcome:"appeal_filed", text:"called. left vm." }
   ],
   "AR-048": [
-      { date:"2026-01-13", user:"M.Williams", outcome:"escalated", text:"credentialing team notified." },
-      { date:"2026-02-20", user:"K.Brown", outcome:"in_adjudication", text:"charge capture alerted." },
-      { date:"2026-03-17", user:"R.Garcia", outcome:"in_adjudication", text:"escalated to clinical denials." },
-      { date:"2026-04-30", user:"K.Brown", outcome:"physician_query", text:"called. out of timely filing window per payer." },
-      { date:"2026-05-06", user:"K.Brown", outcome:"escalated", text:"payer confirmed receipt. ref #33602494123." },
-      { date:"2026-05-14", user:"K.Brown", outcome:"promised_payment", text:"escalated to clinical denials." }
+    { date:"2026-03-23", user:"M.Williams", outcome:"left_voicemail", text:"payer confirmed receipt. ref #17800125827." }
   ],
   "AR-049": [
-      { date:"2026-04-17", user:"R.Garcia", outcome:"escalated", text:"called. in adjudication. est 30 days." }
+    { date:"2026-02-19", user:"S.Chen", outcome:"escalated", text:"appeal filed. waiting response." },
+    { date:"2026-03-15", user:"S.Chen", outcome:"escalated", text:"called. left vm." },
+    { date:"2026-03-15", user:"J.Smith", outcome:"escalated", text:"called. no answer." },
+    { date:"2026-04-01", user:"M.Williams", outcome:"appeal_filed", text:"called. in adjudication. est 30 days." }
   ],
   "AR-050": [
-      { date:"2026-01-26", user:"R.Garcia", outcome:"no_response", text:"escalated to clinical denials." },
-      { date:"2026-02-27", user:"J.Smith", outcome:"escalated", text:"physician query sent re documentation." },
-      { date:"2026-03-01", user:"S.Chen", outcome:"needs_documentation", text:"physician query sent re documentation." },
-      { date:"2026-03-10", user:"M.Williams", outcome:"resubmitted", text:"appeal filed. waiting response." },
-      { date:"2026-03-29", user:"T.Jones", outcome:"left_voicemail", text:"called. in adjudication. est 30 days." }
+    { date:"2026-03-17", user:"M.Williams", outcome:"in_adjudication", text:"called. rep said claim processing. ref #97966685715." },
+    { date:"2026-04-04", user:"S.Chen", outcome:"needs_documentation", text:"payer confirmed receipt. ref #16945302598." },
+    { date:"2026-04-25", user:"T.Jones", outcome:"promised_payment", text:"called. rep said claim processing. ref #10712606223." }
   ],
   "AR-051": [
-      { date:"2026-04-17", user:"R.Garcia", outcome:"physician_query", text:"called. in adjudication. est 30 days." },
-      { date:"2026-04-30", user:"S.Chen", outcome:"appeal_filed", text:"credentialing team notified." }
+    { date:"2026-04-24", user:"J.Smith", outcome:"appeal_filed", text:"called. denied CO-4. need to appeal." }
   ],
   "AR-052": [
-      { date:"2026-01-01", user:"S.Chen", outcome:"no_response", text:"resubmitted with modifier." }
-  ],
-  "AR-053": [
-      { date:"2026-01-21", user:"T.Jones", outcome:"coding_assigned", text:"coding supervisor escalated." },
-      { date:"2026-01-29", user:"S.Chen", outcome:"promised_payment", text:"resubmitted with modifier." },
-      { date:"2026-02-26", user:"M.Williams", outcome:"left_voicemail", text:"charge capture alerted." },
-      { date:"2026-03-21", user:"R.Garcia", outcome:"resubmitted", text:"physician query sent re documentation." },
-      { date:"2026-04-16", user:"J.Smith", outcome:"coding_assigned", text:"credentialing team notified." },
-      { date:"2026-04-29", user:"J.Smith", outcome:"promised_payment", text:"escalated to clinical denials." },
-      { date:"2026-05-07", user:"T.Jones", outcome:"needs_documentation", text:"called. rep said claim processing. ref #33230906602." }
+    { date:"2026-04-12", user:"J.Smith", outcome:"in_adjudication", text:"resubmitted with modifier." },
+    { date:"2026-05-08", user:"R.Garcia", outcome:"appeal_filed", text:"called. left vm." }
   ],
   "AR-054": [
-      { date:"2026-04-29", user:"K.Brown", outcome:"coding_assigned", text:"called. in adjudication. est 30 days." }
+    { date:"2026-03-17", user:"R.Garcia", outcome:"appeal_filed", text:"called. left vm." },
+    { date:"2026-04-05", user:"T.Jones", outcome:"no_response", text:"called. no answer." },
+    { date:"2026-04-30", user:"R.Garcia", outcome:"needs_documentation", text:"called. payer requested EOB." }
   ],
   "AR-058": [
-      { date:"2026-01-30", user:"S.Chen", outcome:"physician_query", text:"called. rep said claim processing. ref #15476744406." },
-      { date:"2026-04-01", user:"S.Chen", outcome:"promised_payment", text:"credentialing team notified." },
-      { date:"2026-05-03", user:"K.Brown", outcome:"needs_documentation", text:"called. payer requested EOB." }
-  ],
-  "AR-059": [
-      { date:"2026-04-17", user:"R.Garcia", outcome:"needs_documentation", text:"called. rep said claim processing. ref #83261936957." }
-  ],
-  "AR-060": [
-      { date:"2026-05-10", user:"M.Williams", outcome:"needs_documentation", text:"escalated to clinical denials." }
-  ],
-  "AR-061": [
-      { date:"2025-11-30", user:"M.Williams", outcome:"coding_assigned", text:"called. payer requested EOB." },
-      { date:"2026-01-13", user:"T.Jones", outcome:"coding_assigned", text:"called. out of timely filing window per payer." },
-      { date:"2026-02-22", user:"R.Garcia", outcome:"coding_assigned", text:"coding supervisor escalated." },
-      { date:"2026-05-12", user:"K.Brown", outcome:"no_response", text:"called. denied CO-50. need to appeal." }
-  ],
-  "AR-062": [
-      { date:"2026-03-21", user:"J.Smith", outcome:"escalated", text:"called. denied CO-4. need to appeal." },
-      { date:"2026-04-10", user:"K.Brown", outcome:"needs_documentation", text:"called. out of timely filing window per payer." }
+    { date:"2026-02-27", user:"J.Smith", outcome:"promised_payment", text:"resubmitted with modifier." },
+    { date:"2026-05-08", user:"J.Smith", outcome:"resubmitted", text:"called. rep said claim processing. ref #93906234916." }
   ],
   "AR-063": [
-      { date:"2026-02-19", user:"R.Garcia", outcome:"in_adjudication", text:"called. no answer." },
-      { date:"2026-02-24", user:"T.Jones", outcome:"coding_assigned", text:"called. denied CO-4. need to appeal." },
-      { date:"2026-03-14", user:"J.Smith", outcome:"no_response", text:"called. in adjudication. est 30 days." },
-      { date:"2026-03-18", user:"T.Jones", outcome:"coding_assigned", text:"called. in adjudication. est 30 days." },
-      { date:"2026-04-02", user:"K.Brown", outcome:"promised_payment", text:"called. rep said claim processing. ref #99007003643." }
+    { date:"2026-05-07", user:"R.Garcia", outcome:"in_adjudication", text:"called. rep said claim processing. ref #61484050918." }
   ],
-  "AR-064": [
-      { date:"2025-11-29", user:"R.Garcia", outcome:"needs_documentation", text:"payer confirmed receipt. ref #18726018516." },
-      { date:"2025-12-25", user:"S.Chen", outcome:"escalated", text:"appeal filed. waiting response." },
-      { date:"2025-12-29", user:"K.Brown", outcome:"needs_documentation", text:"called. rep said claim processing. ref #78793103630." },
-      { date:"2026-01-18", user:"M.Williams", outcome:"no_response", text:"physician query sent re documentation." },
-      { date:"2026-02-08", user:"K.Brown", outcome:"left_voicemail", text:"escalated to clinical denials." },
-      { date:"2026-03-08", user:"M.Williams", outcome:"needs_documentation", text:"coding supervisor escalated." },
-      { date:"2026-03-15", user:"M.Williams", outcome:"resubmitted", text:"called. denied CO-4. need to appeal." },
-      { date:"2026-03-31", user:"S.Chen", outcome:"in_adjudication", text:"called. left vm." }
-  ],
-  "AR-067": [
-      { date:"2026-04-30", user:"M.Williams", outcome:"needs_documentation", text:"physician query sent re documentation." },
-      { date:"2026-05-07", user:"S.Chen", outcome:"resubmitted", text:"coding supervisor escalated." }
-  ],
-  "AR-068": [
-      { date:"2026-03-19", user:"S.Chen", outcome:"needs_documentation", text:"resubmitted with modifier." },
-      { date:"2026-03-21", user:"K.Brown", outcome:"needs_documentation", text:"called. in adjudication. est 30 days." }
+  "AR-066": [
+    { date:"2026-02-08", user:"T.Jones", outcome:"resubmitted", text:"called. rep said claim processing. ref #16522255494." }
   ],
   "AR-069": [
-      { date:"2026-03-20", user:"J.Smith", outcome:"in_adjudication", text:"called. payer requested EOB." },
-      { date:"2026-04-05", user:"J.Smith", outcome:"escalated", text:"called. payer requested EOB." },
-      { date:"2026-05-04", user:"S.Chen", outcome:"coding_assigned", text:"called. in adjudication. est 30 days." }
-  ],
-  "AR-070": [
-      { date:"2026-04-14", user:"K.Brown", outcome:"needs_documentation", text:"physician query sent re documentation." },
-      { date:"2026-04-24", user:"M.Williams", outcome:"promised_payment", text:"called. in adjudication. est 30 days." },
-      { date:"2026-05-14", user:"J.Smith", outcome:"coding_assigned", text:"called. rep said claim processing. ref #63316908259." }
-  ],
-  "AR-071": [
-      { date:"2026-02-26", user:"T.Jones", outcome:"escalated", text:"called. denied CO-4. need to appeal." },
-      { date:"2026-04-13", user:"R.Garcia", outcome:"physician_query", text:"called. denied CO-4. need to appeal." }
-  ],
-  "AR-072": [
-      { date:"2026-02-28", user:"R.Garcia", outcome:"resubmitted", text:"called. payer requested EOB." },
-      { date:"2026-03-31", user:"M.Williams", outcome:"promised_payment", text:"appeal filed. waiting response." }
+    { date:"2026-04-25", user:"M.Williams", outcome:"escalated", text:"called. left vm." }
   ],
   "AR-073": [
-      { date:"2026-02-17", user:"K.Brown", outcome:"promised_payment", text:"coding supervisor escalated." }
-  ],
-  "AR-074": [
-      { date:"2025-12-27", user:"K.Brown", outcome:"no_response", text:"called. no answer." },
-      { date:"2026-01-13", user:"S.Chen", outcome:"needs_documentation", text:"physician query sent re documentation." },
-      { date:"2026-03-12", user:"R.Garcia", outcome:"physician_query", text:"credentialing team notified." }
-  ],
-  "AR-075": [
-      { date:"2026-05-13", user:"S.Chen", outcome:"coding_assigned", text:"called. left vm." }
-  ],
-  "AR-077": [
-      { date:"2026-03-15", user:"R.Garcia", outcome:"promised_payment", text:"called. payer requested EOB." },
-      { date:"2026-04-05", user:"K.Brown", outcome:"no_response", text:"called. left vm." },
-      { date:"2026-04-14", user:"T.Jones", outcome:"resubmitted", text:"escalated to clinical denials." },
-      { date:"2026-05-13", user:"J.Smith", outcome:"in_adjudication", text:"payer confirmed receipt. ref #97372854493." }
-  ],
-  "AR-078": [
-      { date:"2025-12-14", user:"S.Chen", outcome:"no_response", text:"appeal filed. waiting response." },
-      { date:"2025-12-15", user:"K.Brown", outcome:"appeal_filed", text:"appeal filed. waiting response." },
-      { date:"2026-02-03", user:"T.Jones", outcome:"promised_payment", text:"called. no answer." },
-      { date:"2026-03-09", user:"S.Chen", outcome:"resubmitted", text:"credentialing team notified." },
-      { date:"2026-03-24", user:"J.Smith", outcome:"coding_assigned", text:"called. rep said claim processing. ref #87578120578." },
-      { date:"2026-03-29", user:"R.Garcia", outcome:"no_response", text:"called. payer requested EOB." }
-  ],
-  "AR-079": [
-      { date:"2026-02-09", user:"R.Garcia", outcome:"needs_documentation", text:"charge capture alerted." },
-      { date:"2026-02-24", user:"J.Smith", outcome:"in_adjudication", text:"called. left vm." }
+    { date:"2026-03-17", user:"J.Smith", outcome:"in_adjudication", text:"escalated to clinical denials." },
+    { date:"2026-05-07", user:"T.Jones", outcome:"in_adjudication", text:"called. left vm." }
   ],
   "AR-080": [
-      { date:"2026-01-06", user:"K.Brown", outcome:"promised_payment", text:"credentialing team notified." },
-      { date:"2026-01-29", user:"R.Garcia", outcome:"in_adjudication", text:"charge capture alerted." },
-      { date:"2026-04-10", user:"J.Smith", outcome:"resubmitted", text:"called. in adjudication. est 30 days." },
-      { date:"2026-05-13", user:"R.Garcia", outcome:"coding_assigned", text:"resubmitted with modifier." }
+    { date:"2026-02-02", user:"J.Smith", outcome:"escalated", text:"called. denied CO-4. need to appeal." },
+    { date:"2026-02-09", user:"S.Chen", outcome:"appeal_filed", text:"called. denied CO-4. need to appeal." },
+    { date:"2026-04-01", user:"J.Smith", outcome:"in_adjudication", text:"called. payer requested EOB." },
+    { date:"2026-05-05", user:"M.Williams", outcome:"appeal_filed", text:"resubmitted with modifier." }
   ],
-  "AR-081": [
-      { date:"2026-03-06", user:"J.Smith", outcome:"escalated", text:"escalated to clinical denials." },
-      { date:"2026-03-07", user:"S.Chen", outcome:"left_voicemail", text:"payer confirmed receipt. ref #61500495937." },
-      { date:"2026-03-20", user:"K.Brown", outcome:"appeal_filed", text:"escalated to clinical denials." }
-  ],
-  "AR-083": [
-      { date:"2025-11-29", user:"T.Jones", outcome:"resubmitted", text:"called. in adjudication. est 30 days." },
-      { date:"2025-12-30", user:"T.Jones", outcome:"resubmitted", text:"called. rep said claim processing. ref #85577928274." },
-      { date:"2026-03-02", user:"S.Chen", outcome:"no_response", text:"called. rep said claim processing. ref #46819618962." },
-      { date:"2026-03-13", user:"T.Jones", outcome:"physician_query", text:"coding supervisor escalated." },
-      { date:"2026-04-11", user:"J.Smith", outcome:"escalated", text:"coding supervisor escalated." }
-  ],
-  "AR-084": [
-      { date:"2025-12-04", user:"J.Smith", outcome:"coding_assigned", text:"credentialing team notified." },
-      { date:"2026-02-03", user:"T.Jones", outcome:"promised_payment", text:"called. denied CO-4. need to appeal." },
-      { date:"2026-02-10", user:"M.Williams", outcome:"physician_query", text:"resubmitted with modifier." },
-      { date:"2026-05-15", user:"K.Brown", outcome:"promised_payment", text:"payer confirmed receipt. ref #21736960320." }
+  "AR-082": [
+    { date:"2026-05-06", user:"J.Smith", outcome:"no_response", text:"called. denied CO-50. need to appeal." }
   ],
   "AR-087": [
-      { date:"2026-01-26", user:"T.Jones", outcome:"promised_payment", text:"credentialing team notified." },
-      { date:"2026-05-02", user:"K.Brown", outcome:"appeal_filed", text:"appeal filed. waiting response." }
+    { date:"2026-02-06", user:"J.Smith", outcome:"appeal_filed", text:"payer confirmed receipt. ref #77143918378." },
+    { date:"2026-03-08", user:"M.Williams", outcome:"no_response", text:"called. payer requested EOB." },
+    { date:"2026-03-24", user:"J.Smith", outcome:"resubmitted", text:"escalated to clinical denials." },
+    { date:"2026-04-14", user:"M.Williams", outcome:"needs_documentation", text:"resubmitted with modifier." }
   ],
   "AR-089": [
-      { date:"2026-02-22", user:"S.Chen", outcome:"physician_query", text:"credentialing team notified." },
-      { date:"2026-03-29", user:"R.Garcia", outcome:"in_adjudication", text:"called. out of timely filing window per payer." }
-  ],
-  "AR-090": [
-      { date:"2025-11-28", user:"S.Chen", outcome:"physician_query", text:"called. out of timely filing window per payer." },
-      { date:"2025-12-16", user:"R.Garcia", outcome:"resubmitted", text:"charge capture alerted." },
-      { date:"2025-12-25", user:"K.Brown", outcome:"left_voicemail", text:"physician query sent re documentation." },
-      { date:"2026-01-05", user:"M.Williams", outcome:"left_voicemail", text:"called. denied CO-4. need to appeal." },
-      { date:"2026-03-15", user:"T.Jones", outcome:"promised_payment", text:"resubmitted with modifier." },
-      { date:"2026-03-21", user:"T.Jones", outcome:"no_response", text:"called. left vm." },
-      { date:"2026-04-10", user:"J.Smith", outcome:"appeal_filed", text:"called. denied CO-4. need to appeal." }
-  ],
-  "AR-091": [
-      { date:"2026-02-07", user:"J.Smith", outcome:"physician_query", text:"resubmitted with modifier." }
+    { date:"2026-02-19", user:"S.Chen", outcome:"needs_documentation", text:"called. rep said claim processing. ref #76880075328." }
   ],
   "AR-092": [
-      { date:"2026-05-02", user:"K.Brown", outcome:"coding_assigned", text:"charge capture alerted." }
-  ],
-  "AR-093": [
-      { date:"2026-05-03", user:"K.Brown", outcome:"no_response", text:"physician query sent re documentation." }
-  ],
-  "AR-095": [
-      { date:"2025-12-06", user:"S.Chen", outcome:"resubmitted", text:"called. left vm." },
-      { date:"2026-01-03", user:"M.Williams", outcome:"in_adjudication", text:"coding supervisor escalated." },
-      { date:"2026-01-26", user:"M.Williams", outcome:"physician_query", text:"called. rep said claim processing. ref #20839871323." },
-      { date:"2026-03-08", user:"J.Smith", outcome:"resubmitted", text:"charge capture alerted." },
-      { date:"2026-03-14", user:"R.Garcia", outcome:"in_adjudication", text:"called. no answer." },
-      { date:"2026-03-18", user:"J.Smith", outcome:"left_voicemail", text:"charge capture alerted." },
-      { date:"2026-04-05", user:"S.Chen", outcome:"no_response", text:"called. rep said claim processing. ref #26206324472." },
-      { date:"2026-05-01", user:"T.Jones", outcome:"resubmitted", text:"resubmitted with modifier." }
-  ],
-  "AR-097": [
-      { date:"2026-03-27", user:"J.Smith", outcome:"coding_assigned", text:"payer confirmed receipt. ref #54284109746." },
-      { date:"2026-04-16", user:"M.Williams", outcome:"physician_query", text:"called. no answer." }
-  ],
-  "AR-099": [
-      { date:"2025-12-18", user:"K.Brown", outcome:"needs_documentation", text:"called. left vm." },
-      { date:"2026-01-02", user:"K.Brown", outcome:"no_response", text:"appeal filed. waiting response." },
-      { date:"2026-01-10", user:"J.Smith", outcome:"appeal_filed", text:"called. no answer." },
-      { date:"2026-02-26", user:"T.Jones", outcome:"needs_documentation", text:"called. left vm." },
-      { date:"2026-03-16", user:"K.Brown", outcome:"resubmitted", text:"called. rep said claim processing. ref #64979089627." },
-      { date:"2026-04-26", user:"R.Garcia", outcome:"in_adjudication", text:"physician query sent re documentation." }
+    { date:"2026-02-06", user:"T.Jones", outcome:"in_adjudication", text:"called. left vm." },
+    { date:"2026-03-13", user:"T.Jones", outcome:"in_adjudication", text:"called. no answer." },
+    { date:"2026-04-02", user:"M.Williams", outcome:"appeal_filed", text:"escalated to clinical denials." },
+    { date:"2026-04-05", user:"R.Garcia", outcome:"left_voicemail", text:"called. no answer." }
   ]
 };
 
@@ -1265,6 +976,7 @@ function WorkedList({ worked }) {
 
 function CollectorView({ arScored, dnfbScored, isMedicareBc }) {
   const [workedAccounts, setWorkedAccounts] = useState([]);
+  const [sessionStart] = useState(() => Date.now());
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResult, setSearchResult] = useState(null);
 
@@ -1302,10 +1014,10 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc }) {
       {/* Productivity metrics */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
         {[
-          { label: "Accounts worked", value: workedAccounts.length, sub: `${queue.length} remaining in queue`, color: "#0f172a" },
+          { label: "Accounts worked today", value: workedAccounts.length, sub: `${Math.max(0, DAILY_GOAL - workedAccounts.length)} remaining to goal (${DAILY_GOAL}/day)`, color: "#0f172a" },
           { label: "EV worked", value: fmt(totalEV), sub: "expected recovery logged", color: "#2563eb" },
-          { label: "Average EV", value: workedAccounts.length ? fmt(avgEV) : "—", sub: "per account this session", color: "#0369a1" },
-          { label: "Most common outcome", value: mostCommon === "—" ? "—" : mostCommon.split(" ").slice(0,2).join(" "), sub: mostCommon === "—" ? "no accounts worked yet" : mostCommon, color: "#16a34a" },
+          { label: "Payment commitments", value: workedAccounts.filter(w => w.outcomeLabel && (w.outcomeLabel.toLowerCase().includes("promis") || w.outcomeLabel.toLowerCase().includes("payment") || w.outcomeLabel.toLowerCase().includes("paid"))).length, sub: "accounts with payment expected", color: "#16a34a" },
+          { label: "Dollars per hour", value: (() => { const hrs = (Date.now() - sessionStart) / 3600000; return hrs > 0.01 && totalEV > 0 ? fmt(Math.round(totalEV / Math.max(hrs, 0.1))) : "—"; })(), sub: "EV worked ÷ session time", color: "#7c3aed" },
         ].map(({ label, value, sub, color }) => (
           <div key={label} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
             <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>{label}</div>
@@ -1621,6 +1333,8 @@ function EscalationQueue({ arScored, dnfbScored }) {
     </div>
   );
 }
+
+const DAILY_GOAL = 50; // Default daily goal — will be configurable per user in Phase 2
 
 const SELF_PAY_ACTIONS = [
   { value: "send_statement",   label: "Send statement",                days: null,  note: "First contact — required before phone outreach" },
@@ -2021,11 +1735,11 @@ function CFOEscalationSection() {
 
 
 export default function WIPPlatform() {
-  const [tab, setTab] = useState("dnfb");
+  const [tab, setTab] = useState("ar");
   const [role, setRole] = useState("commercial_collector");
   const [areaFilter, setAreaFilter] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [aiText, setAiText] = useState("");
+  const [aiText, setAiText] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
   const dnfb = useMemo(() => DNFB_DATA.map(a => score(a, "dnfb")).sort((a,b) => b.expectedValue - a.expectedValue), []);
@@ -2068,17 +1782,30 @@ export default function WIPPlatform() {
     current.forEach(a => { byArea[a.area] = (byArea[a.area] || 0) + a.amount; });
     const topArea = Object.entries(byArea).sort((a,b) => b[1]-a[1])[0];
     const crits = current.filter(a => a.cfg.severity === "CRITICAL");
-    const prompt = `You are a healthcare revenue cycle expert. Write a 3-sentence CFO-level executive summary for this ${tab === "dnfb" ? "DNFB unbilled" : "collections"} WIP portfolio. Be specific with dollar amounts and prioritize the top 1-2 actions.\n\nPortfolio: ${fmt(totalWIP)} total WIP, ${fmt(totalEV)} expected recovery (${Math.round(totalEV/totalWIP*100)}% rate). Critical holds: ${critCount}. Largest area: ${topArea?.[0]} at ${fmt(topArea?.[1] || 0)}. Critical: ${crits.map(a => `${a.id} ${a.vertical} ${fmt(a.amount)} — ${a.cfg.label}`).join("; ")}.`;
+    const woList = ESCALATION_DATA.writeOffPending.map(w => w.accountId + " " + fmt(w.amount)).join(", ");
+    const critList = crits.slice(0,3).map(a => a.id + " " + a.vertical + " " + fmt(a.amount) + " (" + a.cfg.label + ")").join("; ");
+    const prompt = "You are a healthcare revenue cycle expert advising a CFO. Return ONLY a valid JSON object with exactly these four keys: status, priorities, risks, decisions. No markdown, no code fences, no explanation. Just the raw JSON object.\n\nPortfolio: " + fmt(totalWIP) + " total WIP, " + fmt(totalEV) + " expected recovery (" + Math.round(totalEV / Math.max(totalWIP, 1) * 100) + "%). Critical holds: " + critCount + ". Largest area: " + (topArea?.[0] || "none") + " at " + fmt(topArea?.[1] || 0) + ". Critical accounts: " + critList + ". Write-offs pending: " + woList + ".\n\nJSON: {status: one sentence on portfolio health, priorities: [two specific priority actions with account IDs and amounts], risks: [two specific risk flags], decisions: [one or two items requiring CFO action or approval]}";
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: prompt }] }) });
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 600, messages: [{ role: "user", content: prompt }] })
+      });
       const data = await res.json();
-      setAiText(data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "Analysis unavailable.");
-    } catch { setAiText("AI analysis temporarily unavailable."); }
+      const raw = data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "{}";
+      const cleaned = raw.replace(/```json|```/g, "").trim();
+      try {
+        setAiText(JSON.parse(cleaned));
+      } catch {
+        setAiText({ status: raw.slice(0, 300), priorities: [], risks: [], decisions: [] });
+      }
+    } catch {
+      setAiText({ status: "AI analysis temporarily unavailable.", priorities: [], risks: [], decisions: [] });
+    }
     setAiLoading(false);
   };
 
   const seg = (label, val) => (
-    <button onClick={() => { setRole(val); setAiText(""); setSearchQuery(""); setAreaFilter(null); }} style={{ padding: "6px 14px", cursor: "pointer", fontSize: 11, fontWeight: role === val ? 600 : 400, border: "none", borderRadius: 6, fontFamily: "inherit", background: role === val ? "#2563eb" : "transparent", color: role === val ? "#fff" : "#64748b" }}>{label}</button>
+    <button onClick={() => { setRole(val); setAiText(null); setSearchQuery(""); setAreaFilter(null); }} style={{ padding: "6px 14px", cursor: "pointer", fontSize: 11, fontWeight: role === val ? 600 : 400, border: "none", borderRadius: 6, fontFamily: "inherit", background: role === val ? "#2563eb" : "transparent", color: role === val ? "#fff" : "#64748b" }}>{label}</button>
   );
 
   const tabStyle = active => ({ padding: "12px 20px", cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 400, border: "none", borderBottom: active ? "2px solid #2563eb" : "2px solid transparent", background: "transparent", color: active ? "#2563eb" : "#64748b", fontFamily: "inherit" });
@@ -2121,12 +1848,12 @@ export default function WIPPlatform() {
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Collectors & Billers</div>
               <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2 }}>
+                {seg("Biller", "biller")}
                 {seg("Commercial", "commercial_collector")}
                 {seg("Medicare B/C", "medicare_bc")}
                 {seg("Medicaid", "medicaid")}
-                {seg("WC", "wc")}
-                {seg("Biller", "biller")}
                 {seg("Self-Pay", "self_pay")}
+                {seg("WC", "wc")}
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -2165,12 +1892,12 @@ export default function WIPPlatform() {
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Collectors &amp; Billers</div>
               <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2 }}>
+                {seg("Biller", "biller")}
                 {seg("Commercial", "commercial_collector")}
                 {seg("Medicare B/C", "medicare_bc")}
                 {seg("Medicaid", "medicaid")}
-                {seg("WC", "wc")}
-                {seg("Biller", "biller")}
                 {seg("Self-Pay", "self_pay")}
+                {seg("WC", "wc")}
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -2191,8 +1918,15 @@ export default function WIPPlatform() {
 
       <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex" }}>
-          <button style={tabStyle(tab === "dnfb")} onClick={() => { setTab("dnfb"); setAreaFilter(null); setSearchQuery(""); setAiText(""); }}>DNFB — Unbilled ({dnfbForRole.length})</button>
-          <button style={tabStyle(tab === "ar")} onClick={() => { setTab("ar"); setAreaFilter(null); setSearchQuery(""); setAiText(""); }}>Collections Queue ({arForRole.length})</button>
+          {(role === "supervisor" || role === "cfo") && (
+            <button style={tabStyle(tab === "dnfb")} onClick={() => { setTab("dnfb"); setAreaFilter(null); setSearchQuery(""); setAiText(null); }}>DNFB Report ({dnfbForRole.length})</button>
+          )}
+          {role !== "biller" && (
+            <button style={tabStyle(tab === "ar")} onClick={() => { setTab("ar"); setAreaFilter(null); setSearchQuery(""); setAiText(null); }}>Collections Queue ({arForRole.length})</button>
+          )}
+          {role === "biller" && (
+            <button style={tabStyle(tab === "dnfb")} onClick={() => { setTab("dnfb"); setAreaFilter(null); setSearchQuery(""); setAiText(null); }}>DNFB Report — Read Only ({dnfbForRole.length})</button>
+          )}
           {role === "supervisor" && (
             <button style={{...tabStyle(tab === "escalation"), color: tab === "escalation" ? "#dc2626" : "#64748b", borderBottomColor: tab === "escalation" ? "#dc2626" : "transparent"}} onClick={() => { setTab("escalation"); setAreaFilter(null); setSearchQuery(""); }}>
               Escalation Queue <span style={{ background: "#fee2e2", color: "#b91c1c", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 700, marginLeft: 4 }}>{ESCALATION_DATA.escalated.length + ESCALATION_DATA.slaBreach.length}</span>
@@ -2215,14 +1949,42 @@ export default function WIPPlatform() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 8 }}>
               <MetricCard label="Total AR" value={fmt(ar.reduce((s,a) => s+a.amount, 0))} sub={`${ar.length} billed accounts`} />
               <MetricCard label="WIP — Unworked" value={fmt(ar.filter(a => daysSince(a.lastContact) > 45).reduce((s,a) => s+a.amount, 0))} sub={`${ar.filter(a => daysSince(a.lastContact) > 45).length} accounts with no action in 45+ days`} accent="#c2410c" />
-              <MetricCard label="Expected recovery" value={fmt(totalEV)} sub={`${Math.round(totalEV/totalWIP*100)}% probability-weighted rate`} accent="#2563eb" />
+              <MetricCard label="Expected recovery" value={fmt(totalEV)} sub="probability-weighted — see breakdown below" accent="#2563eb" />
             </div>
-            {Math.round(totalEV/totalWIP*100) < 50 && (
-              <div style={{ background: "#fefce8", border: "1px solid #fde68a", borderRadius: 8, padding: "9px 14px", marginBottom: 16, fontSize: 11, color: "#854d0e", display: "flex", alignItems: "center", gap: 8 }}>
-                <span>⚠️</span>
-                <span><strong>Rate context:</strong> This rate reflects the probability model applied to current portfolio aging. A healthy commercial portfolio typically shows 70–85%. Accounts over 120 days carry significantly lower collection probability by design.</span>
-              </div>
-            )}
+            {(() => {
+              const groups = {
+                Medicare:   { label: "Medicare",    accounts: ar.filter(a => PAYER_CATEGORY[a.payer] === "medicare") },
+                Commercial: { label: "Commercial",  accounts: ar.filter(a => PAYER_CATEGORY[a.payer] === "commercial") },
+                Medicaid:   { label: "Medicaid",    accounts: ar.filter(a => PAYER_CATEGORY[a.payer] === "medicaid") },
+                "Worker Comp": { label: "Worker's Comp", accounts: ar.filter(a => PAYER_CATEGORY[a.payer] === "workers_comp") },
+              };
+              return (
+                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px", marginBottom: 16 }}>
+                  <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>Expected recovery by payer group</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                    {Object.entries(groups).map(([key, g]) => {
+                      const bal = g.accounts.reduce((s,a) => s+a.amount, 0);
+                      const ev = g.accounts.reduce((s,a) => s+a.expectedValue, 0);
+                      const rate = bal > 0 ? Math.round(ev/bal*100) : 0;
+                      const color = rate >= 70 ? "#16a34a" : rate >= 50 ? "#d97706" : "#dc2626";
+                      return (
+                        <div key={key} style={{ textAlign: "center", padding: "10px", background: "#f8fafc", borderRadius: 8 }}>
+                          <div style={{ fontSize: 10, color: "#64748b", marginBottom: 6 }}>{g.label}</div>
+                          <div style={{ fontSize: 22, fontWeight: 700, color }}>{rate}%</div>
+                          <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 3 }}>{fmt(ev)} of {fmt(bal)}</div>
+                          <div style={{ marginTop: 5, height: 3, background: "#e2e8f0", borderRadius: 2 }}>
+                            <div style={{ width: rate + "%", height: "100%", background: color, borderRadius: 2 }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 10, fontStyle: "italic" }}>
+                    ⚠️ Rates reflect probability model on current data. Calibrate to client historical AR for production accuracy. Healthy targets: Medicare 85-92%, Commercial 75-88%, Medicaid 55-70%.
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
@@ -2237,7 +1999,7 @@ export default function WIPPlatform() {
             <button onClick={runAI} disabled={aiLoading} style={{ padding: "9px 20px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, color: "#2563eb", cursor: aiLoading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
               {aiLoading ? "Analyzing..." : "Generate AI Executive Summary"}
             </button>
-            {aiText && typeof aiText === "object" && (
+            {aiText !== null && typeof aiText === "object" && (
               <div style={{ background: "#fff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "18px 20px", marginTop: 12 }}>
                 <div style={{ fontSize: 10, letterSpacing: "0.1em", color: "#2563eb", textTransform: "uppercase", marginBottom: 14, fontWeight: 700 }}>📊 AI Executive Analysis — {tab === "dnfb" ? "DNFB" : "Collections"}</div>
                 {aiText.status && <div style={{ fontSize: 13, color: "#1e3a5f", lineHeight: 1.7, marginBottom: 14, padding: "10px 14px", background: "#f8fbff", borderRadius: 8, borderLeft: "3px solid #2563eb" }}>{aiText.status}</div>}
