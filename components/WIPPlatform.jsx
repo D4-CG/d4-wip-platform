@@ -1651,6 +1651,46 @@ function DonutChart({ accounts, onFilter, activeFilter }) {
 }
 
 
+function DonutChartPanel({ accounts, title }) {
+  const byArea = {};
+  accounts.forEach(a => { byArea[a.area] = (byArea[a.area] || 0) + a.amount; });
+  const total = Object.values(byArea).reduce((s,v) => s+v, 0) || 1;
+  const areaColors = { "Coding":"#6d28d9","Physician/Doc":"#1d4ed8","Charge Capture":"#be185d","Credentialing":"#9f1239","Authorization":"#c2410c","Clinical/HIM":"#0369a1","Billing/Scrubber":"#0f766e","Pending":"#374151" };
+  const sorted = Object.entries(byArea).sort((a,b) => b[1]-a[1]);
+  const cx = 70, cy = 70, outerR = 56, innerR = 34;
+  const toXY = (r, deg) => { const rad = (deg - 90) * Math.PI / 180; return [+(cx + r * Math.cos(rad)).toFixed(3), +(cy + r * Math.sin(rad)).toFixed(3)]; };
+  const arcPath = (s, e) => { const [ox1,oy1]=toXY(outerR,s);const [ox2,oy2]=toXY(outerR,e);const [ix2,iy2]=toXY(innerR,e);const [ix1,iy1]=toXY(innerR,s);const lg=(e-s)>180?1:0;return `M${ox1} ${oy1} A${outerR} ${outerR} 0 ${lg} 1 ${ox2} ${oy2} L${ix2} ${iy2} A${innerR} ${innerR} 0 ${lg} 0 ${ix1} ${iy1}Z`; };
+  let angle = 0;
+  const segs = sorted.map(([area, amount]) => { const sweep=(amount/total)*359.99; const seg={area,amount,startDeg:angle,endDeg:angle+sweep}; angle+=sweep; return seg; });
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 18px" }}>
+      <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 }}>{title}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+        <div style={{ flexShrink: 0 }}>
+          <svg width="140" height="140" viewBox="0 0 140 140">
+            {segs.length === 0 && <circle cx={cx} cy={cy} r={(outerR+innerR)/2} fill="none" stroke="#f1f5f9" strokeWidth={outerR-innerR} />}
+            {segs.map(s => (
+              <path key={s.area} d={arcPath(s.startDeg, s.endDeg)} fill={areaColors[s.area] || "#64748b"} stroke="#fff" strokeWidth={2} />
+            ))}
+            <text x={cx} y={cy - 7} textAnchor="middle" fontSize="9" fill="#94a3b8" fontFamily="system-ui">TOTAL WIP</text>
+            <text x={cx} y={cy + 9} textAnchor="middle" fontSize="13" fontWeight="700" fill="#0f172a" fontFamily="system-ui">${(total/1000).toFixed(0)}K</text>
+          </svg>
+        </div>
+        <div style={{ flex: 1 }}>
+          {sorted.map(([area, amount]) => (
+            <div key={area} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
+              <div style={{ width: 9, height: 9, borderRadius: "50%", background: areaColors[area] || "#64748b", flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: "#475569", flex: 1 }}>{area}</span>
+              <span style={{ fontSize: 11, color: "#94a3b8" }}>{Math.round(amount/total*100)}%</span>
+              <span style={{ fontSize: 12, color: "#334155", fontWeight: 500, minWidth: 60, textAlign: "right" }}>${(amount/1000).toFixed(0)}K</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CFOEscalationSection() {
   const [open, setOpen] = useState(false);
   const [approved, setApproved] = useState({});
@@ -2073,9 +2113,8 @@ export default function WIPPlatform() {
               );
             })()}
 
-            {/* Billing WIP + Follow-up WIP side by side */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              {/* Billing WIP */}
+            {/* Billing WIP + Billing Donut + Follow-up WIP + Follow-up Donut — all one row */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
               <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 16px" }}>
                 <div style={{ fontSize: 10, color: "#1d4ed8", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>Billing WIP — DNFB</div>
                 {(() => {
@@ -2087,7 +2126,7 @@ export default function WIPPlatform() {
                   return tiers.map((t, i) => (
                     <div key={t.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 7, marginBottom: 7, borderBottom: i < 2 ? "1px solid #f1f5f9" : "none" }}>
                       <div style={{ fontSize: 12, color: "#475569", fontWeight: 500 }}>{t.label}</div>
-                      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                         <span style={{ fontSize: 11, color: "#94a3b8" }}>{t.accs.length} accts</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: t.color }}>{fmt(t.accs.reduce((s,a) => s+a.amount, 0))}</span>
                       </div>
@@ -2096,7 +2135,7 @@ export default function WIPPlatform() {
                 })()}
                 <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 4 }}>Total unbilled: {fmt(dnfbForRole.reduce((s,a) => s+a.amount, 0))} · {dnfbForRole.length} accounts</div>
               </div>
-              {/* Follow-up WIP */}
+              <DonutChartPanel accounts={dnfbForRole} title="Billing WIP by responsible area" />
               <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 16px" }}>
                 <div style={{ fontSize: 10, color: "#c2410c", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>Follow-up WIP — Collections</div>
                 {(() => {
@@ -2109,7 +2148,7 @@ export default function WIPPlatform() {
                   return tiers.map((t, i) => (
                     <div key={t.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 7, marginBottom: 7, borderBottom: i < 2 ? "1px solid #f1f5f9" : "none" }}>
                       <div style={{ fontSize: 12, color: "#475569", fontWeight: 500 }}>{t.label}</div>
-                      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                         <span style={{ fontSize: 11, color: "#94a3b8" }}>{t.accs.length} accts</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: t.color }}>{fmt(t.accs.reduce((s,a) => s+a.amount, 0))}</span>
                       </div>
@@ -2118,6 +2157,7 @@ export default function WIPPlatform() {
                 })()}
                 <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 4 }}>Accounts &gt;21 days without contact · {ar.filter(a => daysSince(a.lastContact) >= 21).length} total past due</div>
               </div>
+              <DonutChartPanel accounts={arForRole} title="Collections WIP by responsible area" />
             </div>
             {(() => {
               const groups = {
