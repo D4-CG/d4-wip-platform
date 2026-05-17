@@ -59,6 +59,13 @@ const PAYER_CATEGORY = {
   "Worker Comp": "workers_comp",
 };
 
+const PAYER_BENCHMARKS = {
+  medicare:     { min: 85, max: 92, label: "Medicare" },
+  commercial:   { min: 75, max: 88, label: "Commercial" },
+  medicaid:     { min: 55, max: 70, label: "Medicaid" },
+  workers_comp: { min: 45, max: 65, label: "Worker's Comp" },
+};
+
 const ROLE_DEFS = {
   commercial_collector: { label: "Commercial Collector", paneLabel: "Commercial accounts only", filter: ["commercial"], mode: "collector" },
   medicare_bc:          { label: "Medicare B/C",          paneLabel: "Medicare only — portal workflow", filter: ["medicare"], mode: "medicare_bc" },
@@ -1946,9 +1953,35 @@ export default function WIPPlatform() {
       <div style={{ padding: "24px 32px" }}>
         {role === "cfo" ? (
           <div>
+            {/* Headline KPIs */}
+            {(() => {
+              const grossAR = ar.reduce((s,a) => s+a.amount, 0);
+              const arDays = grossAR > 0 ? Math.round(ar.reduce((s,a) => s + a.amount * a.daysOut, 0) / grossAR) : 0;
+              const annualNPR = arDays > 0 ? Math.round(grossAR / arDays * 365 * 0.82) : 0;
+              const arDaysColor = arDays < 40 ? "#16a34a" : arDays < 55 ? "#2563eb" : arDays < 65 ? "#d97706" : "#dc2626";
+              const arDaysLabel = arDays < 40 ? "Excellent" : arDays < 55 ? "Good" : arDays < 65 ? "Needs attention" : "Critical";
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Net Patient Revenue (est.)</div>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(annualNPR)}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Annualized · 82% net revenue factor · from accounting system in production</div>
+                  </div>
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>AR Days Outstanding</div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                      <div style={{ fontSize: 28, fontWeight: 700, color: arDaysColor, letterSpacing: "-0.02em" }}>{arDays}</div>
+                      <div style={{ fontSize: 13, color: arDaysColor, fontWeight: 600 }}>days · {arDaysLabel}</div>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Dollar-weighted average age · Benchmarks: &lt;40 excellent, &lt;55 good, &lt;65 watch</div>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 8 }}>
               <MetricCard label="Total AR" value={fmt(ar.reduce((s,a) => s+a.amount, 0))} sub={`${ar.length} billed accounts`} />
-              <MetricCard label="WIP — Unworked" value={fmt(ar.filter(a => daysSince(a.lastContact) > 45).reduce((s,a) => s+a.amount, 0))} sub={`${ar.filter(a => daysSince(a.lastContact) > 45).length} accounts with no action in 45+ days`} accent="#c2410c" />
+              <MetricCard label="WIP — Collections Past Due" value={fmt(ar.filter(a => daysSince(a.lastContact) >= 21).reduce((s,a) => s+a.amount, 0))} sub={`${ar.filter(a => daysSince(a.lastContact) >= 21).length} accounts overdue for follow-up · DNFB: ${dnfbForRole.length} unbilled holds`} accent="#c2410c" />
               <MetricCard label="Expected recovery" value={fmt(totalEV)} sub="probability-weighted — see breakdown below" accent="#2563eb" />
             </div>
             {(() => {
@@ -1960,27 +1993,48 @@ export default function WIPPlatform() {
               };
               return (
                 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px", marginBottom: 16 }}>
-                  <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>Expected recovery by payer group</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase" }}>Expected recovery by payer group</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 10, color: "#64748b" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />On target</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "#d97706", display: "inline-block" }} />&lt;10pp below</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "#dc2626", display: "inline-block" }} />&gt;10pp below</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 2, height: 12, background: "#0f172a", display: "inline-block", borderRadius: 1 }} />Benchmark min</span>
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
                     {Object.entries(groups).map(([key, g]) => {
                       const bal = g.accounts.reduce((s,a) => s+a.amount, 0);
                       const ev = g.accounts.reduce((s,a) => s+a.expectedValue, 0);
                       const rate = bal > 0 ? Math.round(ev/bal*100) : 0;
-                      const color = rate >= 70 ? "#16a34a" : rate >= 50 ? "#d97706" : "#dc2626";
+                      const bm = PAYER_BENCHMARKS[key] || { min: 70, max: 85 };
+                      const gap = bm.min - rate;
+                      const color = rate >= bm.min ? "#16a34a" : gap <= 10 ? "#d97706" : "#dc2626";
+                      const statusLabel = rate >= bm.min ? "On target" : "";
+                      const statusIcon = rate >= bm.min ? "✓" : gap <= 10 ? "⚠" : "✕";
                       return (
-                        <div key={key} style={{ textAlign: "center", padding: "10px", background: "#f8fafc", borderRadius: 8 }}>
-                          <div style={{ fontSize: 10, color: "#64748b", marginBottom: 6 }}>{g.label}</div>
-                          <div style={{ fontSize: 22, fontWeight: 700, color }}>{rate}%</div>
-                          <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 3 }}>{fmt(ev)} of {fmt(bal)}</div>
-                          <div style={{ marginTop: 5, height: 3, background: "#e2e8f0", borderRadius: 2 }}>
-                            <div style={{ width: rate + "%", height: "100%", background: color, borderRadius: 2 }} />
+                        <div key={key} style={{ padding: "12px 14px", background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0" }}>
+                          <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>{g.label}</div>
+                          <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
+                            <div style={{ fontSize: 28, fontWeight: 700, color, letterSpacing: "-0.02em", lineHeight: 1 }}>{rate}%</div>
+                            <div style={{ fontSize: 11, color, fontWeight: 600 }}>{statusIcon} {statusLabel}</div>
                           </div>
+                          <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 8 }}>{fmt(ev)} recovered of {fmt(bal)}</div>
+                          {/* Progress bar with benchmark marker */}
+                          <div style={{ position: "relative", height: 6, background: "#e2e8f0", borderRadius: 3, marginBottom: 6 }}>
+                            <div style={{ width: Math.min(rate, 100) + "%", height: "100%", background: color, borderRadius: 3, transition: "width 0.3s" }} />
+                            {/* Benchmark min marker */}
+                            <div style={{ position: "absolute", left: "calc(" + bm.min + "% - 1px)", top: -3, width: 2, height: 12, background: "#0f172a", borderRadius: 1 }} />
+                            {/* Benchmark max marker */}
+                            <div style={{ position: "absolute", left: "calc(" + Math.min(bm.max, 99) + "% - 1px)", top: -1, width: 1, height: 8, background: "#94a3b8", borderRadius: 1 }} />
+                          </div>
+                          <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.04em" }}>Best practice: {bm.min}–{bm.max}%</div>
                         </div>
                       );
                     })}
                   </div>
-                  <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 10, fontStyle: "italic" }}>
-                    ⚠️ Rates reflect probability model on current data. Calibrate to client historical AR for production accuracy. Healthy targets: Medicare 85-92%, Commercial 75-88%, Medicaid 55-70%.
+                  <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 12, fontStyle: "italic", borderTop: "1px solid #f1f5f9", paddingTop: 10 }}>
+                    Benchmark ranges represent industry best practice for well-managed AR portfolios. Rates reflect probability model on current data — calibrate to client historical AR for production accuracy.
                   </div>
                 </div>
               );
