@@ -1791,8 +1791,8 @@ function CFOCriticalHolds({ accounts }) {
 }
 
 export default function WIPPlatform() {
-  const [tab, setTab] = useState("ar");
-  const [role, setRole] = useState("commercial_collector");
+  const [tab, setTab] = useState("metrics");
+  const [role, setRole] = useState("cfo");
   const [areaFilter, setAreaFilter] = useState(null);
   const [severityFilter, setSeverityFilter] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -2022,19 +2022,19 @@ export default function WIPPlatform() {
                   {aiText.status && <div style={{ fontSize: 13, color: "#1e3a5f", lineHeight: 1.7, marginBottom: 14, padding: "10px 14px", background: "#f8fbff", borderRadius: 8, borderLeft: "3px solid #2563eb" }}>{aiText.status}</div>}
                   {aiText.priorities?.length > 0 && (
                     <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#0369a1", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>⚡ Top Priorities</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#0369a1", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Top Priorities</div>
                       {aiText.priorities.map((p, i) => <div key={i} style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginBottom: 4, paddingLeft: 12, borderLeft: "2px solid #bfdbfe" }}>{p}</div>)}
                     </div>
                   )}
                   {aiText.risks?.length > 0 && (
                     <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#c2410c", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>⚠️ Risk Flags</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#c2410c", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Risk Flags</div>
                       {aiText.risks.map((r, i) => <div key={i} style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginBottom: 4, paddingLeft: 12, borderLeft: "2px solid #fed7aa" }}>{r}</div>)}
                     </div>
                   )}
                   {aiText.decisions?.length > 0 && (
                     <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#b91c1c", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>✋ Decisions Required</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#b91c1c", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Decisions Required</div>
                       {aiText.decisions.map((d, i) => <div key={i} style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginBottom: 4, paddingLeft: 12, borderLeft: "2px solid #fca5a5" }}>{d}</div>)}
                     </div>
                   )}
@@ -2178,42 +2178,66 @@ export default function WIPPlatform() {
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
             <MetricCard label="Total WIP" value={fmt(totalWIP)} sub={`${current.length} accounts`} />
+
+            {/* Net Collection Rate + Denial Rate */}
+            {(() => {
+              const totalGrossAR = ar.reduce((s,a) => s+a.amount, 0);
+              const totalEV = ar.reduce((s,a) => s+a.expectedValue, 0);
+              const totalNPR = totalGrossAR * 0.82;
+              const ncr = totalNPR > 0 ? Math.round(totalEV / totalNPR * 100) : 0;
+              const ncrColor = ncr >= 95 ? "#16a34a" : ncr >= 85 ? "#d97706" : "#dc2626";
+              const ncrLabel = ncr >= 95 ? "Excellent" : ncr >= 85 ? "Acceptable" : "Needs attention";
+              const ncrBenchmark = 95;
+
+              const totalDenied = ar.filter(a => a.denialCode !== null).length;
+              const denialRate = ar.length > 0 ? Math.round(totalDenied / ar.length * 100) : 0;
+              const deniedBalance = ar.filter(a => a.denialCode !== null).reduce((s,a) => s+a.amount, 0);
+              const denialBalanceRate = totalGrossAR > 0 ? Math.round(deniedBalance / totalGrossAR * 100) : 0;
+              const denialColor = denialRate <= 5 ? "#16a34a" : denialRate <= 10 ? "#d97706" : "#dc2626";
+              const denialLabel = denialRate <= 5 ? "Excellent" : denialRate <= 10 ? "Acceptable" : "Needs attention";
+
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  {/* Net Collection Rate */}
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Net Collection Rate</div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
+                      <div style={{ fontSize: 28, fontWeight: 700, color: ncrColor, letterSpacing: "-0.02em" }}>{ncr}%</div>
+                      <div style={{ fontSize: 12, color: ncrColor, fontWeight: 600 }}>{ncrLabel}</div>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>EV {fmt(totalEV)} of NPR {fmt(Math.round(totalNPR))}</div>
+                    <div style={{ position: "relative", height: 5, background: "#f1f5f9", borderRadius: 3, marginBottom: 5 }}>
+                      <div style={{ width: Math.min(ncr, 100) + "%", height: "100%", background: ncrColor, borderRadius: 3 }} />
+                      <div style={{ position: "absolute", left: "calc(" + ncrBenchmark + "% - 1px)", top: -3, width: 2, height: 11, background: "#0f172a", borderRadius: 1 }} />
+                    </div>
+                    <div style={{ fontSize: 9, color: "#94a3b8" }}>Benchmark: &gt;95% excellent · EV ÷ Net Patient Revenue</div>
+                  </div>
+
+                  {/* Denial Rate */}
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>First-Pass Denial Rate</div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
+                      <div style={{ fontSize: 28, fontWeight: 700, color: denialColor, letterSpacing: "-0.02em" }}>{denialRate}%</div>
+                      <div style={{ fontSize: 12, color: denialColor, fontWeight: 600 }}>{denialLabel}</div>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>{totalDenied} of {ar.length} accounts · {fmt(deniedBalance)} denied balance ({denialBalanceRate}%)</div>
+                    <div style={{ position: "relative", height: 5, background: "#f1f5f9", borderRadius: 3, marginBottom: 5 }}>
+                      <div style={{ width: Math.min(denialRate * 4, 100) + "%", height: "100%", background: denialColor, borderRadius: 3 }} />
+                      <div style={{ position: "absolute", left: "20%", top: -3, width: 2, height: 11, background: "#0f172a", borderRadius: 1 }} title="5% benchmark" />
+                      <div style={{ position: "absolute", left: "40%", top: -1, width: 1, height: 7, background: "#94a3b8", borderRadius: 1 }} title="10% watch" />
+                    </div>
+                    <div style={{ fontSize: 9, color: "#94a3b8" }}>Benchmark: &lt;5% excellent, &lt;10% acceptable · Denied claims ÷ total submitted</div>
+                  </div>
+                </div>
+              );
+            })()}
+
             <MetricCard label="Expected recovery" value={fmt(totalEV)} sub={`${Math.round(totalEV/totalWIP*100)}% collection rate`} accent="#2563eb" />
             <div onClick={() => setCritFilter(f => !f)} style={{ cursor: "pointer" }}><MetricCard label="Critical holds" value={critCount} sub={critFilter ? "click to clear filter" : "click to filter worklist"} accent="#b91c1c" /></div>
           </div>
         )}
 
-        {role === "cfo" && (
-          <div style={{ marginBottom: 20 }}>
-            <button onClick={runAI} disabled={aiLoading} style={{ padding: "9px 20px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, color: "#2563eb", cursor: aiLoading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
-              {aiLoading ? "Analyzing..." : "Generate AI Executive Summary"}
-            </button>
-            {aiText !== null && typeof aiText === "object" && (
-              <div style={{ background: "#fff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "18px 20px", marginTop: 12 }}>
-                <div style={{ fontSize: 10, letterSpacing: "0.1em", color: "#2563eb", textTransform: "uppercase", marginBottom: 14, fontWeight: 700 }}>📊 AI Executive Analysis — {tab === "dnfb" ? "DNFB" : "Collections"}</div>
-                {aiText.status && <div style={{ fontSize: 13, color: "#1e3a5f", lineHeight: 1.7, marginBottom: 14, padding: "10px 14px", background: "#f8fbff", borderRadius: 8, borderLeft: "3px solid #2563eb" }}>{aiText.status}</div>}
-                {aiText.priorities?.length > 0 && (
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#0369a1", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>⚡ Top Priorities</div>
-                    {aiText.priorities.map((p, i) => <div key={i} style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginBottom: 4, paddingLeft: 12, borderLeft: "2px solid #bfdbfe" }}>{p}</div>)}
-                  </div>
-                )}
-                {aiText.risks?.length > 0 && (
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#c2410c", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>⚠️ Risk Flags</div>
-                    {aiText.risks.map((r, i) => <div key={i} style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginBottom: 4, paddingLeft: 12, borderLeft: "2px solid #fed7aa" }}>{r}</div>)}
-                  </div>
-                )}
-                {aiText.decisions?.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#b91c1c", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>✋ Decisions Required</div>
-                    {aiText.decisions.map((d, i) => <div key={i} style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginBottom: 4, paddingLeft: 12, borderLeft: "2px solid #fca5a5" }}>{d}</div>)}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+
 
         {(role === "supervisor" || role === "biller") && <AreaChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />}
         {role === "cfo" && <DonutChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />}
