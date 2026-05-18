@@ -1885,8 +1885,8 @@ export default function WIPPlatform() {
     return list;
   }, [current, areaFilter, searchQuery]);
 
-  const exportToExcel = () => {
-    import("https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.mjs").then(XLSX => {
+  const exportToExcel = async () => {
+    const XLSX = await import("xlsx");
       let rows, filename, sheetName;
       if (tab === "dnfb") {
         sheetName = "Billing WIP — DNFB";
@@ -1924,12 +1924,10 @@ export default function WIPPlatform() {
         }));
       }
       const ws = XLSX.utils.json_to_sheet(rows);
-      // Column widths
       ws["!cols"] = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length, 14) }));
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
       XLSX.writeFile(wb, filename);
-    });
   };
 
   const totalWIP = current.reduce((s,a) => s + a.amount, 0);
