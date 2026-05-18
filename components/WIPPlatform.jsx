@@ -1885,49 +1885,25 @@ export default function WIPPlatform() {
     return list;
   }, [current, areaFilter, searchQuery]);
 
-  const exportToExcel = async () => {
-    const XLSX = await import("xlsx");
-      let rows, filename, sheetName;
-      if (tab === "dnfb") {
-        sheetName = "Billing WIP — DNFB";
-        filename = "billing-wip-dnfb.xlsx";
-        rows = filtered.map(a => ({
-          "Account ID":    a.id,
-          "Patient":       a.patient,
-          "Site":          a.site,
-          "Vertical":      a.vertical,
-          "Payer":         a.payer,
-          "Balance ($)":   a.amount,
-          "Days in DNFB":  a.daysInDNFB,
-          "Hold Code":     a.holdCode,
-          "Service Date":  a.serviceDate,
-          "Last Contact":  a.lastContact,
-        }));
-      } else {
-        sheetName = tab === "ar" ? "Collections WIP" : "WIP Worklist";
-        filename = tab === "ar" ? "collections-wip.xlsx" : "wip-export.xlsx";
-        rows = filtered.map(a => ({
-          "Account ID":       a.id,
-          "Patient":          a.patient,
-          "Payer":            a.payer,
-          "Site":             a.site,
-          "Vertical":         a.vertical,
-          "Balance ($)":      a.amount,
-          "Expected Value ($)": a.expectedValue,
-          "Probability (%)":  Math.round(a.probability * 100),
-          "Days Out":         a.daysOut,
-          "Responsible Area": a.area,
-          "Severity":         a.cfg?.severity || "",
-          "Last Contact":     a.lastContact,
-          "Outcome Status":   a.outcomeStatus || "",
-          "Denial Code":      a.denialCode || "",
-        }));
-      }
-      const ws = XLSX.utils.json_to_sheet(rows);
-      ws["!cols"] = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length, 14) }));
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
-      XLSX.writeFile(wb, filename);
+  const exportToExcel = () => {
+    let rows, filename;
+    if (tab === "dnfb") {
+      filename = "billing-wip-dnfb.csv";
+      const headers = ["Account ID","Patient","Site","Vertical","Payer","Balance","Days in DNFB","Hold Code","Service Date","Last Contact"];
+      const data = filtered.map(a => [a.id, a.patient, a.site, a.vertical, a.payer, a.amount, a.daysInDNFB, a.holdCode, a.serviceDate, a.lastContact]);
+      rows = [headers, ...data];
+    } else {
+      filename = tab === "ar" ? "collections-wip.csv" : "wip-export.csv";
+      const headers = ["Account ID","Patient","Payer","Site","Vertical","Balance","Expected Value","Probability %","Days Out","Responsible Area","Severity","Last Contact","Outcome Status","Denial Code"];
+      const data = filtered.map(a => [a.id, a.patient, a.payer, a.site, a.vertical, a.amount, a.expectedValue, Math.round(a.probability*100), a.daysOut, a.area, a.cfg?.severity||"", a.lastContact, a.outcomeStatus||"", a.denialCode||""]);
+      rows = [headers, ...data];
+    }
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
   };
 
   const totalWIP = current.reduce((s,a) => s + a.amount, 0);
