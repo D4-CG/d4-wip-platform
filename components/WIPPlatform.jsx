@@ -1885,6 +1885,53 @@ export default function WIPPlatform() {
     return list;
   }, [current, areaFilter, searchQuery]);
 
+  const exportToExcel = () => {
+    import("https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.mjs").then(XLSX => {
+      let rows, filename, sheetName;
+      if (tab === "dnfb") {
+        sheetName = "Billing WIP — DNFB";
+        filename = "billing-wip-dnfb.xlsx";
+        rows = filtered.map(a => ({
+          "Account ID":    a.id,
+          "Patient":       a.patient,
+          "Site":          a.site,
+          "Vertical":      a.vertical,
+          "Payer":         a.payer,
+          "Balance ($)":   a.amount,
+          "Days in DNFB":  a.daysInDNFB,
+          "Hold Code":     a.holdCode,
+          "Service Date":  a.serviceDate,
+          "Last Contact":  a.lastContact,
+        }));
+      } else {
+        sheetName = tab === "ar" ? "Collections WIP" : "WIP Worklist";
+        filename = tab === "ar" ? "collections-wip.xlsx" : "wip-export.xlsx";
+        rows = filtered.map(a => ({
+          "Account ID":       a.id,
+          "Patient":          a.patient,
+          "Payer":            a.payer,
+          "Site":             a.site,
+          "Vertical":         a.vertical,
+          "Balance ($)":      a.amount,
+          "Expected Value ($)": a.expectedValue,
+          "Probability (%)":  Math.round(a.probability * 100),
+          "Days Out":         a.daysOut,
+          "Responsible Area": a.area,
+          "Severity":         a.cfg?.severity || "",
+          "Last Contact":     a.lastContact,
+          "Outcome Status":   a.outcomeStatus || "",
+          "Denial Code":      a.denialCode || "",
+        }));
+      }
+      const ws = XLSX.utils.json_to_sheet(rows);
+      // Column widths
+      ws["!cols"] = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length, 14) }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      XLSX.writeFile(wb, filename);
+    });
+  };
+
   const totalWIP = current.reduce((s,a) => s + a.amount, 0);
   const totalEV = current.reduce((s,a) => s + a.expectedValue, 0);
   const critCount = current.filter(a => a.cfg.severity === "CRITICAL").length;
@@ -2284,7 +2331,78 @@ export default function WIPPlatform() {
 
 
         {(role === "supervisor" || role === "biller") && <AreaChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />}
-        {role === "cfo" && tab !== "metrics" && <DonutChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />}
+        {role === "cfo" && tab === "dnfb" && (() => {
+          const tiers = [
+            { label: "Normal (1–3 days)", accs: dnfbForRole.filter(a => a.daysInDNFB <= 3), color: "#16a34a" },
+            { label: "Watch (3–5 days)",  accs: dnfbForRole.filter(a => a.daysInDNFB > 3 && a.daysInDNFB < 6), color: "#d97706" },
+            { label: "Flag (6+ days)",    accs: dnfbForRole.filter(a => a.daysInDNFB >= 6), color: "#dc2626" },
+          ];
+          return (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                <div style={{ fontSize: 10, color: "#1d4ed8", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 12 }}>Billing WIP — DNFB</div>
+                {tiers.map((t, i) => {
+                  const isActive = areaFilter === t.label;
+                  return (
+                    <div key={t.label} onClick={() => setAreaFilter(isActive ? null : t.label)}
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, cursor: "pointer", opacity: areaFilter && !isActive ? 0.4 : 1, padding: "6px 8px", borderRadius: 6, background: isActive ? t.color + "12" : "transparent" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 9, height: 9, borderRadius: "50%", background: t.color, flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, color: isActive ? t.color : "#475569", fontWeight: isActive ? 600 : 500 }}>{t.label}</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                        <span style={{ fontSize: 11, color: "#94a3b8" }}>{t.accs.length} accts</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: t.color }}>{fmt(t.accs.reduce((s,a) => s+a.amount, 0))}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: "1px solid #f1f5f9" }}>
+                  <span style={{ fontSize: 9, color: "#94a3b8" }}>Total unbilled: {fmt(dnfbForRole.reduce((s,a) => s+a.amount, 0))} · {dnfbForRole.length} accounts</span>
+                  {areaFilter && <button onClick={() => setAreaFilter(null)} style={{ fontSize: 9, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Clear ×</button>}
+                </div>
+              </div>
+              <DonutChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />
+            </div>
+          );
+        })()}
+        {role === "cfo" && tab === "ar" && (() => {
+          const pastDue = arForRole.filter(a => daysSince(a.lastContact) >= 21);
+          const tiers = [
+            { label: "$10K+",    accs: pastDue.filter(a => a.amount >= 10000), color: "#b91c1c" },
+            { label: "$1K–$10K", accs: pastDue.filter(a => a.amount >= 1000 && a.amount < 10000), color: "#c2410c" },
+            { label: "<$1K",     accs: pastDue.filter(a => a.amount < 1000), color: "#64748b" },
+          ];
+          return (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                <div style={{ fontSize: 10, color: "#c2410c", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 12 }}>Follow-up WIP — Collections</div>
+                {tiers.map((t, i) => {
+                  const isActive = areaFilter === t.label;
+                  return (
+                    <div key={t.label} onClick={() => setAreaFilter(isActive ? null : t.label)}
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, cursor: "pointer", opacity: areaFilter && !isActive ? 0.4 : 1, padding: "6px 8px", borderRadius: 6, background: isActive ? t.color + "12" : "transparent" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 9, height: 9, borderRadius: "50%", background: t.color, flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, color: isActive ? t.color : "#475569", fontWeight: isActive ? 600 : 500 }}>{t.label}</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                        <span style={{ fontSize: 11, color: "#94a3b8" }}>{t.accs.length} accts</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: t.color }}>{fmt(t.accs.reduce((s,a) => s+a.amount, 0))}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: "1px solid #f1f5f9" }}>
+                  <span style={{ fontSize: 9, color: "#94a3b8" }}>Accounts &gt;21 days without contact · {pastDue.length} past due</span>
+                  {areaFilter && <button onClick={() => setAreaFilter(null)} style={{ fontSize: 9, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Clear ×</button>}
+                </div>
+              </div>
+              <DonutChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />
+            </div>
+          );
+        })()}
+        {role === "cfo" && tab === "metrics" && false && <DonutChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />}
 
         <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Search by account ID, patient, payer, or site..." />
 
@@ -2303,9 +2421,15 @@ export default function WIPPlatform() {
           </div>
         )}
 
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div style={{ fontSize: 11, color: "#94a3b8" }}>{filtered.length} account{filtered.length !== 1 ? "s" : ""}{searchQuery ? ` matching "${searchQuery}"` : ""} · click to expand</div>
-          <div style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(filtered.reduce((s,a) => s + a.expectedValue, 0))} expected recovery</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(filtered.reduce((s,a) => s + a.expectedValue, 0))} expected recovery</div>
+            <button onClick={exportToExcel} disabled={filtered.length === 0} style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", fontSize: 11, fontWeight: 600, fontFamily: "inherit", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, color: "#15803d", cursor: filtered.length === 0 ? "not-allowed" : "pointer", opacity: filtered.length === 0 ? 0.5 : 1 }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5l3 3 3-3M1 9v1.5A.5.5 0 001.5 11h9a.5.5 0 00.5-.5V9" stroke="#15803d" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Export {filtered.length > 0 ? `(${filtered.length})` : ""}
+            </button>
+          </div>
         </div>
 
         {role === "cfo" && tab === "metrics" && <CFOEscalationSection />}
