@@ -1,4 +1,14 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+
+function useWindowWidth() {
+  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1280);
+  useEffect(() => {
+    const handler = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return width;
+}
 
 const PAYER_BASELINES = {
   "Medicare": 88, "Blue Cross": 84, "Blue Shield": 82, "Aetna": 79,
@@ -1654,6 +1664,8 @@ function DonutChart({ accounts, onFilter, activeFilter }) {
 const fmtDonut = n => n >= 1000000 ? `$${(n/1000000).toFixed(1)}M` : `$${(n/1000).toFixed(0)}K`;
 
 function DonutChartPanel({ accounts, title, onFilter, activeFilter }) {
+  const width = useWindowWidth();
+  const panelMobile = width < 768;
   const byArea = {};
   accounts.forEach(a => { byArea[a.area] = (byArea[a.area] || 0) + a.amount; });
   const total = Object.values(byArea).reduce((s,v) => s+v, 0) || 1;
@@ -1667,7 +1679,7 @@ function DonutChartPanel({ accounts, title, onFilter, activeFilter }) {
   return (
     <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 18px" }}>
       <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 }}>{title}</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+      <div style={{ display: "flex", alignItems: panelMobile ? "flex-start" : "center", flexDirection: panelMobile ? "column" : "row", gap: 20 }}>
         <div style={{ flexShrink: 0 }}>
           <svg width="140" height="140" viewBox="0 0 140 140">
             {segs.length === 0 && <circle cx={cx} cy={cy} r={(outerR+innerR)/2} fill="none" stroke="#f1f5f9" strokeWidth={outerR-innerR} />}
@@ -1854,6 +1866,12 @@ export default function WIPPlatform() {
   const [aiText, setAiText] = useState(null);
   const [critFilter, setCritFilter] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [donutExpanded, setDonutExpanded] = useState(false);
+
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 768;
+  const isTablet = windowWidth >= 768 && windowWidth < 1024;
+  const cols = (desktop, tablet, mobile) => isMobile ? mobile : isTablet ? tablet : desktop;
 
   const dnfb = useMemo(() => DNFB_DATA.map(a => score(a, "dnfb")).sort((a,b) => b.expectedValue - a.expectedValue), []);
   const ar = useMemo(() => AR_DATA.map(a => score(a, "ar")).sort((a,b) => b.expectedValue - a.expectedValue), []);
@@ -1949,14 +1967,14 @@ export default function WIPPlatform() {
   if (isSelfPayMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif" }}>
-        <div style={{ background: "#0f766e", padding: "14px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ background: "#0f766e", padding: isMobile ? "12px 16px" : "14px 32px", display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", flexWrap: "wrap", gap: isMobile ? 8 : 0 }}>
           <div>
             <div style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 2 }}>D4 Consulting Group</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#fff" }}>Self-Pay Specialist <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginLeft: 8, background: "rgba(255,255,255,0.15)", padding: "2px 8px", borderRadius: 10 }}>Patient Accounts</span></div>
+            <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 600, color: "#fff" }}>Self-Pay Specialist <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginLeft: 8, background: "rgba(255,255,255,0.15)", padding: "2px 8px", borderRadius: 10 }}>Patient Accounts</span></div>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.15)", padding: "4px 12px", borderRadius: 6 }}>⚖️ FDCPA Active</span>
-            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.15)", padding: "4px 12px", borderRadius: 6 }}>🔒 30-Day Hold Enforced</span>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {!isMobile && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.15)", padding: "4px 12px", borderRadius: 6 }}>⚖️ FDCPA Active</span>}
+            {!isMobile && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.15)", padding: "4px 12px", borderRadius: 6 }}>🔒 30-Day Hold Enforced</span>}
             <button onClick={() => setRole("commercial_collector")} style={{ background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 11, padding: "4px 12px", fontFamily: "inherit" }}>Switch role</button>
           </div>
         </div>
@@ -1971,10 +1989,10 @@ export default function WIPPlatform() {
   if (isCollectorMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif" }}>
-        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "14px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "12px 16px" : "14px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 2 }}>D4 Consulting Group</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#0f172a" }}>WIP Intelligence Platform <span style={{ fontSize: 11, color: "#2563eb", marginLeft: 6 }}>v2.0</span></div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#0f172a" }}>WIP Intelligence Platform <span style={{ fontSize: 11, color: "#2563eb", marginLeft: 6 }}>v2.1</span></div>
           </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
@@ -2016,19 +2034,20 @@ export default function WIPPlatform() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif" }}>
-      <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "14px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "10px 16px" : "14px 32px", display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", flexWrap: "wrap", gap: isMobile ? 10 : 0 }}>
         <div>
           <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 2 }}>D4 Consulting Group</div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: "#0f172a" }}>WIP Intelligence Platform <span style={{ fontSize: 11, color: "#2563eb", marginLeft: 6 }}>v2.0</span></div>
+          <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 600, color: "#0f172a" }}>WIP Intelligence Platform <span style={{ fontSize: 11, color: "#2563eb", marginLeft: 6 }}>v2.1</span></div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
-          <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: isMobile ? "flex-start" : "flex-end" }}>
+          <div style={{ display: "flex", gap: isMobile ? 4 : 8, flexWrap: "wrap" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Collectors &amp; Billers</div>
-              <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2 }}>
+              <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
                 {seg("Biller", "biller")}
-                {seg("Commercial", "commercial_collector")}
-                {seg("Medicare B/C", "medicare_bc")}
+                {seg("Comm.", "commercial_collector")}
+                {!isMobile && seg("Medicare B/C", "medicare_bc")}
+                {isMobile && seg("MC B/C", "medicare_bc")}
                 {seg("Medicaid", "medicaid")}
                 {seg("Self-Pay", "self_pay")}
                 {seg("WC", "wc")}
@@ -2042,7 +2061,7 @@ export default function WIPPlatform() {
               </div>
             </div>
           </div>
-          {roleConfig.paneLabel && (
+          {roleConfig.paneLabel && !isMobile && (
             <div style={{ fontSize: 10, color: "#94a3b8" }}>
               <span style={{ color: "#2563eb", fontWeight: 500 }}>{roleConfig.label}</span> — {roleConfig.paneLabel}
             </div>
@@ -2050,7 +2069,7 @@ export default function WIPPlatform() {
         </div>
       </div>
 
-      <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "0 12px" : "0 32px", display: isMobile ? "none" : "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex" }}>
           {role === "cfo" && (
             <button style={tabStyle(tab === "metrics")} onClick={() => setTab("metrics")}>Metrics</button>
@@ -2079,12 +2098,43 @@ export default function WIPPlatform() {
         </div>
       </div>
 
+      {/* Mobile bottom tab bar */}
+      {isMobile && (
+        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: "1px solid #e2e8f0", display: "flex", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+          {role === "cfo" && (
+            <button onClick={() => setTab("metrics")} style={{ flex: 1, padding: "12px 4px 10px", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="1" y="9" width="4" height="8" rx="1" fill={tab === "metrics" ? "#2563eb" : "#94a3b8"}/><rect x="7" y="5" width="4" height="12" rx="1" fill={tab === "metrics" ? "#2563eb" : "#94a3b8"}/><rect x="13" y="1" width="4" height="16" rx="1" fill={tab === "metrics" ? "#2563eb" : "#94a3b8"}/></svg>
+              <span style={{ fontSize: 9, fontWeight: tab === "metrics" ? 600 : 400, color: tab === "metrics" ? "#2563eb" : "#94a3b8" }}>Metrics</span>
+            </button>
+          )}
+          {(role === "supervisor" || role === "cfo" || role === "biller") && (
+            <button onClick={() => { setTab("dnfb"); setAreaFilter(null); setSeverityFilter(null); setSearchQuery(""); setAiText(null); }} style={{ flex: 1, padding: "12px 4px 10px", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="1" y="1" width="16" height="3" rx="1" fill={tab === "dnfb" ? "#1d4ed8" : "#94a3b8"}/><rect x="1" y="6" width="11" height="3" rx="1" fill={tab === "dnfb" ? "#1d4ed8" : "#94a3b8"}/><rect x="1" y="11" width="14" height="3" rx="1" fill={tab === "dnfb" ? "#1d4ed8" : "#94a3b8"}/></svg>
+              <span style={{ fontSize: 9, fontWeight: tab === "dnfb" ? 600 : 400, color: tab === "dnfb" ? "#1d4ed8" : "#94a3b8" }}>Billing</span>
+            </button>
+          )}
+          {(role !== "biller") && (
+            <button onClick={() => { setTab("ar"); setAreaFilter(null); setSeverityFilter(null); setSearchQuery(""); setAiText(null); }} style={{ flex: 1, padding: "12px 4px 10px", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke={tab === "ar" ? "#c2410c" : "#94a3b8"} strokeWidth="1.5"/><path d="M9 5v4l3 2" stroke={tab === "ar" ? "#c2410c" : "#94a3b8"} strokeWidth="1.5" strokeLinecap="round"/></svg>
+              <span style={{ fontSize: 9, fontWeight: tab === "ar" ? 600 : 400, color: tab === "ar" ? "#c2410c" : "#94a3b8" }}>Collections</span>
+            </button>
+          )}
+          {role === "supervisor" && (
+            <button onClick={() => { setTab("escalation"); setAreaFilter(null); setSearchQuery(""); }} style={{ flex: 1, padding: "12px 4px 10px", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, position: "relative" }}>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L11 7h6L12 11l2 6L9 14l-5 3 2-6L1 7h6L9 1z" fill={tab === "escalation" ? "#dc2626" : "#94a3b8"}/></svg>
+              <span style={{ fontSize: 9, fontWeight: tab === "escalation" ? 600 : 400, color: tab === "escalation" ? "#dc2626" : "#94a3b8" }}>Escalation</span>
+              <span style={{ position: "absolute", top: 8, right: "calc(50% - 14px)", background: "#dc2626", color: "#fff", borderRadius: 8, padding: "0 4px", fontSize: 8, fontWeight: 700 }}>{ESCALATION_DATA.escalated.length + ESCALATION_DATA.slaBreach.length}</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {(tab === "escalation" && role === "supervisor") || (tab === "metrics" && role === "cfo" && false) ? null : null}
       {tab === "escalation" && role === "supervisor" && (
         <EscalationQueue arScored={arForRole} dnfbScored={dnfbForRole} />
       )}
       {tab !== "escalation" && (
-      <div style={{ padding: "24px 32px" }}>
+      <div style={{ padding: isMobile ? "16px 12px 80px" : isTablet ? "20px 20px" : "24px 32px" }}>
         {role === "cfo" && tab === "metrics" ? (
           <div>
             {/* AI Executive Summary — top of metrics */}
@@ -2126,7 +2176,7 @@ export default function WIPPlatform() {
               const arDaysColor = arDays < 40 ? "#16a34a" : arDays < 55 ? "#2563eb" : arDays < 65 ? "#d97706" : "#dc2626";
               const arDaysLabel = arDays < 40 ? "Excellent" : arDays < 55 ? "Good" : arDays < 65 ? "Needs attention" : "Critical";
               return (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Net Patient Revenue (est.)</div>
                     <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(annualNPR)}</div>
@@ -2160,14 +2210,14 @@ export default function WIPPlatform() {
                 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px", marginBottom: 12 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase" }}>Expected recovery by payer group</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 10, color: "#64748b" }}>
+                    {!isMobile && <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 10, color: "#64748b" }}>
                       <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />On target</span>
                       <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "#d97706", display: "inline-block" }} />&lt;10pp below</span>
                       <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "#dc2626", display: "inline-block" }} />&gt;10pp below</span>
                       <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 2, height: 12, background: "#0f172a", display: "inline-block", borderRadius: 1 }} />Benchmark min</span>
-                    </div>
+                    </div>}
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: cols("repeat(4, 1fr)", "repeat(2, 1fr)", "1fr"), gap: 12 }}>
                     {Object.entries(groups).map(([key, g]) => {
                       const bal = g.accounts.reduce((s,a) => s+a.amount, 0);
                       const ev = g.accounts.reduce((s,a) => s+a.expectedValue, 0);
@@ -2201,7 +2251,7 @@ export default function WIPPlatform() {
             })()}
 
             {/* Billing WIP + Billing Donut + Follow-up WIP + Follow-up Donut — all one row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
               <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 16px" }}>
                 <div style={{ fontSize: 10, color: "#1d4ed8", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>Billing WIP — DNFB</div>
                 {(() => {
@@ -2262,7 +2312,7 @@ export default function WIPPlatform() {
               const denialColor = denialRate <= 5 ? "#16a34a" : denialRate <= 10 ? "#d97706" : "#dc2626";
               const denialLabel = denialRate <= 5 ? "Excellent" : denialRate <= 10 ? "Acceptable" : "Needs attention";
               return (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Net Collection Rate</div>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
@@ -2295,7 +2345,7 @@ export default function WIPPlatform() {
             })()}
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: cols("repeat(3, 1fr)", "repeat(3, 1fr)", "1fr"), gap: 12, marginBottom: 24 }}>
             <MetricCard label="Total WIP" value={fmt(totalWIP)} sub={`${current.length} accounts`} />
             <MetricCard label="Expected recovery" value={fmt(totalEV)} sub={`${Math.round(totalEV/totalWIP*100)}% collection rate`} accent="#2563eb" />
             <div onClick={() => setCritFilter(f => !f)} style={{ cursor: "pointer" }}><MetricCard label="Critical holds" value={critCount} sub={critFilter ? "click to clear filter" : "click to filter worklist"} accent="#b91c1c" /></div>
@@ -2312,7 +2362,7 @@ export default function WIPPlatform() {
             { label: "Flag (6+ days)",    accs: dnfbForRole.filter(a => a.daysInDNFB >= 6), color: "#dc2626" },
           ];
           return (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 16 }}>
               <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
                 <div style={{ fontSize: 10, color: "#1d4ed8", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 12 }}>Billing WIP — DNFB</div>
                 {tiers.map((t, i) => {
@@ -2348,7 +2398,7 @@ export default function WIPPlatform() {
             { label: "<$1K",     accs: pastDue.filter(a => a.amount < 1000), color: "#64748b" },
           ];
           return (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 16 }}>
               <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
                 <div style={{ fontSize: 10, color: "#c2410c", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 12 }}>Follow-up WIP — Collections</div>
                 {tiers.map((t, i) => {
@@ -2395,7 +2445,7 @@ export default function WIPPlatform() {
           </div>
         )}
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? 8 : 0, marginBottom: 12 }}>
           <div style={{ fontSize: 11, color: "#94a3b8" }}>{filtered.length} account{filtered.length !== 1 ? "s" : ""}{searchQuery ? ` matching "${searchQuery}"` : ""} · click to expand</div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(filtered.reduce((s,a) => s + a.expectedValue, 0))} expected recovery</div>
@@ -2426,9 +2476,9 @@ export default function WIPPlatform() {
       </div>
       )}
 
-      <div style={{ borderTop: "1px solid #e2e8f0", padding: "14px 32px", display: "flex", justifyContent: "space-between", fontSize: 10, color: "#cbd5e1" }}>
+      <div style={{ borderTop: "1px solid #e2e8f0", padding: isMobile ? "12px 16px" : "14px 32px", display: "flex", justifyContent: "space-between", fontSize: 10, color: "#cbd5e1" }}>
         <span>D4 Consulting Group — Proprietary</span>
-        <span>WIP Intelligence Platform v2.0 · Human-in-the-loop · Phase 1 Internal</span>
+        {!isMobile && <span>WIP Intelligence Platform v2.1 · Human-in-the-loop · Phase 1 Internal</span>}
       </div>
     </div>
   );
