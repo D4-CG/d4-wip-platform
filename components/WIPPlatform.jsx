@@ -992,6 +992,10 @@ function WorkedList({ worked }) {
 }
 
 function CollectorView({ arScored, dnfbScored, isMedicareBc }) {
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 768;
+  const isTablet = windowWidth >= 768 && windowWidth < 1024;
+  const cols = (d, t, m) => isMobile ? m : isTablet ? t : d;
   const [workedAccounts, setWorkedAccounts] = useState([]);
   const [sessionStart] = useState(() => Date.now());
   const [searchQuery, setSearchQuery] = useState("");
@@ -1027,9 +1031,9 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc }) {
   })() : "—";
 
   return (
-    <div style={{ padding: "24px 32px" }}>
+    <div style={{ padding: isMobile ? "16px 12px 80px" : isTablet ? "20px 20px" : "24px 32px" }}>
       {/* Productivity metrics */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: cols("repeat(4, 1fr)", "repeat(2, 1fr)", "repeat(2, 1fr)"), gap: 12, marginBottom: 24 }}>
         {[
           { label: "Accounts worked today", value: workedAccounts.length, sub: `${Math.max(0, DAILY_GOAL - workedAccounts.length)} remaining to goal (${DAILY_GOAL}/day)`, color: "#0f172a" },
           { label: "EV worked", value: fmt(totalEV), sub: "expected recovery logged", color: "#2563eb" },
@@ -1090,6 +1094,8 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc }) {
 }
 
 function BillerAccountCard({ acc, onSeverityFilter }) {
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 768;
   const [open, setOpen] = useState(false);
   const [outcome, setOutcome] = useState("");
   const [logged, setLogged] = useState(false);
@@ -1100,7 +1106,7 @@ function BillerAccountCard({ acc, onSeverityFilter }) {
 
   return (
     <div style={{ background: logged ? "#f0fdf4" : "#fff", border: `1px solid ${logged ? "#bbf7d0" : "#e2e8f0"}`, borderRadius: 10, marginBottom: 8, overflow: "hidden" }}>
-      <div onClick={() => setOpen(o => !o)} style={{ padding: "14px 18px", cursor: "pointer", display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 16, alignItems: "center" }}>
+      <div onClick={() => setOpen(o => !o)} style={{ padding: isMobile ? "12px 14px" : "14px 18px", cursor: "pointer", display: "grid", gridTemplateColumns: isMobile ? "1fr auto" : "1fr auto auto auto", gap: isMobile ? 10 : 16, alignItems: "center" }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5, flexWrap: "wrap" }}>
             <span onClick={e => { e.stopPropagation(); if (acc.cfg.severity === "CRITICAL" || acc.cfg.severity === "URGENT") { onSeverityFilter && onSeverityFilter(prev => prev === acc.cfg.severity ? null : acc.cfg.severity); } }} style={{ fontSize: 10, fontWeight: 600, background: sev.bg, color: sev.text, border: `1px solid ${sev.border}`, padding: "1px 7px", borderRadius: 4, cursor: acc.cfg.severity === "CRITICAL" || acc.cfg.severity === "URGENT" ? "pointer" : "default" }} title={acc.cfg.severity === "CRITICAL" || acc.cfg.severity === "URGENT" ? "Click to filter by " + acc.cfg.severity : ""}>{acc.cfg.severity}</span>
@@ -1112,12 +1118,13 @@ function BillerAccountCard({ acc, onSeverityFilter }) {
           <div style={{ fontSize: 11, color: "#64748b" }}>{acc.cfg.label}</div>
         </div>
         <ProbCircle prob={acc.prob} />
-        <div style={{ textAlign: "right" }}>
+        {isMobile && <div style={{ color: "#94a3b8", fontSize: 11, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</div>}
+        {!isMobile && <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 2 }}>Expected value</div>
           <div style={{ fontSize: 19, fontWeight: 700, color: "#2563eb", letterSpacing: "-0.02em" }}>{fmt(acc.expectedValue)}</div>
           <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{fmt(acc.amount)} · {acc.daysOut}d</div>
-        </div>
-        <div style={{ color: "#94a3b8", fontSize: 11, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</div>
+        </div>}
+        {!isMobile && <div style={{ color: "#94a3b8", fontSize: 11, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</div>}
       </div>
 
       {open && (
@@ -1159,7 +1166,7 @@ function BillerAccountCard({ acc, onSeverityFilter }) {
           </div>
 
           {/* Detail grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: 8, marginTop: 12 }}>
             {[
               { label: "Payer", value: acc.payer },
               { label: "Service date", value: acc.serviceDate },
@@ -1409,6 +1416,10 @@ function scoreSelfPay(acc) {
 }
 
 function SelfPayView() {
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 768;
+  const isTablet = windowWidth >= 768 && windowWidth < 1024;
+  const cols = (d, t, m) => isMobile ? m : isTablet ? t : d;
   const scored = useMemo(() =>
     SP_DATA.map(scoreSelfPay).sort((a,b) => b.ev - a.ev), []);
   const [worked, setWorked] = useState([]);
@@ -1452,9 +1463,9 @@ function SelfPayView() {
   );
 
   return (
-    <div style={{ padding: "24px 32px" }}>
+    <div style={{ padding: isMobile ? "16px 12px 80px" : isTablet ? "20px 20px" : "24px 32px" }}>
       {/* Metrics */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: cols("repeat(4, 1fr)", "repeat(2, 1fr)", "repeat(2, 1fr)"), gap: 12, marginBottom: 20 }}>
         <MetricCard label="Total self-pay balance" value={"$"+totalBalance.toLocaleString()} sub={`${scored.length} accounts`} />
         <MetricCard label="Expected recovery" value={"$"+totalEV.toLocaleString()} sub={`${Math.round(totalEV/totalBalance*100)}% rate`} accent="#2563eb" />
         <MetricCard label="Uninsured" value={uninsured} sub="full balance patient responsibility" />
@@ -1989,41 +2000,41 @@ export default function WIPPlatform() {
   if (isCollectorMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif" }}>
-        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "12px 16px" : "14px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "10px 16px" : "14px 32px", display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", flexWrap: "wrap", gap: isMobile ? 10 : 0 }}>
           <div>
             <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 2 }}>D4 Consulting Group</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#0f172a" }}>WIP Intelligence Platform <span style={{ fontSize: 11, color: "#2563eb", marginLeft: 6 }}>v2.1</span></div>
+            <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 600, color: "#0f172a" }}>WIP Intelligence Platform <span style={{ fontSize: 11, color: "#2563eb", marginLeft: 6 }}>v2.1</span></div>
           </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
-          <div style={{ display: "flex", gap: 8 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Collectors & Billers</div>
-              <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2 }}>
-                {seg("Biller", "biller")}
-                {seg("Commercial", "commercial_collector")}
-                {seg("Medicare B/C", "medicare_bc")}
-                {seg("Medicaid", "medicaid")}
-                {seg("Self-Pay", "self_pay")}
-                {seg("WC", "wc")}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: isMobile ? "flex-start" : "flex-end" }}>
+            <div style={{ display: "flex", gap: isMobile ? 4 : 8, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Collectors &amp; Billers</div>
+                <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+                  {seg("Biller", "biller")}
+                  {seg("Comm.", "commercial_collector")}
+                  {!isMobile && seg("Medicare B/C", "medicare_bc")}
+                  {isMobile && seg("MC B/C", "medicare_bc")}
+                  {seg("Medicaid", "medicaid")}
+                  {seg("Self-Pay", "self_pay")}
+                  {seg("WC", "wc")}
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Management</div>
+                <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2 }}>
+                  {seg("Supervisor", "supervisor")}
+                  {seg("CFO", "cfo")}
+                </div>
               </div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Management</div>
-              <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2 }}>
-                {seg("Supervisor", "supervisor")}
-                {seg("CFO", "cfo")}
+            {roleConfig.paneLabel && !isMobile && (
+              <div style={{ fontSize: 10, color: "#94a3b8" }}>
+                <span style={{ color: "#2563eb", fontWeight: 500 }}>{roleConfig.label}</span> — {roleConfig.paneLabel}
               </div>
-            </div>
+            )}
           </div>
-          {roleConfig.paneLabel && (
-            <div style={{ fontSize: 10, color: "#94a3b8" }}>
-              <span style={{ color: "#2563eb", fontWeight: 500 }}>{roleConfig.label}</span> — {roleConfig.paneLabel}
-            </div>
-          )}
         </div>
-        </div>
-        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "10px 32px", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "8px 16px" : "10px 32px", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 12, color: "#64748b" }}>{roleConfig?.label} — {roleConfig?.mode === "medicare_bc" ? "Unified DNFB + AR" : "Collections Queue"}</span>
           <span style={{ fontSize: 11, color: "#94a3b8" }}>· {arForRole.length} accounts · sorted by expected value</span>
         </div>
