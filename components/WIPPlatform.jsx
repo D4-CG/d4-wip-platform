@@ -2860,15 +2860,20 @@ function CFOCriticalHolds({ accounts }) {
 }
 
 export default function WIPPlatform() {
-  const [tab, setTab] = useState("metrics");
+  const [tab, setTab] = useState(() => {
+    const savedRole = (() => { try { return localStorage.getItem("d4_last_role") || "cfo"; } catch { return "cfo"; } })();
+    return savedRole === "supervisor" ? "escalation" : "metrics";
+  });
   const [role, setRole] = useState(() => {
     try { return localStorage.getItem("d4_last_role") || "cfo"; } catch { return "cfo"; }
   });
   const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const setRoleAndPersist = (val) => {
     try { localStorage.setItem("d4_last_role", val); } catch {}
     setRole(val);
+    setTab(val === "supervisor" ? "escalation" : "metrics");
     setAiText(null);
     setSearchQuery("");
     setAreaFilter(null);
@@ -3033,6 +3038,31 @@ Return JSON with:
     setAiLoading(false);
   };
 
+  // ─── Notification Tray ──────────────────────────────────────────────────────
+  const notifications = useMemo(() => {
+    const items = [];
+    // SLA breaches
+    const breached = worklinks.filter(w => w.status === "open" && new Date() > w.slaDue);
+    breached.forEach(w => items.push({ id: `sla-${w.id}`, type: "sla", urgency: "critical", title: "WorkLink SLA breached", body: `${w.requestLabel} → ${w.targetArea} · ${w.patient} · ${fmt(w.expectedValue)} EV`, tab: "worklink", role: "supervisor" }));
+    // Critical holds
+    const crits = arForRole.filter(a => a.cfg.severity === "CRITICAL");
+    if (crits.length > 0) items.push({ id: "crits", type: "critical", urgency: "critical", title: `${crits.length} critical hold${crits.length > 1 ? "s" : ""}`, body: `${fmt(crits.reduce((s,a)=>s+a.amount,0))} at risk · immediate action required`, tab: "metrics", role: "cfo" });
+    // Timely filing risk
+    const filingRisk = arForRole.filter(a => (120 - (a.daysOut||0)) < 14 && (120 - (a.daysOut||0)) >= 0);
+    if (filingRisk.length > 0) items.push({ id: "filing", type: "filing", urgency: "high", title: `${filingRisk.length} account${filingRisk.length > 1 ? "s" : ""} near timely filing deadline`, body: `${fmt(filingRisk.reduce((s,a)=>s+a.amount,0))} at risk of permanent loss · use Triage sort`, tab: "ar", role: null });
+    // Write-offs pending
+    const wo = ESCALATION_DATA.writeOffPending;
+    if (wo.length > 0) items.push({ id: "writeoffs", type: "writeoff", urgency: "high", title: `${wo.length} write-off${wo.length > 1 ? "s" : ""} pending CFO approval`, body: `${fmt(wo.reduce((s,w)=>s+w.amount,0))} pending review`, tab: "escalation", role: "supervisor" });
+    // Open WorkLink
+    const openWL = worklinks.filter(w => w.status === "open");
+    if (openWL.length > 0) items.push({ id: "worklinks", type: "worklink", urgency: "medium", title: `${openWL.length} open WorkLink request${openWL.length > 1 ? "s" : ""}`, body: `${fmt(openWL.reduce((s,w)=>s+w.expectedValue,0))} EV pending cross-area action`, tab: "worklink", role: "supervisor" });
+    return items;
+  }, [worklinks, arForRole]);
+
+  const urgencyColor = { critical: "#dc2626", high: "#d97706", medium: "#2563eb" };
+  const urgencyBg = { critical: "#fee2e2", high: "#fef3c7", medium: "#eff6ff" };
+  const urgencyIcon = { critical: "🔴", high: "🟠", medium: "🔵" };
+
   const seg = (label, val) => (
     <button onClick={() => setRoleAndPersist(val)} style={{ padding: "6px 14px", cursor: "pointer", fontSize: 11, fontWeight: role === val ? 600 : 400, border: "none", borderRadius: 6, fontFamily: "inherit", background: role === val ? "#2563eb" : "transparent", color: role === val ? "#fff" : "#64748b" }}>{label}</button>
   );
@@ -3180,8 +3210,41 @@ Return JSON with:
           <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 2 }}>D4 Consulting Group</div>
           <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 600, color: "#0f172a" }}>WIP Intelligence Platform <span style={{ fontSize: 11, color: "#2563eb", marginLeft: 6 }}>v2.1</span></div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: isMobile ? "flex-start" : "flex-end" }}>
-          {/* Collapsed role display — shown by default */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* Notification bell */}
+          <div style={{ position: "relative" }}>
+            <button onClick={() => setShowNotifications(s => !s)}
+              style={{ background: showNotifications ? "#f1f5f9" : "none", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
+              <span style={{ fontSize: 16 }}>🔔</span>
+              {notifications.length > 0 && (
+                <span style={{ background: notifications.some(n=>n.urgency==="critical") ? "#dc2626" : "#d97706", color: "#fff", borderRadius: 10, padding: "0 6px", fontSize: 10, fontWeight: 700, minWidth: 16, textAlign: "center" }}>{notifications.length}</span>
+              )}
+            </button>
+            {showNotifications && (
+              <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 340, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 200, overflow: "hidden" }}>
+                <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Notifications</span>
+                  <button onClick={() => setShowNotifications(false)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 12 }}>✕</button>
+                </div>
+                {notifications.length === 0 ? (
+                  <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 12, color: "#94a3b8" }}>No active notifications</div>
+                ) : notifications.map(n => (
+                  <div key={n.id} onClick={() => { if (n.role) setRoleAndPersist(n.role); setTab(n.tab || "metrics"); setShowNotifications(false); }}
+                    style={{ padding: "12px 16px", borderBottom: "1px solid #f8fafc", cursor: "pointer", background: urgencyBg[n.urgency] + "40", display: "flex", gap: 10, alignItems: "flex-start" }}
+                    onMouseEnter={e => e.currentTarget.style.background = urgencyBg[n.urgency]}
+                    onMouseLeave={e => e.currentTarget.style.background = urgencyBg[n.urgency] + "40"}>
+                    <span style={{ fontSize: 14, flexShrink: 0 }}>{urgencyIcon[n.urgency]}</span>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: urgencyColor[n.urgency], marginBottom: 2 }}>{n.title}</div>
+                      <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.5 }}>{n.body}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Collapsed role display */}
           {!showRoleSwitcher ? (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ textAlign: "right" }}>
@@ -3239,8 +3302,15 @@ Return JSON with:
 
       <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "0 12px" : "0 32px", display: isMobile ? "none" : "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex" }}>
+          {/* Supervisor: Act Now first (escalation + SLA breaches) */}
+          {role === "supervisor" && (
+            <button style={{...tabStyle(tab === "escalation"), color: tab === "escalation" ? "#dc2626" : "#64748b", borderBottomColor: tab === "escalation" ? "#dc2626" : "transparent"}} onClick={() => { setTab("escalation"); setAreaFilter(null); setSearchQuery(""); }}>
+              ⚡ Act Now <span style={{ background: "#fee2e2", color: "#b91c1c", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 700, marginLeft: 4 }}>{ESCALATION_DATA.escalated.length + ESCALATION_DATA.slaBreach.length}</span>
+            </button>
+          )}
+          {/* CFO: Dashboard */}
           {role === "cfo" && (
-            <button style={tabStyle(tab === "metrics")} onClick={() => setTab("metrics")}>Metrics</button>
+            <button style={tabStyle(tab === "metrics")} onClick={() => setTab("metrics")}>Dashboard</button>
           )}
           {(role === "supervisor" || role === "cfo") && (
             <button style={tabStyle(tab === "dnfb")} onClick={() => { setTab("dnfb"); setAreaFilter(null); setSeverityFilter(null); setSearchQuery(""); setAiText(null); }}>Billing WIP ({dnfbForRole.length})</button>
@@ -3252,7 +3322,7 @@ Return JSON with:
             <button style={tabStyle(tab === "ar")} onClick={() => { setTab("ar"); setAreaFilter(null); setSeverityFilter(null); setSearchQuery(""); setAiText(null); }}>Collections WIP ({arForRole.length})</button>
           )}
           {role === "biller" && (
-            <button style={tabStyle(tab === "dnfb")} onClick={() => { setTab("dnfb"); setAreaFilter(null); setSeverityFilter(null); setSearchQuery(""); setAiText(null); }}>Billing WIP — Read Only ({dnfbForRole.length})</button>
+            <button style={tabStyle(tab === "dnfb")} onClick={() => { setTab("dnfb"); setAreaFilter(null); setSeverityFilter(null); setSearchQuery(""); setAiText(null); }}>Billing WIP ({dnfbForRole.length})</button>
           )}
           {role === "supervisor" && (
             <button onClick={() => setTab("worklink")} style={{ ...tabStyle(tab === "worklink"), color: tab === "worklink" ? "#0369a1" : "#64748b", borderBottomColor: tab === "worklink" ? "#0369a1" : "transparent" }}>
@@ -3260,11 +3330,6 @@ Return JSON with:
               {worklinks.filter(w => w.status === "open").length > 0 && (
                 <span style={{ background: "#0369a1", color: "#fff", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 700, marginLeft: 6 }}>{worklinks.filter(w => w.status === "open").length}</span>
               )}
-            </button>
-          )}
-          {role === "supervisor" && (
-            <button style={{...tabStyle(tab === "escalation"), color: tab === "escalation" ? "#dc2626" : "#64748b", borderBottomColor: tab === "escalation" ? "#dc2626" : "transparent"}} onClick={() => { setTab("escalation"); setAreaFilter(null); setSearchQuery(""); }}>
-              Escalation Queue <span style={{ background: "#fee2e2", color: "#b91c1c", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 700, marginLeft: 4 }}>{ESCALATION_DATA.escalated.length + ESCALATION_DATA.slaBreach.length}</span>
             </button>
           )}
         </div>
@@ -3298,7 +3363,7 @@ Return JSON with:
           {role === "supervisor" && (
             <button onClick={() => { setTab("escalation"); setAreaFilter(null); setSearchQuery(""); }} style={{ flex: 1, padding: "12px 4px 10px", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, position: "relative" }}>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L11 7h6L12 11l2 6L9 14l-5 3 2-6L1 7h6L9 1z" fill={tab === "escalation" ? "#dc2626" : "#94a3b8"}/></svg>
-              <span style={{ fontSize: 9, fontWeight: tab === "escalation" ? 600 : 400, color: tab === "escalation" ? "#dc2626" : "#94a3b8" }}>Escalation</span>
+              <span style={{ fontSize: 9, fontWeight: tab === "escalation" ? 600 : 400, color: tab === "escalation" ? "#dc2626" : "#94a3b8" }}>Act Now</span>
               <span style={{ position: "absolute", top: 8, right: "calc(50% - 14px)", background: "#dc2626", color: "#fff", borderRadius: 8, padding: "0 4px", fontSize: 8, fontWeight: 700 }}>{ESCALATION_DATA.escalated.length + ESCALATION_DATA.slaBreach.length}</span>
             </button>
           )}
