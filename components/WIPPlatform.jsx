@@ -2772,6 +2772,11 @@ export default function WIPPlatform() {
         body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 600, messages: [{ role: "user", content: prompt }] })
       });
       const data = await res.json();
+      if (!res.ok) {
+        setAiText({ status: `API error ${res.status}: ${data.error || "Unknown error"}`, priorities: [], risks: [], decisions: [] });
+        setAiLoading(false);
+        return;
+      }
       const raw = data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "{}";
       const cleaned = raw.replace(/```json|```/g, "").trim();
       try {
