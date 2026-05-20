@@ -3071,39 +3071,48 @@ export default function WIPPlatform() {
               const siteStatsTableSorted = [...siteStats].sort((a,b) => b.totalEV - a.totalEV);
 
               return (
-                <div style={{ marginBottom: 16 }}>
-                  {/* Site summary table */}
-                  {!isMobile && (
-                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr repeat(4, auto)", gap: 0, fontSize: 10, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", padding: "8px 16px", borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
-                        <span>Site</span><span style={{ textAlign:"right", paddingRight:16 }}>Total AR</span><span style={{ textAlign:"right", paddingRight:16 }}>EV</span><span style={{ textAlign:"right", paddingRight:16 }}>AR Days</span><span style={{ textAlign:"right" }}>WorkLink</span>
+                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, marginBottom: 16, overflow: "hidden" }}>
+                  {/* Filter chip bar — always visible at top */}
+                  <div style={{ padding: "10px 16px", borderBottom: siteFilter ? "1px solid #e2e8f0" : "none", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: "#f8fafc" }}>
+                    <span style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0 }}>Site:</span>
+                    <button onClick={() => setSiteFilter(null)}
+                      style={{ padding: "3px 10px", fontSize: 11, fontWeight: siteFilter===null ? 700 : 400, border: `1px solid ${siteFilter===null ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: siteFilter===null ? "#2563eb" : "#fff", color: siteFilter===null ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
+                      All
+                    </button>
+                    {siteStats.map(s => (
+                      <button key={s.site} onClick={() => setSiteFilter(siteFilter===s.site ? null : s.site)}
+                        style={{ padding: "3px 10px", fontSize: 11, fontWeight: siteFilter===s.site ? 700 : 400, border: `1px solid ${siteFilter===s.site ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: siteFilter===s.site ? "#2563eb" : "#fff", color: siteFilter===s.site ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
+                        {s.site}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Site performance table — only show when no site selected (overview mode) */}
+                  {!siteFilter && !isMobile && (
+                    <div>
+                      <div style={{ display: "grid", gridTemplateColumns: "120px 1fr 1fr 80px 70px", fontSize: 10, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", padding: "8px 16px", background: "#f8fafc", borderTop: "1px solid #f1f5f9" }}>
+                        <span>Site</span><span style={{ textAlign:"right" }}>Total AR</span><span style={{ textAlign:"right" }}>EV</span><span style={{ textAlign:"right" }}>AR Days</span><span style={{ textAlign:"right" }}>WorkLink</span>
                       </div>
                       {siteStatsTableSorted.map(s => (
-                        <div key={s.site} onClick={() => setSiteFilter(siteFilter===s.site ? null : s.site)}
-                          style={{ display: "grid", gridTemplateColumns: "1fr repeat(4, auto)", gap: 0, padding: "8px 16px", cursor: "pointer", background: siteFilter===s.site ? "#eff6ff" : "transparent", borderBottom: "1px solid #f8fafc" }}>
-                          <span style={{ fontSize: 12, fontWeight: siteFilter===s.site ? 700 : 400, color: siteFilter===s.site ? "#2563eb" : "#0f172a" }}>{s.site}</span>
-                          <span style={{ fontSize: 12, color: "#475569", textAlign:"right", paddingRight:16 }}>{fmt(s.totalAR)}</span>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: "#2563eb", textAlign:"right", paddingRight:16 }}>{fmt(s.totalEV)}</span>
-                          <span style={{ fontSize: 12, color: s.avgDays > 55 ? "#dc2626" : s.avgDays > 40 ? "#d97706" : "#16a34a", textAlign:"right", paddingRight:16 }}>{s.avgDays}d</span>
+                        <div key={s.site} onClick={() => setSiteFilter(s.site)}
+                          style={{ display: "grid", gridTemplateColumns: "120px 1fr 1fr 80px 70px", padding: "7px 16px", cursor: "pointer", borderTop: "1px solid #f8fafc", background: "transparent" }}
+                          onMouseEnter={e => e.currentTarget.style.background="#f8fafc"}
+                          onMouseLeave={e => e.currentTarget.style.background="transparent"}>
+                          <span style={{ fontSize: 12, color: "#0f172a", fontWeight: 500 }}>{s.site}</span>
+                          <span style={{ fontSize: 12, color: "#475569", textAlign:"right" }}>{fmt(s.totalAR)}</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "#2563eb", textAlign:"right" }}>{fmt(s.totalEV)}</span>
+                          <span style={{ fontSize: 12, color: s.avgDays > 55 ? "#dc2626" : s.avgDays > 40 ? "#d97706" : "#16a34a", textAlign:"right", fontWeight: 600 }}>{s.avgDays}d</span>
                           <span style={{ fontSize: 12, color: s.openWL > 0 ? "#0369a1" : "#94a3b8", textAlign:"right" }}>{s.openWL > 0 ? s.openWL : "—"}</span>
                         </div>
                       ))}
                     </div>
                   )}
-                  {/* Site chips */}
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                    <span style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em" }}>Filter by site:</span>
-                    <button onClick={() => setSiteFilter(null)}
-                      style={{ padding: "4px 12px", fontSize: 11, fontWeight: siteFilter===null ? 700 : 400, border: `1px solid ${siteFilter===null ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: siteFilter===null ? "#2563eb" : "#fff", color: siteFilter===null ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
-                      All Sites
-                    </button>
-                    {siteStats.map(s => (
-                      <button key={s.site} onClick={() => setSiteFilter(siteFilter===s.site ? null : s.site)}
-                        style={{ padding: "4px 12px", fontSize: 11, fontWeight: siteFilter===s.site ? 700 : 400, border: `1px solid ${siteFilter===s.site ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: siteFilter===s.site ? "#2563eb" : "#fff", color: siteFilter===s.site ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
-                        {s.site}
-                      </button>
-                    ))}
-                  </div>
+                  {/* Active site label */}
+                  {siteFilter && (
+                    <div style={{ padding: "8px 16px", fontSize: 11, color: "#2563eb", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                      <span>Showing: {siteFilter}</span>
+                      <button onClick={() => setSiteFilter(null)} style={{ fontSize: 10, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}>✕ clear</button>
+                    </div>
+                  )}
                 </div>
               );
             })()}
