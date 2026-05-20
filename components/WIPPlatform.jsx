@@ -716,7 +716,7 @@ Notes:\n${noteText}`;
 
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
         body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 400, messages: [{ role: "user", content: prompt }] })
       });
       const data = await res.json();
@@ -786,7 +786,7 @@ Requirements:
 
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
         body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 300, messages: [{ role: "user", content: prompt }] })
       });
       const data = await res.json();
@@ -1294,7 +1294,7 @@ function WorkLinkForm({ acc, onSubmit, onCancel }) {
     const prompt = `You are a healthcare revenue cycle specialist creating a structured internal work request. Generate a concise, professional work request note in 2-3 sentences. Account: ${acc.id} · ${acc.patient} · ${acc.payer} · Balance: ${fmt(acc.amount)} · EV: ${fmt(acc.expectedValue)} · Hold: ${acc.cfg?.label || acc.area}. Request type: ${selectedType?.label}. Target area: ${targetArea}. Collector notes: "${scratch || "No additional notes provided"}". Write the note as a direct communication to the ${targetArea} team. Be specific about what action is needed and why it is urgent. Return only the note text, no preamble.`;
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
         body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 200, messages: [{ role: "user", content: prompt }] })
       });
       const data = await res.json();
@@ -2768,7 +2768,7 @@ export default function WIPPlatform() {
     const prompt = "You are a healthcare revenue cycle expert advising a CFO." + (verticalCtx ? " " + verticalCtx : "") + " Return ONLY a valid JSON object with exactly these four keys: status, priorities, risks, decisions. No markdown, no code fences, no explanation. Just the raw JSON object.\n\nPortfolio: " + fmt(totalWIP) + " total WIP, " + fmt(totalEV) + " expected recovery (" + Math.round(totalEV / Math.max(totalWIP, 1) * 100) + "%). Critical holds: " + critCount + ". Largest area: " + (topArea?.[0] || "none") + " at " + fmt(topArea?.[1] || 0) + ". Critical accounts: " + critList + ". Write-offs pending: " + woList + ".\n\nJSON: {status: one sentence on portfolio health, priorities: [two specific priority actions with account IDs and amounts], risks: [two specific risk flags], decisions: [one or two items requiring CFO action or approval]}";
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
         body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 600, messages: [{ role: "user", content: prompt }] })
       });
       const data = await res.json();
