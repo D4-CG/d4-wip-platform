@@ -3062,19 +3062,25 @@ export default function WIPPlatform() {
                 const siteAR = arForRole.filter(a => a.site === s);
                 const siteDNFB = dnfbForRole.filter(a => a.site === s);
                 const totalAR = siteAR.reduce((sum,a) => sum+a.amount, 0);
+                const totalDNFB = siteDNFB.reduce((sum,a) => sum+a.amount, 0);
+                const totalExposure = totalAR + totalDNFB;
                 const totalEV = siteAR.reduce((sum,a) => sum+a.expectedValue, 0);
-                const avgDays = siteAR.length ? Math.round(siteAR.reduce((s,a) => s+a.daysOut*a.amount, 0) / Math.max(siteAR.reduce((s,a) => s+a.amount,0),1)) : 0;
+                const avgDays = totalAR > 0 ? Math.round(siteAR.reduce((s,a) => s+a.daysOut*a.amount, 0) / totalAR) : 0;
+                const npr = avgDays > 0 ? Math.round(totalAR / avgDays * 365 * 0.82) : 0;
+                const ncr = npr > 0 ? Math.round(totalEV / npr * 100) : 0;
+                const deniedCount = siteAR.filter(a => a.denialCode !== null).length;
+                const denialRate = siteAR.length > 0 ? Math.round(deniedCount / siteAR.length * 100) : 0;
                 const openWL = worklinks.filter(w => w.status==="open" && [...siteAR,...siteDNFB].some(a => a.id===w.accountId)).length;
-                return { site: s, totalAR, totalEV, avgDays, openWL };
+                return { site: s, npr, totalAR, totalDNFB, totalExposure, totalEV, avgDays, ncr, denialRate, openWL };
               });
-              // Table sorted by EV desc for quick scanning, chips in numeric site order
               const siteStatsTableSorted = [...siteStats].sort((a,b) => b.totalEV - a.totalEV);
+              const cols9 = "90px repeat(8, 1fr)";
 
               return (
                 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, marginBottom: 16, overflow: "hidden" }}>
                   {/* Filter chip bar — always visible at top */}
-                  <div style={{ padding: "10px 16px", borderBottom: siteFilter ? "1px solid #e2e8f0" : "none", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: "#f8fafc" }}>
-                    <span style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0 }}>Site:</span>
+                  <div style={{ padding: "10px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", background: "#f8fafc" }}>
+                    <span style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0, marginRight: 2 }}>Site:</span>
                     <button onClick={() => setSiteFilter(null)}
                       style={{ padding: "3px 10px", fontSize: 11, fontWeight: siteFilter===null ? 700 : 400, border: `1px solid ${siteFilter===null ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: siteFilter===null ? "#2563eb" : "#fff", color: siteFilter===null ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
                       All
@@ -3085,32 +3091,64 @@ export default function WIPPlatform() {
                         {s.site}
                       </button>
                     ))}
+                    {siteFilter && (
+                      <button onClick={() => setSiteFilter(null)} style={{ marginLeft: "auto", fontSize: 10, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}>✕ clear</button>
+                    )}
                   </div>
-                  {/* Site performance table — only show when no site selected (overview mode) */}
+                  {/* Site performance table — visible in All Sites mode only, desktop only */}
                   {!siteFilter && !isMobile && (
-                    <div>
-                      <div style={{ display: "grid", gridTemplateColumns: "120px 1fr 1fr 80px 70px", fontSize: 10, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", padding: "8px 16px", background: "#f8fafc", borderTop: "1px solid #f1f5f9" }}>
-                        <span>Site</span><span style={{ textAlign:"right" }}>Total AR</span><span style={{ textAlign:"right" }}>EV</span><span style={{ textAlign:"right" }}>AR Days</span><span style={{ textAlign:"right" }}>WorkLink</span>
+                    <div style={{ overflowX: "auto" }}>
+                      {/* Header */}
+                      <div style={{ display: "grid", gridTemplateColumns: cols9, minWidth: 820, fontSize: 9, color: "#94a3b8", letterSpacing: "0.07em", textTransform: "uppercase", padding: "7px 16px", background: "#f8fafc", borderTop: "1px solid #f1f5f9" }}>
+                        <span>Site</span>
+                        <span style={{ textAlign:"right" }}>NPR (est.)</span>
+                        <span style={{ textAlign:"right" }}>Total AR</span>
+                        <span style={{ textAlign:"right" }}>DNFB</span>
+                        <span style={{ textAlign:"right" }}>Total Exposure</span>
+                        <span style={{ textAlign:"right" }}>EV</span>
+                        <span style={{ textAlign:"right" }}>AR Days</span>
+                        <span style={{ textAlign:"right" }}>NCR</span>
+                        <span style={{ textAlign:"right" }}>Denial Rate</span>
                       </div>
-                      {siteStatsTableSorted.map(s => (
-                        <div key={s.site} onClick={() => setSiteFilter(s.site)}
-                          style={{ display: "grid", gridTemplateColumns: "120px 1fr 1fr 80px 70px", padding: "7px 16px", cursor: "pointer", borderTop: "1px solid #f8fafc", background: "transparent" }}
-                          onMouseEnter={e => e.currentTarget.style.background="#f8fafc"}
-                          onMouseLeave={e => e.currentTarget.style.background="transparent"}>
-                          <span style={{ fontSize: 12, color: "#0f172a", fontWeight: 500 }}>{s.site}</span>
-                          <span style={{ fontSize: 12, color: "#475569", textAlign:"right" }}>{fmt(s.totalAR)}</span>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: "#2563eb", textAlign:"right" }}>{fmt(s.totalEV)}</span>
-                          <span style={{ fontSize: 12, color: s.avgDays > 55 ? "#dc2626" : s.avgDays > 40 ? "#d97706" : "#16a34a", textAlign:"right", fontWeight: 600 }}>{s.avgDays}d</span>
-                          <span style={{ fontSize: 12, color: s.openWL > 0 ? "#0369a1" : "#94a3b8", textAlign:"right" }}>{s.openWL > 0 ? s.openWL : "—"}</span>
-                        </div>
-                      ))}
+                      {/* Rows */}
+                      {siteStatsTableSorted.map(s => {
+                        const daysColor = s.avgDays < 40 ? "#16a34a" : s.avgDays < 55 ? "#2563eb" : s.avgDays < 65 ? "#d97706" : "#dc2626";
+                        const ncrColor = s.ncr >= 95 ? "#16a34a" : s.ncr >= 85 ? "#d97706" : "#dc2626";
+                        const denialColor = s.denialRate <= 5 ? "#16a34a" : s.denialRate <= 10 ? "#d97706" : "#dc2626";
+                        return (
+                          <div key={s.site} onClick={() => setSiteFilter(s.site)}
+                            style={{ display: "grid", gridTemplateColumns: cols9, minWidth: 820, padding: "7px 16px", cursor: "pointer", borderTop: "1px solid #f8fafc", background: "transparent", alignItems: "center" }}
+                            onMouseEnter={e => e.currentTarget.style.background="#f8fafc"}
+                            onMouseLeave={e => e.currentTarget.style.background="transparent"}>
+                            <span style={{ fontSize: 11, color: "#0f172a", fontWeight: 600 }}>{s.site}</span>
+                            <span style={{ fontSize: 11, color: "#475569", textAlign:"right" }}>{fmt(s.npr)}</span>
+                            <span style={{ fontSize: 11, color: "#475569", textAlign:"right" }}>{fmt(s.totalAR)}</span>
+                            <span style={{ fontSize: 11, color: "#64748b", textAlign:"right" }}>{fmt(s.totalDNFB)}</span>
+                            <span style={{ fontSize: 11, color: "#334155", fontWeight: 600, textAlign:"right" }}>{fmt(s.totalExposure)}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: "#2563eb", textAlign:"right" }}>{fmt(s.totalEV)}</span>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: daysColor, textAlign:"right" }}>{s.avgDays}d</span>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: ncrColor, textAlign:"right" }}>{s.ncr}%</span>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: denialColor, textAlign:"right" }}>{s.denialRate}%</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
-                  {/* Active site label */}
+                  {/* Active site context when filtered */}
                   {siteFilter && (
-                    <div style={{ padding: "8px 16px", fontSize: 11, color: "#2563eb", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
-                      <span>Showing: {siteFilter}</span>
-                      <button onClick={() => setSiteFilter(null)} style={{ fontSize: 10, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}>✕ clear</button>
+                    <div style={{ padding: "7px 16px", fontSize: 11, color: "#2563eb", fontWeight: 600, display: "flex", alignItems: "center", gap: 6, borderTop: "1px solid #f1f5f9" }}>
+                      <span>📍 Showing: {siteFilter}</span>
+                      {(() => {
+                        const s = siteStats.find(x => x.site === siteFilter);
+                        if (!s) return null;
+                        const daysColor = s.avgDays < 40 ? "#16a34a" : s.avgDays < 55 ? "#2563eb" : s.avgDays < 65 ? "#d97706" : "#dc2626";
+                        const ncrColor = s.ncr >= 95 ? "#16a34a" : s.ncr >= 85 ? "#d97706" : "#dc2626";
+                        return (
+                          <span style={{ fontWeight: 400, color: "#64748b", fontSize: 11 }}>
+                            · NPR {fmt(s.npr)} · AR {fmt(s.totalAR)} · DNFB {fmt(s.totalDNFB)} · EV <span style={{ color: "#2563eb", fontWeight: 600 }}>{fmt(s.totalEV)}</span> · AR Days <span style={{ color: daysColor, fontWeight: 600 }}>{s.avgDays}d</span> · NCR <span style={{ color: ncrColor, fontWeight: 600 }}>{s.ncr}%</span> · Denial <span style={{ color: s.denialRate <= 5 ? "#16a34a" : s.denialRate <= 10 ? "#d97706" : "#dc2626", fontWeight: 600 }}>{s.denialRate}%</span>
+                          </span>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
