@@ -77,14 +77,20 @@ const PAYER_BENCHMARKS = {
 };
 
 const ROLE_DEFS = {
-  commercial_collector: { label: "Commercial Collector", paneLabel: "Commercial accounts only", filter: ["commercial"], mode: "collector" },
-  medicare_bc:          { label: "Medicare B/C",          paneLabel: "Medicare only — portal workflow", filter: ["medicare"], mode: "medicare_bc" },
-  medicaid:             { label: "Medicaid Specialist",    paneLabel: "Medicaid accounts only", filter: ["medicaid"], mode: "collector" },
-  wc:                   { label: "Worker's Comp",          paneLabel: "Worker's Comp accounts only", filter: ["workers_comp"], mode: "collector" },
-  biller:               { label: "Biller — All Payers",    paneLabel: "All payer types", filter: ["all"], mode: "biller" },
-  self_pay:             { label: "Self-Pay Specialist",    paneLabel: "Patient accounts — 30-day hold active", filter: ["self_pay"], mode: "self_pay" },
-  supervisor:           { label: "Supervisor",             paneLabel: "All payer types", filter: ["all"], mode: "supervisor" },
-  cfo:                  { label: "CFO",                    paneLabel: "All payer types", filter: ["all"], mode: "cfo" },
+  commercial_collector: { label: "Commercial Collector",    paneLabel: "Commercial accounts only",              filter: ["commercial"],  mode: "collector" },
+  medicare_bc:          { label: "Medicare B/C",            paneLabel: "Medicare only — portal workflow",        filter: ["medicare"],    mode: "medicare_bc" },
+  medicaid:             { label: "Medicaid Specialist",     paneLabel: "Medicaid accounts only",                filter: ["medicaid"],    mode: "collector" },
+  wc:                   { label: "Worker's Comp",           paneLabel: "Worker's Comp accounts only",           filter: ["workers_comp"],mode: "collector" },
+  biller:               { label: "Biller — All Payers",    paneLabel: "All payer types",                       filter: ["all"],         mode: "biller" },
+  self_pay:             { label: "Self-Pay Specialist",     paneLabel: "Patient accounts — 30-day hold active", filter: ["self_pay"],    mode: "self_pay" },
+  supervisor:           { label: "Supervisor",              paneLabel: "All payer types",                       filter: ["all"],         mode: "supervisor" },
+  cfo:                  { label: "CFO",                     paneLabel: "All payer types",                       filter: ["all"],         mode: "cfo" },
+  coder:                { label: "Coder",                   paneLabel: "Coding holds + WorkLink requests",      filter: ["all"],         mode: "area", area: "Coding" },
+  charge_capture:       { label: "Charge Capture",          paneLabel: "Charge holds + WorkLink requests",      filter: ["all"],         mode: "area", area: "Charge Capture" },
+  authorization:        { label: "Authorization",           paneLabel: "Auth holds + WorkLink requests",        filter: ["all"],         mode: "area", area: "Authorization" },
+  credentialing:        { label: "Credentialing",           paneLabel: "Credentialing holds + WorkLink requests",filter: ["all"],        mode: "area", area: "Credentialing" },
+  him:                  { label: "HIM / Physician Doc",     paneLabel: "HIM & physician holds + WorkLink",      filter: ["all"],         mode: "area", area: "Clinical/HIM" },
+  billing_scrubber:     { label: "Billing / Scrubber",      paneLabel: "Billing holds + WorkLink requests",     filter: ["all"],         mode: "area", area: "Billing/Scrubber" },
 };
 
 const ESCALATION_DATA = {
@@ -827,6 +833,280 @@ Requirements:
             }}>Regenerate</button>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+// ─── Area Worklist ────────────────────────────────────────────────────────────
+
+function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn }) {
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 768;
+  const [resolving, setResolving] = useState(null);
+  const [resolutionNote, setResolutionNote] = useState("");
+  const [worked, setWorked] = useState(new Set());
+
+  // Native DNFB accounts for this area
+  const nativeAccounts = dnfbScored
+    .filter(a => a.area === area && !worked.has(a.id))
+    .map(a => ({ ...a, _type: "native" }));
+
+  // Incoming WorkLink requests for this area
+  const incomingRequests = worklinks
+    .filter(w => w.targetArea === area && w.status === "open")
+    .map(w => ({ ...w, _type: "worklink", expectedValue: w.expectedValue }));
+
+  // Interleave by EV descending
+  const queue = [...nativeAccounts, ...incomingRequests]
+    .sort((a, b) => b.expectedValue - a.expectedValue);
+
+  const openWL = incomingRequests.length;
+  const totalEV = queue.reduce((s, a) => s + a.expectedValue, 0);
+  const breached = incomingRequests.filter(w => new Date() > w.slaDue).length;
+  const slaColor = (w) => new Date() > w.slaDue ? "#dc2626" : (new Date(w.slaDue) - Date.now()) < 3600000 ? "#d97706" : "#16a34a";
+  const slaRemaining = (w) => {
+    const ms = new Date(w.slaDue) - Date.now();
+    if (ms < 0) return "SLA breached";
+    const hrs = Math.floor(ms / 3600000);
+    const mins = Math.floor((ms % 3600000) / 60000);
+    return hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+  };
+
+  return (
+    <div style={{ padding: isMobile ? "16px 12px 80px" : "24px 32px" }}>
+      {/* Metrics */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>
+        {[
+          { label: "In queue", value: queue.length, sub: `${nativeAccounts.length} native · ${openWL} WorkLink`, color: "#0f172a" },
+          { label: "Total EV", value: fmt(totalEV), sub: "expected recovery at stake", color: "#2563eb" },
+          { label: "WorkLink requests", value: openWL, sub: breached > 0 ? `${breached} SLA breached` : "all within SLA", color: openWL > 0 ? "#0369a1" : "#16a34a" },
+          { label: "SLA breached", value: breached, sub: breached > 0 ? "needs immediate action" : "all on track", color: breached > 0 ? "#dc2626" : "#16a34a" },
+        ].map(m => (
+          <div key={m.label} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
+            <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>{m.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: m.color }}>{m.value}</div>
+            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{m.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {queue.length === 0 && (
+        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "40px 24px", textAlign: "center" }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#16a34a" }}>Queue clear</div>
+          <div style={{ fontSize: 13, color: "#166534", marginTop: 4 }}>No accounts or WorkLink requests pending.</div>
+        </div>
+      )}
+
+      {queue.map(item => {
+        if (item._type === "worklink") {
+          // WorkLink card — light blue
+          const w = item;
+          return (
+            <div key={w.id} style={{ background: "#f0f9ff", border: `1px solid ${new Date() > w.slaDue ? "#fca5a5" : "#bae6fd"}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
+              <div style={{ padding: "12px 18px", borderBottom: "1px solid #e0f2fe", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, background: "#0369a1", color: "#fff", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.06em" }}>⇄ WORKLINK</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "#0369a1" }}>{w.requestIcon} {w.requestLabel}</span>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: slaColor(w), background: slaColor(w) + "14", padding: "2px 8px", borderRadius: 4 }}>⏱ {slaRemaining(w)}</span>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 2 }}>{w.patient}</div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>{w.accountId} · {w.payer} · {w.vertical}</div>
+                  <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.6, marginTop: 8, padding: "8px 12px", background: "#fff", borderRadius: 6, border: "1px solid #e0f2fe" }}>{w.note}</div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 2 }}>Expected value</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: "#2563eb" }}>{fmt(w.expectedValue)}</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(w.amount)} balance</div>
+                </div>
+              </div>
+              <div style={{ padding: "10px 18px" }}>
+                {resolving === w.id ? (
+                  <>
+                    <textarea value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} placeholder="What action did you take?" rows={2}
+                      style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", fontSize: 13, border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff", color: "#0f172a", fontFamily: "inherit", resize: "none", outline: "none", marginBottom: 8 }} />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => { onResolve(w.id, resolutionNote); setResolving(null); setResolutionNote(""); }}
+                        style={{ flex: 1, padding: "8px", background: "#16a34a", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>✓ Mark resolved</button>
+                      <button onClick={() => setResolving(null)} style={{ padding: "8px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Cancel</button>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setResolving(w.id)}
+                      style={{ flex: 1, padding: "8px", background: "#0369a1", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>Resolve</button>
+                    <button onClick={() => onReturn(w.id)}
+                      style={{ padding: "8px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>Return</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        } else {
+          // Native DNFB account card
+          const a = item;
+          return (
+            <div key={a.id} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, marginBottom: 8, padding: "14px 18px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0", padding: "2px 8px", borderRadius: 4 }}>{a.holdCode}</span>
+                    <span style={{ fontSize: 10, color: "#94a3b8" }}>{a.daysInDNFB}d in DNFB</span>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 2 }}>{a.patient}</div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>{a.id} · {a.site} · {a.vertical} · {a.payer}</div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 2 }}>Expected value</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "#2563eb" }}>{fmt(a.expectedValue)}</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(a.amount)} balance</div>
+                </div>
+              </div>
+              <button onClick={() => setWorked(prev => new Set([...prev, a.id]))}
+                style={{ marginTop: 10, width: "100%", padding: "8px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
+                Mark worked ✓
+              </button>
+            </div>
+          );
+        }
+      })}
+    </div>
+  );
+}
+
+// ─── WorkLink Reporting ───────────────────────────────────────────────────────
+
+function WorkLinkReporting({ worklinks, isMobile }) {
+  const [drillArea, setDrillArea] = useState(null);
+
+  const open = worklinks.filter(w => w.status === "open");
+  const resolved = worklinks.filter(w => w.status !== "open");
+
+  // Group by target area
+  const byArea = {};
+  WORKLINK_TARGET_AREAS.forEach(area => {
+    const areaOpen = open.filter(w => w.targetArea === area);
+    const areaResolved = resolved.filter(w => w.targetArea === area);
+    const totalEV = areaOpen.reduce((s,w) => s+w.expectedValue, 0);
+    const breached = areaOpen.filter(w => new Date() > w.slaDue).length;
+    const avgResolutionHrs = areaResolved.length
+      ? Math.round(areaResolved.reduce((s,w) => s + (new Date(w.resolvedAt) - new Date(w.sentAt)) / 3600000, 0) / areaResolved.length)
+      : null;
+    byArea[area] = { open: areaOpen, resolved: areaResolved, totalEV, breached, avgResolutionHrs };
+  });
+
+  const activeAreas = WORKLINK_TARGET_AREAS.filter(a => byArea[a].open.length > 0 || byArea[a].resolved.length > 0)
+    .sort((a,b) => byArea[b].totalEV - byArea[a].totalEV);
+
+  const totalOpenEV = open.reduce((s,w) => s+w.expectedValue, 0);
+  const totalBreached = open.filter(w => new Date() > w.slaDue).length;
+
+  // Donut for EV by area
+  const cx = 56, cy = 56, outerR = 46, innerR = 28;
+  const areaColors2 = { "Coding":"#6d28d9","Physician/Doc":"#1d4ed8","Charge Capture":"#be185d","Credentialing":"#9f1239","Authorization":"#c2410c","Clinical/HIM":"#0369a1","Billing/Scrubber":"#0f766e" };
+  const toXY2 = (r, deg) => { const rad = (deg-90)*Math.PI/180; return [+(cx+r*Math.cos(rad)).toFixed(3), +(cy+r*Math.sin(rad)).toFixed(3)]; };
+  const arcPath2 = (s, e) => { const [ox1,oy1]=toXY2(outerR,s);const [ox2,oy2]=toXY2(outerR,e);const [ix2,iy2]=toXY2(innerR,e);const [ix1,iy1]=toXY2(innerR,s);const lg=(e-s)>180?1:0;return `M${ox1} ${oy1} A${outerR} ${outerR} 0 ${lg} 1 ${ox2} ${oy2} L${ix2} ${iy2} A${innerR} ${innerR} 0 ${lg} 0 ${ix1} ${iy1}Z`; };
+  let angle2 = 0;
+  const donutSegs = activeAreas.map(area => {
+    const sweep = totalOpenEV > 0 ? (byArea[area].totalEV / totalOpenEV) * 359.99 : 0;
+    const seg = { area, sweep, startDeg: angle2, endDeg: angle2 + sweep };
+    angle2 += sweep;
+    return seg;
+  });
+
+  if (open.length === 0 && resolved.length === 0) return (
+    <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "24px", textAlign: "center", marginBottom: 16 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "#16a34a" }}>✓ No WorkLink activity this session</div>
+    </div>
+  );
+
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 20px", marginBottom: 16 }}>
+      <div style={{ fontSize: 10, color: "#0369a1", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 14 }}>⇄ WIP WorkLink — by area</div>
+
+      {/* Summary row */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 10, marginBottom: 16 }}>
+        {[
+          { label: "Open requests", value: open.length, color: "#0369a1" },
+          { label: "Total EV at stake", value: fmt(totalOpenEV), color: "#2563eb" },
+          { label: "SLA breached", value: totalBreached, color: totalBreached > 0 ? "#dc2626" : "#16a34a" },
+          { label: "Resolved this session", value: resolved.length, color: "#16a34a" },
+        ].map(m => (
+          <div key={m.label} style={{ background: "#f8fafc", borderRadius: 8, padding: "10px 12px", border: "1px solid #f1f5f9" }}>
+            <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>{m.label}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: m.color }}>{m.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Donut + area cards */}
+      <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexDirection: isMobile ? "column" : "row" }}>
+        {totalOpenEV > 0 && (
+          <div style={{ flexShrink: 0 }}>
+            <svg width="112" height="112" viewBox="0 0 112 112">
+              {donutSegs.map(s => s.sweep > 0 && (
+                <path key={s.area} d={arcPath2(s.startDeg, s.endDeg)}
+                  fill={drillArea === s.area ? areaColors2[s.area] : (drillArea ? areaColors2[s.area] + "40" : areaColors2[s.area])}
+                  stroke="#fff" strokeWidth={1.5} style={{ cursor: "pointer" }}
+                  onClick={() => setDrillArea(drillArea === s.area ? null : s.area)} />
+              ))}
+              <text x={cx} y={cy-5} textAnchor="middle" fontSize="8" fill="#94a3b8" fontFamily="system-ui">EV</text>
+              <text x={cx} y={cy+8} textAnchor="middle" fontSize="11" fontWeight="700" fill="#0f172a" fontFamily="system-ui">{fmtDonut(totalOpenEV)}</text>
+            </svg>
+          </div>
+        )}
+
+        {/* Area cards */}
+        <div style={{ flex: 1, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2,1fr)", gap: 8 }}>
+          {activeAreas.map(area => {
+            const d = byArea[area];
+            const isActive = drillArea === area;
+            return (
+              <div key={area} onClick={() => setDrillArea(isActive ? null : area)}
+                style={{ padding: "10px 14px", borderRadius: 8, border: `1px solid ${isActive ? (areaColors2[area] || "#0369a1") : "#e2e8f0"}`, background: isActive ? (areaColors2[area] || "#0369a1") + "08" : "#f8fafc", cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: areaColors2[area] || "#64748b" }} />
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>{area}</span>
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#2563eb" }}>{fmt(d.totalEV)}</span>
+                </div>
+                <div style={{ display: "flex", gap: 12, fontSize: 10, color: "#94a3b8" }}>
+                  <span>{d.open.length} open</span>
+                  {d.breached > 0 && <span style={{ color: "#dc2626", fontWeight: 600 }}>⚠ {d.breached} breached</span>}
+                  {d.avgResolutionHrs !== null && <span>avg {d.avgResolutionHrs}h to resolve</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Drill-down */}
+      {drillArea && byArea[drillArea].open.length > 0 && (
+        <div style={{ marginTop: 14, borderTop: "1px solid #f1f5f9", paddingTop: 14 }}>
+          <div style={{ fontSize: 10, color: "#0369a1", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 10 }}>{drillArea} — open requests ({byArea[drillArea].open.length})</div>
+          {byArea[drillArea].open.sort((a,b) => b.expectedValue - a.expectedValue).map(w => (
+            <div key={w.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #f1f5f9", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: "#0f172a" }}>{w.patient}</div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>{w.accountId} · {w.requestIcon} {w.requestLabel} · {w.payer}</div>
+                <div style={{ fontSize: 10, color: new Date() > w.slaDue ? "#dc2626" : "#94a3b8", marginTop: 2 }}>
+                  {new Date() > w.slaDue ? "⚠ SLA breached" : `⏱ ${Math.max(0, Math.floor((new Date(w.slaDue) - Date.now()) / 3600000))}h remaining`}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#2563eb" }}>{fmt(w.expectedValue)}</div>
+                <div style={{ fontSize: 10, color: "#94a3b8" }}>EV</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {drillArea && byArea[drillArea].open.length === 0 && (
+        <div style={{ marginTop: 14, borderTop: "1px solid #f1f5f9", paddingTop: 14, fontSize: 12, color: "#16a34a" }}>✓ No open requests in {drillArea}</div>
       )}
     </div>
   );
@@ -2347,6 +2627,7 @@ export default function WIPPlatform() {
 
   const isSelfPayMode = roleConfig?.mode === "self_pay";
   const isCollectorMode = roleConfig?.mode === "collector" || roleConfig?.mode === "medicare_bc";
+  const isAreaMode = roleConfig?.mode === "area";
   if (isSelfPayMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif" }}>
@@ -2392,6 +2673,17 @@ export default function WIPPlatform() {
                 </div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Area Worklists</div>
+                <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+                  {seg("Coder", "coder")}
+                  {seg("Charge", "charge_capture")}
+                  {seg("Auth", "authorization")}
+                  {seg("Cred", "credentialing")}
+                  {seg("HIM", "him")}
+                  {seg("Billing", "billing_scrubber")}
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                 <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Management</div>
                 <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2 }}>
                   {seg("Supervisor", "supervisor")}
@@ -2415,6 +2707,58 @@ export default function WIPPlatform() {
     );
   }
 
+  if (isAreaMode) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif" }}>
+        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "10px 16px" : "14px 32px", display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", flexWrap: "wrap", gap: isMobile ? 10 : 0 }}>
+          <div>
+            <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 2 }}>D4 Consulting Group</div>
+            <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 600, color: "#0f172a" }}>WIP Intelligence Platform <span style={{ fontSize: 11, color: "#2563eb", marginLeft: 6 }}>v2.1</span></div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: isMobile ? "flex-start" : "flex-end" }}>
+            <div style={{ display: "flex", gap: isMobile ? 4 : 8, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Area Worklists</div>
+                <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+                  {seg("Coder", "coder")}
+                  {seg("Charge", "charge_capture")}
+                  {seg("Auth", "authorization")}
+                  {seg("Cred", "credentialing")}
+                  {seg("HIM", "him")}
+                  {seg("Billing", "billing_scrubber")}
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Other roles</div>
+                <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+                  {seg("Biller", "biller")}
+                  {seg("Comm.", "commercial_collector")}
+                  {seg("Supervisor", "supervisor")}
+                  {seg("CFO", "cfo")}
+                </div>
+              </div>
+            </div>
+            {!isMobile && <div style={{ fontSize: 10, color: "#94a3b8" }}><span style={{ color: "#2563eb", fontWeight: 500 }}>{roleConfig.label}</span> — {roleConfig.paneLabel}</div>}
+          </div>
+        </div>
+        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "8px 16px" : "10px 32px", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>{roleConfig.label}</span>
+          <span style={{ fontSize: 11, color: "#94a3b8" }}>DNFB holds + WorkLink requests · sorted by expected value</span>
+          {worklinks.filter(w => w.targetArea === roleConfig.area && w.status === "open").length > 0 && (
+            <span style={{ background: "#0369a1", color: "#fff", borderRadius: 10, padding: "1px 8px", fontSize: 10, fontWeight: 700 }}>
+              {worklinks.filter(w => w.targetArea === roleConfig.area && w.status === "open").length} WorkLink
+            </span>
+          )}
+        </div>
+        <AreaWorklist area={roleConfig.area} dnfbScored={dnfbForRole} worklinks={worklinks} onResolve={handleResolveWorklink} onReturn={handleReturnWorklink} />
+        <div style={{ borderTop: "1px solid #e2e8f0", padding: isMobile ? "12px 16px" : "14px 32px", display: "flex", justifyContent: "space-between", fontSize: 10, color: "#cbd5e1" }}>
+          <span>D4 Consulting Group — Proprietary</span>
+          {!isMobile && <span>WIP Intelligence Platform v2.1 · Human-in-the-loop · Phase 1 Internal</span>}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif" }}>
       <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "10px 16px" : "14px 32px", display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", flexWrap: "wrap", gap: isMobile ? 10 : 0 }}>
@@ -2434,6 +2778,17 @@ export default function WIPPlatform() {
                 {seg("Medicaid", "medicaid")}
                 {seg("Self-Pay", "self_pay")}
                 {seg("WC", "wc")}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Area Worklists</div>
+              <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+                {seg("Coder", "coder")}
+                {seg("Charge", "charge_capture")}
+                {seg("Auth", "authorization")}
+                {seg("Cred", "credentialing")}
+                {seg("HIM", "him")}
+                {seg("Billing", "billing_scrubber")}
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -2469,9 +2824,9 @@ export default function WIPPlatform() {
           {role === "biller" && (
             <button style={tabStyle(tab === "dnfb")} onClick={() => { setTab("dnfb"); setAreaFilter(null); setSeverityFilter(null); setSearchQuery(""); setAiText(null); }}>Billing WIP — Read Only ({dnfbForRole.length})</button>
           )}
-          {role === "biller" && (
+          {role === "supervisor" && (
             <button onClick={() => setTab("worklink")} style={{ ...tabStyle(tab === "worklink"), color: tab === "worklink" ? "#0369a1" : "#64748b", borderBottomColor: tab === "worklink" ? "#0369a1" : "transparent" }}>
-              WIP WorkLink
+              WorkLink
               {worklinks.filter(w => w.status === "open").length > 0 && (
                 <span style={{ background: "#0369a1", color: "#fff", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 700, marginLeft: 6 }}>{worklinks.filter(w => w.status === "open").length}</span>
               )}
@@ -2524,8 +2879,11 @@ export default function WIPPlatform() {
       {tab === "escalation" && role === "supervisor" && (
         <EscalationQueue arScored={arForRole} dnfbScored={dnfbForRole} />
       )}
-      {tab === "worklink" && role === "biller" && (
-        <WorkLinkQueue worklinks={worklinks} onResolve={handleResolveWorklink} onReturn={handleReturnWorklink} />
+      {tab === "worklink" && role === "supervisor" && (
+        <div style={{ padding: isMobile ? "16px 12px 80px" : "24px 32px" }}>
+          <WorkLinkReporting worklinks={worklinks} isMobile={isMobile} />
+          <WorkLinkQueue worklinks={worklinks} onResolve={handleResolveWorklink} onReturn={handleReturnWorklink} />
+        </div>
       )}
       {tab !== "escalation" && tab !== "worklink" && (
       <div style={{ padding: isMobile ? "16px 12px 80px" : isTablet ? "20px 20px" : "24px 32px" }}>
@@ -2850,6 +3208,7 @@ export default function WIPPlatform() {
           </div>
         </div>
 
+        {role === "cfo" && tab === "metrics" && <WorkLinkReporting worklinks={worklinks} isMobile={isMobile} />}
         {role === "cfo" && tab === "metrics" && <CFOEscalationSection />}
 
         {critFilter && (
