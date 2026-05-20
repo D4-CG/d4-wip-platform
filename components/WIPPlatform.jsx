@@ -1013,13 +1013,13 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
               </button>
               {onWorkLink && !WORKLINK_HOLD_MAP[a.holdCode] && (
                 <button onClick={() => setWlAccount(a.id)}
-                  style={{ padding: "8px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, color: "#2563eb", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
-                  ⇄ WorkLink
+                  style={{ background: "#fff", border: "1.5px solid #2563eb", borderRadius: 20, color: "#2563eb", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", padding: "6px 16px", display: "flex", alignItems: "center", gap: 6 }}>
+                  ⇄ Send WorkLink Request
                 </button>
               )}
               {onWorkLink && WORKLINK_HOLD_MAP[a.holdCode] && (
-                <button onClick={() => setWlAccount(a.id)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 11, fontFamily: "inherit", textDecoration: "underline", padding: 0 }}>
-                  different WorkLink
+                <button onClick={() => setWlAccount(a.id)} style={{ background: "#fff", border: "1.5px solid #2563eb", borderRadius: 20, color: "#2563eb", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", padding: "6px 16px", display: "flex", alignItems: "center", gap: 6 }}>
+                  ⇄ Different WorkLink
                 </button>
               )}
             </div>
@@ -1721,10 +1721,10 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
             <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.65, marginBottom: 14 }}>{acc.action.text}</div>
             {!approved && (
               <>
-                <button onClick={() => setApproved(true)} style={{ width: "100%", padding: "9px 20px", background: "#2563eb", border: "1px solid #2563eb", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", marginBottom: 6 }}>
+                <button onClick={() => setApproved(true)} style={{ width: "100%", padding: "9px 20px", background: "#2563eb", border: "1px solid #2563eb", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", marginBottom: 8 }}>
                   Approve action
                 </button>
-                <button onClick={() => setOverriding(true)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 11, fontFamily: "inherit", textDecoration: "underline", padding: 0 }}>
+                <button onClick={() => setOverriding(true)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, fontFamily: "inherit", textDecoration: "underline", padding: 0 }}>
                   ↺ Override recommended action
                 </button>
               </>
@@ -1789,8 +1789,8 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
             )}
             {!showWorkLink && (
               <button onClick={() => setShowWorkLink(true)}
-                style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 11, fontFamily: "inherit", textDecoration: "underline", padding: 0, marginBottom: 8 }}>
-                {draft ? "or send different WorkLink" : "⇄ Send WorkLink request"}
+                style={{ background: "#fff", border: "1.5px solid #2563eb", borderRadius: 20, color: "#2563eb", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", padding: "6px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                ⇄ {draft ? "Send different WorkLink" : "Send WorkLink Request"}
               </button>
             )}
             {showWorkLink && (
@@ -2846,24 +2846,69 @@ export default function WIPPlatform() {
     URL.revokeObjectURL(url);
   };
 
-  const totalWIP = current.reduce((s,a) => s + a.amount, 0);
-  const totalEV = current.reduce((s,a) => s + a.expectedValue, 0);
-  const critCount = current.filter(a => a.cfg.severity === "CRITICAL").length;
+  const totalWIP = (role === "cfo" ? dnfbFiltered : current).reduce((s,a) => s + a.amount, 0);
+  const totalARVal = (role === "cfo" ? arFiltered : current).reduce((s,a) => s + a.amount, 0);
+  const totalEV = (role === "cfo" ? arFiltered : current).reduce((s,a) => s + a.expectedValue, 0);
+  const critCount = (role === "cfo" ? arFiltered : current).filter(a => a.cfg.severity === "CRITICAL").length;
 
   const runAI = async () => {
     setAiLoading(true);
+    const baseAR = role === "cfo" ? arFiltered : current;
+    const baseDNFB = role === "cfo" ? dnfbFiltered : current;
     const byArea = {};
-    current.forEach(a => { byArea[a.area] = (byArea[a.area] || 0) + a.amount; });
+    baseDNFB.forEach(a => { byArea[a.area] = (byArea[a.area] || 0) + a.amount; });
     const topArea = Object.entries(byArea).sort((a,b) => b[1]-a[1])[0];
-    const crits = current.filter(a => a.cfg.severity === "CRITICAL");
+    const crits = baseAR.filter(a => a.cfg.severity === "CRITICAL");
     const woList = ESCALATION_DATA.writeOffPending.map(w => w.accountId + " " + fmt(w.amount)).join(", ");
-    const critList = crits.slice(0,3).map(a => a.id + " " + a.vertical + " " + fmt(a.amount) + " (" + a.cfg.label + ")").join("; ");
+    const critList = crits.slice(0,5).map(a => a.id + " · " + a.patient + " · " + a.payer + " · " + fmt(a.amount) + " · " + a.cfg.label + " · " + a.daysOut + " days").join("; ");
     const verticalCtx = CLIENT_CONFIG.verticalContext[CLIENT_CONFIG.vertical] || "";
-    const prompt = "You are a healthcare revenue cycle expert advising a CFO." + (verticalCtx ? " " + verticalCtx : "") + " Return ONLY a valid JSON object with exactly these four keys: status, priorities, risks, decisions. No markdown, no code fences, no explanation. Just the raw JSON object.\n\nPortfolio: " + fmt(totalWIP) + " total WIP, " + fmt(totalEV) + " expected recovery (" + Math.round(totalEV / Math.max(totalWIP, 1) * 100) + "%). Critical holds: " + critCount + ". Largest area: " + (topArea?.[0] || "none") + " at " + fmt(topArea?.[1] || 0) + ". Critical accounts: " + critList + ". Write-offs pending: " + woList + ".\n\nJSON: {status: one sentence on portfolio health, priorities: [two specific priority actions with account IDs and amounts], risks: [two specific risk flags], decisions: [one or two items requiring CFO action or approval]}";
+    const siteCtx = siteFilter ? `Site filter active: ${siteFilter} only.` : `All ${[...new Set([...baseAR,...baseDNFB].map(a=>a.site))].length} sites.`;
+
+    // Payer breakdown
+    const payerBreakdown = Object.entries(
+      baseAR.reduce((acc, a) => { const cat = PAYER_CATEGORY[a.payer] || "other"; acc[cat] = (acc[cat] || 0) + a.amount; return acc; }, {})
+    ).sort((a,b) => b[1]-a[1]).map(([k,v]) => `${k}: ${fmt(v)}`).join(", ");
+
+    // Area breakdown for DNFB
+    const areaBreakdown = Object.entries(byArea).sort((a,b) => b[1]-a[1]).map(([k,v]) => `${k}: ${fmt(v)}`).join(", ");
+
+    // Denial summary
+    const deniedAccounts = baseAR.filter(a => a.denialCode);
+    const denialRate = baseAR.length > 0 ? Math.round(deniedAccounts.length / baseAR.length * 100) : 0;
+
+    // WorkLink summary
+    const openWL = worklinks.filter(w => w.status === "open").length;
+    const breachedWL = worklinks.filter(w => w.status === "open" && new Date() > w.slaDue).length;
+
+    const prompt = `You are a healthcare revenue cycle expert advising a CFO. ${verticalCtx} ${siteCtx}
+
+Return ONLY a valid JSON object with exactly these four keys: status, priorities, risks, decisions. No markdown, no code fences. Raw JSON only.
+
+PORTFOLIO DATA:
+- Total AR (billed): ${fmt(totalARVal)} across ${baseAR.length} accounts
+- Total DNFB (unbilled): ${fmt(totalWIP)} across ${baseDNFB.length} accounts  
+- Expected Recovery (EV): ${fmt(totalEV)} (${Math.round(totalEV / Math.max(totalARVal, 1) * 100)}% NCR)
+- Critical holds: ${critCount} accounts
+- Denial rate: ${denialRate}% (${deniedAccounts.length} of ${baseAR.length} accounts)
+- Open WorkLink requests: ${openWL} (${breachedWL} SLA breached)
+- Write-offs pending CFO approval: ${woList || "none"}
+
+PAYER MIX (AR): ${payerBreakdown}
+DNFB BY AREA: ${areaBreakdown}
+TOP CRITICAL ACCOUNTS: ${critList || "none"}
+
+Return JSON with:
+{
+  "status": "2-3 sentence executive summary of portfolio health, NCR performance, and biggest operational issue",
+  "priorities": ["3 specific priority actions, each naming the account ID or area, dollar amount, and exact next step", "...", "..."],
+  "risks": ["3 specific risk flags with dollar exposure quantified where possible", "...", "..."],
+  "decisions": ["1-2 specific items requiring CFO decision or approval with context and recommended action"]
+}`;
+
     try {
       const res = await fetch("/api/claude", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 600, messages: [{ role: "user", content: prompt }] })
+        body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 1000, messages: [{ role: "user", content: prompt }] })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -2876,7 +2921,7 @@ export default function WIPPlatform() {
       try {
         setAiText(JSON.parse(cleaned));
       } catch {
-        setAiText({ status: raw.slice(0, 300), priorities: [], risks: [], decisions: [] });
+        setAiText({ status: raw.slice(0, 500), priorities: [], risks: [], decisions: [] });
       }
     } catch (err) {
       console.error("AI summary error:", err);
