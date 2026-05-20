@@ -178,6 +178,8 @@ const WORKLINK_HOLD_MAP = {
   "CODING_UNASSIGNED":      { requestType: "recode",          requestLabel: "Recode account",      requestIcon: "💻", targetArea: "Coding" },
   "CREDENTIALING_GAP":      { requestType: "cred_gap",        requestLabel: "Credentialing gap",   requestIcon: "📋", targetArea: "Credentialing" },
 };
+
+const WORKLINK_REQUEST_TYPES = [
   { value: "chase_auth",    label: "Chase authorization",      icon: "🔐", targetArea: "Authorization" },
   { value: "missing_charge",label: "Missing charge",           icon: "⚡", targetArea: "Charge Capture" },
   { value: "recode",        label: "Recode account",           icon: "💻", targetArea: "Coding" },
