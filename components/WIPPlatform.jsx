@@ -994,8 +994,8 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
         : (
           <div style={{ marginTop: 10 }}>
             {WORKLINK_HOLD_MAP[a.holdCode] && onWorkLink && (
-              <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "8px 12px", marginBottom: 6 }}>
-                <div style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700, marginBottom: 6 }}>
+              <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "8px 12px", marginBottom: 6 }}>
+                <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 700, marginBottom: 6 }}>
                   ⇄ WorkLink draft ready — {WORKLINK_HOLD_MAP[a.holdCode].requestIcon} {WORKLINK_HOLD_MAP[a.holdCode].requestLabel} → {WORKLINK_HOLD_MAP[a.holdCode].targetArea}
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -1171,7 +1171,9 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
             <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "32px 24px", textAlign: "center" }}>
               <div style={{ fontSize: 24, marginBottom: 8 }}>✓</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: "#16a34a" }}>Queue clear — at goal</div>
-              <div style={{ fontSize: 12, color: "#166534", marginTop: 4 }}>No accounts beyond normal hold period.</div>
+              <div style={{ fontSize: 12, color: "#166534", marginTop: 4 }}>
+                No accounts beyond normal hold period.{worked.size > 0 ? ` ${worked.size} account${worked.size > 1 ? "s" : ""} worked this session.` : ""}
+              </div>
             </div>
           ) : workAsap.map(a => <NativeCard key={a.id} a={a} />)}
         </>
@@ -1421,8 +1423,8 @@ function WorkLinkForm({ acc, onSubmit, onCancel, defaultRequestType, defaultTarg
           </div>
         ))}
       </div>
-      <div style={{ background: "#fff", border: "1px solid #e0f2fe", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
-        <div style={{ fontSize: 9, color: "#0369a1", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 6 }}>Generated request note</div>
+      <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
+        <div style={{ fontSize: 9, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 6 }}>✦ AI-generated note — review before sending</div>
         <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.6 }}>{noteReady}</div>
       </div>
       <div style={{ display: "flex", gap: 8 }}>
@@ -1771,8 +1773,8 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
         return (
           <div style={{ padding: "10px 22px 0" }}>
             {draft && !showWorkLink && (
-              <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
-                <div style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700, marginBottom: 6 }}>
+              <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
+                <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 700, marginBottom: 6 }}>
                   ⇄ WorkLink draft ready — {draft.requestIcon} {draft.requestLabel} → {draft.targetArea}
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -2771,7 +2773,20 @@ function CFOCriticalHolds({ accounts }) {
 
 export default function WIPPlatform() {
   const [tab, setTab] = useState("metrics");
-  const [role, setRole] = useState("cfo");
+  const [role, setRole] = useState(() => {
+    try { return localStorage.getItem("d4_last_role") || "cfo"; } catch { return "cfo"; }
+  });
+  const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
+
+  const setRoleAndPersist = (val) => {
+    try { localStorage.setItem("d4_last_role", val); } catch {}
+    setRole(val);
+    setAiText(null);
+    setSearchQuery("");
+    setAreaFilter(null);
+    setSeverityFilter(null);
+    setShowRoleSwitcher(false);
+  };
   const [areaFilter, setAreaFilter] = useState(null);
   const [severityFilter, setSeverityFilter] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -2931,7 +2946,7 @@ Return JSON with:
   };
 
   const seg = (label, val) => (
-    <button onClick={() => { setRole(val); setAiText(null); setSearchQuery(""); setAreaFilter(null); setSeverityFilter(null); }} style={{ padding: "6px 14px", cursor: "pointer", fontSize: 11, fontWeight: role === val ? 600 : 400, border: "none", borderRadius: 6, fontFamily: "inherit", background: role === val ? "#2563eb" : "transparent", color: role === val ? "#fff" : "#64748b" }}>{label}</button>
+    <button onClick={() => setRoleAndPersist(val)} style={{ padding: "6px 14px", cursor: "pointer", fontSize: 11, fontWeight: role === val ? 600 : 400, border: "none", borderRadius: 6, fontFamily: "inherit", background: role === val ? "#2563eb" : "transparent", color: role === val ? "#fff" : "#64748b" }}>{label}</button>
   );
 
   const tabStyle = active => ({ padding: "12px 20px", cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 400, border: "none", borderBottom: active ? "2px solid #2563eb" : "2px solid transparent", background: "transparent", color: active ? "#2563eb" : "#64748b", fontFamily: "inherit" });
@@ -3078,41 +3093,57 @@ Return JSON with:
           <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 600, color: "#0f172a" }}>WIP Intelligence Platform <span style={{ fontSize: 11, color: "#2563eb", marginLeft: 6 }}>v2.1</span></div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: isMobile ? "flex-start" : "flex-end" }}>
-          <div style={{ display: "flex", gap: isMobile ? 4 : 8, flexWrap: "wrap" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Collectors &amp; Billers</div>
-              <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
-                {seg("Biller", "biller")}
-                {seg("Comm.", "commercial_collector")}
-                {!isMobile && seg("Medicare B/C", "medicare_bc")}
-                {isMobile && seg("MC B/C", "medicare_bc")}
-                {seg("Medicaid", "medicaid")}
-                {seg("Self-Pay", "self_pay")}
-                {seg("WC", "wc")}
+          {/* Collapsed role display — shown by default */}
+          {!showRoleSwitcher ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 2 }}>Current role</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{roleConfig.label}</div>
               </div>
+              <button onClick={() => setShowRoleSwitcher(true)}
+                style={{ padding: "7px 14px", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 8, color: "#475569", cursor: "pointer", fontSize: 12, fontWeight: 500, fontFamily: "inherit" }}>
+                Switch role ↓
+              </button>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Area Worklists</div>
-              <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
-                {seg("Auth", "authorization")}
-                {seg("Charge", "charge_capture")}
-                {seg("Coder", "coder")}
-                {seg("HIM", "him")}
-                {seg("Billing", "billing_scrubber")}
-                {seg("Cred", "credentialing")}
+          ) : (
+            /* Expanded role switcher */
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+              <div style={{ display: "flex", gap: isMobile ? 4 : 8, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Collectors &amp; Billers</div>
+                  <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+                    {seg("Biller", "biller")}
+                    {seg("Comm.", "commercial_collector")}
+                    {!isMobile && seg("Medicare B/C", "medicare_bc")}
+                    {isMobile && seg("MC B/C", "medicare_bc")}
+                    {seg("Medicaid", "medicaid")}
+                    {seg("Self-Pay", "self_pay")}
+                    {seg("WC", "wc")}
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Area Worklists</div>
+                  <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+                    {seg("Auth", "authorization")}
+                    {seg("Charge", "charge_capture")}
+                    {seg("Coder", "coder")}
+                    {seg("HIM", "him")}
+                    {seg("Billing", "billing_scrubber")}
+                    {seg("Cred", "credentialing")}
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Management</div>
+                  <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2 }}>
+                    {seg("Supervisor", "supervisor")}
+                    {seg("CFO", "cfo")}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Management</div>
-              <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2 }}>
-                {seg("Supervisor", "supervisor")}
-                {seg("CFO", "cfo")}
-              </div>
-            </div>
-          </div>
-          {roleConfig.paneLabel && !isMobile && (
-            <div style={{ fontSize: 10, color: "#94a3b8" }}>
-              <span style={{ color: "#2563eb", fontWeight: 500 }}>{roleConfig.label}</span> — {roleConfig.paneLabel}
+              <button onClick={() => setShowRoleSwitcher(false)}
+                style={{ fontSize: 11, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textDecoration: "underline", padding: 0 }}>
+                ↑ collapse
+              </button>
             </div>
           )}
         </div>
@@ -3300,36 +3331,6 @@ Return JSON with:
               );
             })()}
 
-            {/* AI Executive Summary — top of metrics */}
-            <div style={{ marginBottom: 16 }}>
-              <button onClick={runAI} disabled={aiLoading} style={{ padding: "10px 20px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, color: "#2563eb", cursor: aiLoading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
-                {aiLoading ? "Analyzing..." : "✦ Generate AI Executive Summary"}
-              </button>
-              {aiText !== null && typeof aiText === "object" && (
-                <div style={{ background: "#fff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "18px 20px", marginTop: 10 }}>
-                  <div style={{ fontSize: 10, letterSpacing: "0.1em", color: "#2563eb", textTransform: "uppercase", marginBottom: 14, fontWeight: 700 }}>AI Executive Analysis</div>
-                  {aiText.status && <div style={{ fontSize: 13, color: "#1e3a5f", lineHeight: 1.7, marginBottom: 14, padding: "10px 14px", background: "#f8fbff", borderRadius: 8, borderLeft: "3px solid #2563eb" }}>{aiText.status}</div>}
-                  {aiText.priorities?.length > 0 && (
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#0369a1", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Top Priorities</div>
-                      {aiText.priorities.map((p, i) => <div key={i} style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginBottom: 4, paddingLeft: 12, borderLeft: "2px solid #bfdbfe" }}>{p}</div>)}
-                    </div>
-                  )}
-                  {aiText.risks?.length > 0 && (
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#c2410c", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Risk Flags</div>
-                      {aiText.risks.map((r, i) => <div key={i} style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginBottom: 4, paddingLeft: 12, borderLeft: "2px solid #fed7aa" }}>{r}</div>)}
-                    </div>
-                  )}
-                  {aiText.decisions?.length > 0 && (
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#b91c1c", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Decisions Required</div>
-                      {aiText.decisions.map((d, i) => <div key={i} style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginBottom: 4, paddingLeft: 12, borderLeft: "2px solid #fca5a5" }}>{d}</div>)}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
             <CFOCriticalHolds accounts={arFiltered} />
             {/* Headline KPIs */}
             {(() => {
@@ -3624,6 +3625,53 @@ Return JSON with:
 
         {role === "cfo" && tab === "metrics" && <WorkLinkReporting worklinks={worklinks} isMobile={isMobile} />}
         {role === "cfo" && tab === "metrics" && <CFOEscalationSection />}
+        {role === "cfo" && tab === "metrics" && (
+          <div style={{ padding: isMobile ? "0 12px 80px" : "0 32px 40px" }}>
+            <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 10, overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", borderBottom: "1px solid #e9d5ff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#7c3aed", marginBottom: 2 }}>✦ AI Executive Analysis</div>
+                  <div style={{ fontSize: 11, color: "#9333ea" }}>AI-generated · verify before acting · review after data, not before</div>
+                </div>
+                <button onClick={runAI} disabled={aiLoading} style={{ padding: "8px 18px", background: aiLoading ? "#f3e8ff" : "#7c3aed", border: "none", borderRadius: 8, color: aiLoading ? "#9333ea" : "#fff", cursor: aiLoading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+                  {aiLoading ? (
+                    <><span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span> Analyzing...</>
+                  ) : "✦ Generate Summary"}
+                </button>
+              </div>
+              {aiText !== null && typeof aiText === "object" && (
+                <div style={{ padding: "18px 20px" }}>
+                  {aiText.status && <div style={{ fontSize: 13, color: "#4c1d95", lineHeight: 1.8, marginBottom: 16, padding: "12px 16px", background: "#f5f3ff", borderRadius: 8, borderLeft: "3px solid #7c3aed" }}>{aiText.status}</div>}
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
+                    {aiText.priorities?.length > 0 && (
+                      <div style={{ background: "#fff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "12px 14px" }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#7c3aed", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Top Priorities</div>
+                        {aiText.priorities.map((p, i) => <div key={i} style={{ fontSize: 12, color: "#334155", lineHeight: 1.65, marginBottom: 6, paddingLeft: 10, borderLeft: "2px solid #c4b5fd" }}>{p}</div>)}
+                      </div>
+                    )}
+                    {aiText.risks?.length > 0 && (
+                      <div style={{ background: "#fff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "12px 14px" }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#b91c1c", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Risk Flags</div>
+                        {aiText.risks.map((r, i) => <div key={i} style={{ fontSize: 12, color: "#334155", lineHeight: 1.65, marginBottom: 6, paddingLeft: 10, borderLeft: "2px solid #fca5a5" }}>{r}</div>)}
+                      </div>
+                    )}
+                    {aiText.decisions?.length > 0 && (
+                      <div style={{ background: "#fff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "12px 14px" }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#b91c1c", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Decisions Required</div>
+                        {aiText.decisions.map((d, i) => <div key={i} style={{ fontSize: 12, color: "#334155", lineHeight: 1.65, marginBottom: 6, paddingLeft: 10, borderLeft: "2px solid #fca5a5" }}>{d}</div>)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {aiText === null && !aiLoading && (
+                <div style={{ padding: "24px 20px", textAlign: "center", color: "#9333ea", fontSize: 12 }}>
+                  Review the data above first, then generate the AI analysis to check your assessment.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {critFilter && (
           <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 14px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "#b91c1c" }}>
