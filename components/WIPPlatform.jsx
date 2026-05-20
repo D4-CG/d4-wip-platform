@@ -85,12 +85,12 @@ const ROLE_DEFS = {
   self_pay:             { label: "Self-Pay Specialist",     paneLabel: "Patient accounts — 30-day hold active", filter: ["self_pay"],    mode: "self_pay" },
   supervisor:           { label: "Supervisor",              paneLabel: "All payer types",                       filter: ["all"],         mode: "supervisor" },
   cfo:                  { label: "CFO",                     paneLabel: "All payer types",                       filter: ["all"],         mode: "cfo" },
-  coder:                { label: "Coder",                   paneLabel: "Coding holds + WorkLink requests",      filter: ["all"],         mode: "area", area: "Coding" },
-  charge_capture:       { label: "Charge Capture",          paneLabel: "Charge holds + WorkLink requests",      filter: ["all"],         mode: "area", area: "Charge Capture" },
   authorization:        { label: "Authorization",           paneLabel: "Auth holds + WorkLink requests",        filter: ["all"],         mode: "area", area: "Authorization" },
-  credentialing:        { label: "Credentialing",           paneLabel: "Credentialing holds + WorkLink requests",filter: ["all"],        mode: "area", area: "Credentialing" },
+  charge_capture:       { label: "Charge Capture",          paneLabel: "Charge holds + WorkLink requests",      filter: ["all"],         mode: "area", area: "Charge Capture" },
+  coder:                { label: "Coder",                   paneLabel: "Coding holds + WorkLink requests",      filter: ["all"],         mode: "area", area: "Coding" },
   him:                  { label: "HIM / Physician Doc",     paneLabel: "HIM & physician holds + WorkLink",      filter: ["all"],         mode: "area", area: "Clinical/HIM" },
   billing_scrubber:     { label: "Billing / Scrubber",      paneLabel: "Billing holds + WorkLink requests",     filter: ["all"],         mode: "area", area: "Billing/Scrubber" },
+  credentialing:        { label: "Credentialing",           paneLabel: "Credentialing holds + WorkLink requests",filter: ["all"],        mode: "area", area: "Credentialing" },
 };
 
 const ESCALATION_DATA = {
@@ -117,20 +117,34 @@ const ESCALATION_DATA = {
 
 const AREAS = ["Coding","Physician/Doc","Charge Capture","Credentialing","Authorization","Clinical/HIM","Billing/Scrubber","Pending"];
 
+// Revenue cycle order: Authorization → Charge Capture → Coding → HIM → Billing/Scrubber
+const RC_AREA_ORDER = ["Authorization","Charge Capture","Coding","Clinical/HIM","Billing/Scrubber","Credentialing","Physician/Doc"];
+
 const WORKLINK_REQUEST_TYPES = [
-  { value: "resubmit",      label: "Resubmit claim",          icon: "🔄", targetArea: "Billing/Scrubber" },
-  { value: "recode",        label: "Recode account",           icon: "💻", targetArea: "Coding" },
   { value: "chase_auth",    label: "Chase authorization",      icon: "🔐", targetArea: "Authorization" },
-  { value: "cred_gap",      label: "Credentialing gap",        icon: "📋", targetArea: "Credentialing" },
   { value: "missing_charge",label: "Missing charge",           icon: "⚡", targetArea: "Charge Capture" },
+  { value: "recode",        label: "Recode account",           icon: "💻", targetArea: "Coding" },
   { value: "him_deficiency",label: "HIM deficiency",           icon: "📄", targetArea: "Clinical/HIM" },
   { value: "physician_query",label: "Physician query",         icon: "👨‍⚕️", targetArea: "Physician/Doc" },
+  { value: "resubmit",      label: "Resubmit claim",          icon: "🔄", targetArea: "Billing/Scrubber" },
+  { value: "cred_gap",      label: "Credentialing gap",        icon: "📋", targetArea: "Credentialing" },
   { value: "other",         label: "Other",                    icon: "📌", targetArea: null },
 ];
 
-const WORKLINK_TARGET_AREAS = ["Billing/Scrubber","Coding","Authorization","Credentialing","Charge Capture","Clinical/HIM","Physician/Doc"];
+const WORKLINK_TARGET_AREAS = ["Authorization","Charge Capture","Coding","Clinical/HIM","Billing/Scrubber","Credentialing","Physician/Doc"];
 
 const WORKLINK_SLA_HRS = { CRITICAL: 4, URGENT: 24, MODERATE: 48, ROUTINE: 72 };
+
+const DEFAULT_GOALS = {
+  monitorMaxCount: null,   // no goal on monitor bucket
+  monitorMaxEV: null,
+  workAsapMaxCount: 0,     // goal: zero accounts in 3+ day bucket
+  workAsapMaxAgeDays: 5,   // max days from service date before escalation
+  workAsapMaxEV: 0,
+  worklinkSLATarget: 95,   // % resolved within SLA
+  worklinkMaxOpen: 10,     // max open requests per area
+  worklinkAvgResolutionHrs: 24,
+};
 
 function getWorklinkSLA(severity) {
   const hrs = WORKLINK_SLA_HRS[severity] || 48;
@@ -843,27 +857,40 @@ Requirements:
 function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn }) {
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
+  const [activeTab, setActiveTab] = useState("asap");
+  const [worked, setWorked] = useState(new Set());
   const [resolving, setResolving] = useState(null);
   const [resolutionNote, setResolutionNote] = useState("");
-  const [worked, setWorked] = useState(new Set());
+  const [showSettings, setShowSettings] = useState(false);
+  const [goals, setGoals] = useState({ ...DEFAULT_GOALS });
 
-  // Native DNFB accounts for this area
-  const nativeAccounts = dnfbScored
-    .filter(a => a.area === area && !worked.has(a.id))
-    .map(a => ({ ...a, _type: "native" }));
+  // Account buckets
+  const allNative = dnfbScored.filter(a => a.area === area && !worked.has(a.id));
+  const monitor   = allNative.filter(a => a.daysInDNFB <= 3).sort((a,b) => b.expectedValue - a.expectedValue);
+  const workAsap  = allNative.filter(a => a.daysInDNFB > 3).sort((a,b) => b.daysInDNFB - a.daysInDNFB || b.expectedValue - a.expectedValue);
+  const wlOpen    = worklinks.filter(w => w.targetArea === area && w.status === "open").sort((a,b) => new Date(a.slaDue) - new Date(b.slaDue));
 
-  // Incoming WorkLink requests for this area
-  const incomingRequests = worklinks
-    .filter(w => w.targetArea === area && w.status === "open")
-    .map(w => ({ ...w, _type: "worklink", expectedValue: w.expectedValue }));
+  // Variance calculations
+  const asapEV = workAsap.reduce((s,a) => s+a.expectedValue, 0);
+  const asapCountVariance = goals.workAsapMaxCount !== null ? workAsap.length - goals.workAsapMaxCount : null;
+  const asapEVVariance = goals.workAsapMaxEV !== null ? asapEV - goals.workAsapMaxEV : null;
 
-  // Interleave by EV descending
-  const queue = [...nativeAccounts, ...incomingRequests]
-    .sort((a, b) => b.expectedValue - a.expectedValue);
+  const wlTotal = worklinks.filter(w => w.targetArea === area).length;
+  const wlResolved = worklinks.filter(w => w.targetArea === area && w.status !== "open").length;
+  const wlBreached = wlOpen.filter(w => new Date() > w.slaDue).length;
+  const slaRate = wlTotal > 0 ? Math.round((wlResolved / wlTotal) * 100) : 100;
+  const slaVariance = slaRate - goals.worklinkSLATarget;
+  const openVariance = wlOpen.length - goals.worklinkMaxOpen;
 
-  const openWL = incomingRequests.length;
-  const totalEV = queue.reduce((s, a) => s + a.expectedValue, 0);
-  const breached = incomingRequests.filter(w => new Date() > w.slaDue).length;
+  const varColor = (v, higher = false) => {
+    if (v === null) return "#94a3b8";
+    const bad = higher ? v > 0 : v < 0;
+    const warn = higher ? v > -0.1 * Math.abs(goals.worklinkSLATarget) : v > 0;
+    if (!bad && !warn) return "#16a34a";
+    if (warn && !bad) return "#d97706";
+    return "#dc2626";
+  };
+
   const slaColor = (w) => new Date() > w.slaDue ? "#dc2626" : (new Date(w.slaDue) - Date.now()) < 3600000 ? "#d97706" : "#16a34a";
   const slaRemaining = (w) => {
     const ms = new Date(w.slaDue) - Date.now();
@@ -873,105 +900,197 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn }) {
     return hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
   };
 
+  const tabStyle = (t) => ({
+    padding: "10px 16px", cursor: "pointer", fontSize: 12, fontWeight: activeTab === t ? 600 : 400,
+    border: "none", borderBottom: activeTab === t ? "2px solid #2563eb" : "2px solid transparent",
+    background: "transparent", color: activeTab === t ? "#2563eb" : "#64748b", fontFamily: "inherit",
+  });
+
+  const NativeCard = ({ a }) => (
+    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, marginBottom: 8, padding: "14px 18px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 10, fontWeight: 600, background: a.daysInDNFB > 3 ? "#fee2e2" : "#f1f5f9", color: a.daysInDNFB > 3 ? "#dc2626" : "#475569", border: `1px solid ${a.daysInDNFB > 3 ? "#fca5a5" : "#e2e8f0"}`, padding: "2px 8px", borderRadius: 4 }}>{a.holdCode}</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: a.daysInDNFB > 3 ? "#dc2626" : "#64748b", background: a.daysInDNFB > 3 ? "#fee2e2" : "#f8fafc", padding: "2px 8px", borderRadius: 4, border: "1px solid transparent" }}>{a.daysInDNFB}d in DNFB</span>
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 2 }}>{a.patient}</div>
+          <div style={{ fontSize: 11, color: "#64748b" }}>{a.id} · {a.site} · {a.vertical} · {a.payer}</div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Service: {a.serviceDate}</div>
+        </div>
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 2 }}>Expected value</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: "#2563eb" }}>{fmt(a.expectedValue)}</div>
+          <div style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(a.amount)} balance</div>
+        </div>
+      </div>
+      <button onClick={() => setWorked(prev => new Set([...prev, a.id]))}
+        style={{ marginTop: 10, width: "100%", padding: "8px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
+        Mark worked ✓
+      </button>
+    </div>
+  );
+
+  const WorkLinkCard = ({ w }) => (
+    <div style={{ background: "#f0f9ff", border: `1px solid ${new Date() > w.slaDue ? "#fca5a5" : "#bae6fd"}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
+      <div style={{ padding: "12px 18px", borderBottom: "1px solid #e0f2fe", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 10, fontWeight: 700, background: "#0369a1", color: "#fff", padding: "2px 8px", borderRadius: 4 }}>⇄ WORKLINK</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#0369a1" }}>{w.requestIcon} {w.requestLabel}</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: slaColor(w), background: slaColor(w) + "14", padding: "2px 8px", borderRadius: 4 }}>⏱ {slaRemaining(w)}</span>
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 2 }}>{w.patient}</div>
+          <div style={{ fontSize: 11, color: "#64748b" }}>{w.accountId} · {w.payer} · {w.vertical}</div>
+          <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.6, marginTop: 8, padding: "8px 12px", background: "#fff", borderRadius: 6, border: "1px solid #e0f2fe" }}>{w.note}</div>
+        </div>
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 2 }}>Expected value</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#2563eb" }}>{fmt(w.expectedValue)}</div>
+          <div style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(w.amount)} balance</div>
+        </div>
+      </div>
+      <div style={{ padding: "10px 18px" }}>
+        {resolving === w.id ? (
+          <>
+            <textarea value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} placeholder="What action did you take?" rows={2}
+              style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", fontSize: 13, border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff", color: "#0f172a", fontFamily: "inherit", resize: "none", outline: "none", marginBottom: 8 }} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => { onResolve(w.id, resolutionNote); setResolving(null); setResolutionNote(""); }}
+                style={{ flex: 1, padding: "8px", background: "#16a34a", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>✓ Mark resolved</button>
+              <button onClick={() => setResolving(null)} style={{ padding: "8px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Cancel</button>
+            </div>
+          </>
+        ) : (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setResolving(w.id)} style={{ flex: 1, padding: "8px", background: "#0369a1", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>Resolve</button>
+            <button onClick={() => onReturn(w.id)} style={{ padding: "8px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>Return</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ padding: isMobile ? "16px 12px 80px" : "24px 32px" }}>
-      {/* Metrics */}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>
-        {[
-          { label: "In queue", value: queue.length, sub: `${nativeAccounts.length} native · ${openWL} WorkLink`, color: "#0f172a" },
-          { label: "Total EV", value: fmt(totalEV), sub: "expected recovery at stake", color: "#2563eb" },
-          { label: "WorkLink requests", value: openWL, sub: breached > 0 ? `${breached} SLA breached` : "all within SLA", color: openWL > 0 ? "#0369a1" : "#16a34a" },
-          { label: "SLA breached", value: breached, sub: breached > 0 ? "needs immediate action" : "all on track", color: breached > 0 ? "#dc2626" : "#16a34a" },
-        ].map(m => (
-          <div key={m.label} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
-            <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>{m.label}</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: m.color }}>{m.value}</div>
-            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{m.sub}</div>
-          </div>
-        ))}
-      </div>
 
-      {queue.length === 0 && (
-        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "40px 24px", textAlign: "center" }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "#16a34a" }}>Queue clear</div>
-          <div style={{ fontSize: 13, color: "#166534", marginTop: 4 }}>No accounts or WorkLink requests pending.</div>
+      {/* Settings panel */}
+      {showSettings && (
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 20px", marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#0f172a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>⚙ Goals — {area}</div>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
+            {[
+              { label: "Work ASAP max accounts", key: "workAsapMaxCount", type: "number" },
+              { label: "Work ASAP max age (days)", key: "workAsapMaxAgeDays", type: "number" },
+              { label: "Work ASAP max EV ($)", key: "workAsapMaxEV", type: "number" },
+              { label: "WorkLink SLA target (%)", key: "worklinkSLATarget", type: "number" },
+              { label: "WorkLink max open requests", key: "worklinkMaxOpen", type: "number" },
+              { label: "WorkLink avg resolution (hrs)", key: "worklinkAvgResolutionHrs", type: "number" },
+            ].map(f => (
+              <div key={f.key}>
+                <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{f.label}</div>
+                <input type={f.type} value={goals[f.key] ?? ""} onChange={e => setGoals(g => ({ ...g, [f.key]: e.target.value === "" ? null : Number(e.target.value) }))}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "7px 10px", fontSize: 13, border: "1px solid #e2e8f0", borderRadius: 6, background: "#f8fafc", color: "#0f172a", fontFamily: "inherit", outline: "none" }} />
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button onClick={() => setShowSettings(false)} style={{ padding: "8px 16px", background: "#0f172a", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>Save goals</button>
+            <button onClick={() => { setGoals({ ...DEFAULT_GOALS }); }} style={{ padding: "8px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>Reset to defaults</button>
+          </div>
         </div>
       )}
 
-      {queue.map(item => {
-        if (item._type === "worklink") {
-          // WorkLink card — light blue
-          const w = item;
-          return (
-            <div key={w.id} style={{ background: "#f0f9ff", border: `1px solid ${new Date() > w.slaDue ? "#fca5a5" : "#bae6fd"}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
-              <div style={{ padding: "12px 18px", borderBottom: "1px solid #e0f2fe", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap", alignItems: "center" }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, background: "#0369a1", color: "#fff", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.06em" }}>⇄ WORKLINK</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "#0369a1" }}>{w.requestIcon} {w.requestLabel}</span>
-                    <span style={{ fontSize: 10, fontWeight: 600, color: slaColor(w), background: slaColor(w) + "14", padding: "2px 8px", borderRadius: 4 }}>⏱ {slaRemaining(w)}</span>
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 2 }}>{w.patient}</div>
-                  <div style={{ fontSize: 11, color: "#64748b" }}>{w.accountId} · {w.payer} · {w.vertical}</div>
-                  <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.6, marginTop: 8, padding: "8px 12px", background: "#fff", borderRadius: 6, border: "1px solid #e0f2fe" }}>{w.note}</div>
-                </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 2 }}>Expected value</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: "#2563eb" }}>{fmt(w.expectedValue)}</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(w.amount)} balance</div>
-                </div>
-              </div>
-              <div style={{ padding: "10px 18px" }}>
-                {resolving === w.id ? (
-                  <>
-                    <textarea value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} placeholder="What action did you take?" rows={2}
-                      style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", fontSize: 13, border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff", color: "#0f172a", fontFamily: "inherit", resize: "none", outline: "none", marginBottom: 8 }} />
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={() => { onResolve(w.id, resolutionNote); setResolving(null); setResolutionNote(""); }}
-                        style={{ flex: 1, padding: "8px", background: "#16a34a", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>✓ Mark resolved</button>
-                      <button onClick={() => setResolving(null)} style={{ padding: "8px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Cancel</button>
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => setResolving(w.id)}
-                      style={{ flex: 1, padding: "8px", background: "#0369a1", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>Resolve</button>
-                    <button onClick={() => onReturn(w.id)}
-                      style={{ padding: "8px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>Return</button>
-                  </div>
-                )}
-              </div>
+      {/* Summary cards */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Monitor (0–3d)</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#0f172a" }}>{monitor.length}</div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{fmt(monitor.reduce((s,a) => s+a.expectedValue, 0))} EV</div>
+        </div>
+        <div style={{ background: "#fff", border: `1px solid ${asapCountVariance > 0 ? "#fca5a5" : "#e2e8f0"}`, borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Work ASAP (3+d)</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: workAsap.length > 0 ? "#dc2626" : "#16a34a" }}>{workAsap.length}</div>
+          <div style={{ fontSize: 11, marginTop: 3 }}>
+            {asapCountVariance !== null && asapCountVariance > 0
+              ? <span style={{ color: "#dc2626", fontWeight: 600 }}>+{asapCountVariance} over goal · {fmt(asapEV)} EV at risk</span>
+              : <span style={{ color: "#16a34a" }}>Within goal · {fmt(asapEV)} EV</span>}
+          </div>
+        </div>
+        <div style={{ background: "#fff", border: `1px solid ${wlBreached > 0 ? "#fca5a5" : "#e2e8f0"}`, borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>WorkLink open</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: openVariance > 0 ? "#dc2626" : wlOpen.length > 0 ? "#0369a1" : "#16a34a" }}>{wlOpen.length}</div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{wlBreached > 0 ? <span style={{ color: "#dc2626", fontWeight: 600 }}>{wlBreached} SLA breached</span> : "all within SLA"}</div>
+        </div>
+        <div style={{ background: "#fff", border: `1px solid ${slaVariance < 0 ? "#fca5a5" : "#e2e8f0"}`, borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>SLA compliance</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: slaVariance >= 0 ? "#16a34a" : slaVariance >= -10 ? "#d97706" : "#dc2626" }}>{slaRate}%</div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>goal: {goals.worklinkSLATarget}% · {slaVariance >= 0 ? "✓" : slaVariance.toFixed(0) + "pp below"}</div>
+        </div>
+      </div>
+
+      {/* Tab bar + settings gear */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e2e8f0", marginBottom: 16 }}>
+        <div style={{ display: "flex" }}>
+          <button style={tabStyle("monitor")} onClick={() => setActiveTab("monitor")}>
+            Monitor <span style={{ background: "#f1f5f9", color: "#64748b", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 600, marginLeft: 4 }}>{monitor.length}</span>
+          </button>
+          <button style={tabStyle("asap")} onClick={() => setActiveTab("asap")}>
+            Work ASAP
+            <span style={{ background: workAsap.length > 0 ? "#fee2e2" : "#f1f5f9", color: workAsap.length > 0 ? "#dc2626" : "#64748b", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 600, marginLeft: 4 }}>{workAsap.length}</span>
+          </button>
+          <button style={{ ...tabStyle("worklink"), color: activeTab === "worklink" ? "#0369a1" : "#64748b", borderBottomColor: activeTab === "worklink" ? "#0369a1" : "transparent" }} onClick={() => setActiveTab("worklink")}>
+            WorkLink — SLA
+            <span style={{ background: wlOpen.length > 0 ? "#e0f2fe" : "#f1f5f9", color: wlOpen.length > 0 ? "#0369a1" : "#64748b", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 600, marginLeft: 4 }}>{wlOpen.length}</span>
+          </button>
+        </div>
+        <button onClick={() => setShowSettings(s => !s)} style={{ padding: "6px 12px", background: showSettings ? "#f1f5f9" : "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
+          ⚙ Goals
+        </button>
+      </div>
+
+      {/* Monitor tab */}
+      {activeTab === "monitor" && (
+        <>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 12 }}>Accounts in normal hold window (0–3 days) · sorted by EV · {monitor.length} accounts · {fmt(monitor.reduce((s,a)=>s+a.expectedValue,0))} EV</div>
+          {monitor.length === 0 ? (
+            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "32px 24px", textAlign: "center" }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>✓</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#16a34a" }}>No accounts in monitor bucket</div>
             </div>
-          );
-        } else {
-          // Native DNFB account card
-          const a = item;
-          return (
-            <div key={a.id} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, marginBottom: 8, padding: "14px 18px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 10, fontWeight: 600, background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0", padding: "2px 8px", borderRadius: 4 }}>{a.holdCode}</span>
-                    <span style={{ fontSize: 10, color: "#94a3b8" }}>{a.daysInDNFB}d in DNFB</span>
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 2 }}>{a.patient}</div>
-                  <div style={{ fontSize: 11, color: "#64748b" }}>{a.id} · {a.site} · {a.vertical} · {a.payer}</div>
-                </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 2 }}>Expected value</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: "#2563eb" }}>{fmt(a.expectedValue)}</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(a.amount)} balance</div>
-                </div>
-              </div>
-              <button onClick={() => setWorked(prev => new Set([...prev, a.id]))}
-                style={{ marginTop: 10, width: "100%", padding: "8px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
-                Mark worked ✓
-              </button>
+          ) : monitor.map(a => <NativeCard key={a.id} a={a} />)}
+        </>
+      )}
+
+      {/* Work ASAP tab */}
+      {activeTab === "asap" && (
+        <>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "#94a3b8" }}>Beyond normal hold (3+ days) · sorted by age desc · {workAsap.length} accounts</div>
+            {asapEVVariance > 0 && <div style={{ fontSize: 11, fontWeight: 600, color: "#dc2626" }}>{fmt(asapEVVariance)} EV over goal</div>}
+          </div>
+          {workAsap.length === 0 ? (
+            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "32px 24px", textAlign: "center" }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>✓</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#16a34a" }}>Queue clear — at goal</div>
+              <div style={{ fontSize: 12, color: "#166534", marginTop: 4 }}>No accounts beyond normal hold period.</div>
             </div>
-          );
-        }
-      })}
+          ) : workAsap.map(a => <NativeCard key={a.id} a={a} />)}
+        </>
+      )}
+
+      {/* WorkLink — SLA tab */}
+      {activeTab === "worklink" && (
+        <>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 12 }}>Sorted by SLA deadline · most urgent first · SLA goal: {goals.worklinkSLATarget}% compliance</div>
+          {wlOpen.length === 0 ? (
+            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "32px 24px", textAlign: "center" }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>✓</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#16a34a" }}>No open WorkLink requests</div>
+            </div>
+          ) : wlOpen.map(w => <WorkLinkCard key={w.id} w={w} />)}
+        </>
+      )}
     </div>
   );
 }
@@ -997,8 +1116,7 @@ function WorkLinkReporting({ worklinks, isMobile }) {
     byArea[area] = { open: areaOpen, resolved: areaResolved, totalEV, breached, avgResolutionHrs };
   });
 
-  const activeAreas = WORKLINK_TARGET_AREAS.filter(a => byArea[a].open.length > 0 || byArea[a].resolved.length > 0)
-    .sort((a,b) => byArea[b].totalEV - byArea[a].totalEV);
+  const activeAreas = RC_AREA_ORDER.filter(a => byArea[a] && (byArea[a].open.length > 0 || byArea[a].resolved.length > 0));
 
   const totalOpenEV = open.reduce((s,w) => s+w.expectedValue, 0);
   const totalBreached = open.filter(w => new Date() > w.slaDue).length;
@@ -2675,12 +2793,12 @@ export default function WIPPlatform() {
               <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                 <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Area Worklists</div>
                 <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
-                  {seg("Coder", "coder")}
-                  {seg("Charge", "charge_capture")}
                   {seg("Auth", "authorization")}
-                  {seg("Cred", "credentialing")}
+                  {seg("Charge", "charge_capture")}
+                  {seg("Coder", "coder")}
                   {seg("HIM", "him")}
                   {seg("Billing", "billing_scrubber")}
+                  {seg("Cred", "credentialing")}
                 </div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -2720,12 +2838,12 @@ export default function WIPPlatform() {
               <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                 <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Area Worklists</div>
                 <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
-                  {seg("Coder", "coder")}
-                  {seg("Charge", "charge_capture")}
                   {seg("Auth", "authorization")}
-                  {seg("Cred", "credentialing")}
+                  {seg("Charge", "charge_capture")}
+                  {seg("Coder", "coder")}
                   {seg("HIM", "him")}
                   {seg("Billing", "billing_scrubber")}
+                  {seg("Cred", "credentialing")}
                 </div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -2783,12 +2901,12 @@ export default function WIPPlatform() {
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Area Worklists</div>
               <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
-                {seg("Coder", "coder")}
-                {seg("Charge", "charge_capture")}
                 {seg("Auth", "authorization")}
-                {seg("Cred", "credentialing")}
+                {seg("Charge", "charge_capture")}
+                {seg("Coder", "coder")}
                 {seg("HIM", "him")}
                 {seg("Billing", "billing_scrubber")}
+                {seg("Cred", "credentialing")}
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -3106,7 +3224,10 @@ export default function WIPPlatform() {
 
 
 
-        {(role === "supervisor" || role === "biller") && <AreaChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />}
+        {role === "biller" && tab === "dnfb" && (
+          <AreaWorklist area="Billing/Scrubber" dnfbScored={dnfbForRole} worklinks={worklinks} onResolve={handleResolveWorklink} onReturn={handleReturnWorklink} />
+        )}
+        {(role === "supervisor") && <AreaChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />}
         {role === "cfo" && tab === "dnfb" && (() => {
           const tiers = [
             { label: "Normal (1–3 days)", accs: dnfbForRole.filter(a => a.daysInDNFB <= 3), color: "#16a34a" },
