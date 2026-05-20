@@ -3057,7 +3057,7 @@ export default function WIPPlatform() {
           <div>
             {/* Site filter */}
             {(() => {
-              const sites = [...new Set([...dnfbForRole, ...arForRole].map(a => a.site))].sort();
+              const sites = [...new Set([...dnfbForRole, ...arForRole].map(a => a.site))].sort((a,b) => parseInt(a.replace(/\D/g,"")) - parseInt(b.replace(/\D/g,"")));
               const siteStats = sites.map(s => {
                 const siteAR = arForRole.filter(a => a.site === s);
                 const siteDNFB = dnfbForRole.filter(a => a.site === s);
@@ -3136,11 +3136,11 @@ export default function WIPPlatform() {
                 </div>
               )}
             </div>
-            <CFOCriticalHolds accounts={arForRole} />
+            <CFOCriticalHolds accounts={arFiltered} />
             {/* Headline KPIs */}
             {(() => {
-              const grossAR = ar.reduce((s,a) => s+a.amount, 0);
-              const arDays = grossAR > 0 ? Math.round(ar.reduce((s,a) => s + a.amount * a.daysOut, 0) / grossAR) : 0;
+              const grossAR = arFiltered.reduce((s,a) => s+a.amount, 0);
+              const arDays = grossAR > 0 ? Math.round(arFiltered.reduce((s,a) => s + a.amount * a.daysOut, 0) / grossAR) : 0;
               const annualNPR = arDays > 0 ? Math.round(grossAR / arDays * 365 * 0.82) : 0;
               const arDaysColor = arDays < 40 ? "#16a34a" : arDays < 55 ? "#2563eb" : arDays < 65 ? "#d97706" : "#dc2626";
               const arDaysLabel = arDays < 40 ? "Excellent" : arDays < 55 ? "Good" : arDays < 65 ? "Needs attention" : "Critical";
@@ -3149,12 +3149,12 @@ export default function WIPPlatform() {
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Net Patient Revenue (est.)</div>
                     <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(annualNPR)}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Annualized · 82% net revenue factor · from accounting system in production</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Annualized · 82% net revenue factor · from accounting system in production{siteFilter ? ` · ${siteFilter}` : ""}</div>
                   </div>
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Total AR</div>
                     <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(grossAR)}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{ar.length} billed accounts</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{arFiltered.length} billed accounts{siteFilter ? ` · ${siteFilter}` : ""}</div>
                   </div>
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>AR Days Outstanding</div>
@@ -3170,10 +3170,10 @@ export default function WIPPlatform() {
 
             {(() => {
               const groups = {
-                Medicare:   { label: "Medicare",    accounts: ar.filter(a => PAYER_CATEGORY[a.payer] === "medicare") },
-                Commercial: { label: "Commercial",  accounts: ar.filter(a => PAYER_CATEGORY[a.payer] === "commercial") },
-                Medicaid:   { label: "Medicaid",    accounts: ar.filter(a => PAYER_CATEGORY[a.payer] === "medicaid") },
-                "Worker Comp": { label: "Worker's Comp", accounts: ar.filter(a => PAYER_CATEGORY[a.payer] === "workers_comp") },
+                Medicare:   { label: "Medicare",    accounts: arFiltered.filter(a => PAYER_CATEGORY[a.payer] === "medicare") },
+                Commercial: { label: "Commercial",  accounts: arFiltered.filter(a => PAYER_CATEGORY[a.payer] === "commercial") },
+                Medicaid:   { label: "Medicaid",    accounts: arFiltered.filter(a => PAYER_CATEGORY[a.payer] === "medicaid") },
+                "Worker Comp": { label: "Worker's Comp", accounts: arFiltered.filter(a => PAYER_CATEGORY[a.payer] === "workers_comp") },
               };
               return (
                 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px", marginBottom: 12 }}>
@@ -3225,9 +3225,9 @@ export default function WIPPlatform() {
                 <div style={{ fontSize: 10, color: "#1d4ed8", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>Billing WIP — DNFB</div>
                 {(() => {
                   const tiers = [
-                    { label: "Normal (1–3 days)", accs: dnfbForRole.filter(a => a.daysInDNFB <= 3), color: "#16a34a" },
-                    { label: "Watch (3–5 days)",  accs: dnfbForRole.filter(a => a.daysInDNFB > 3 && a.daysInDNFB < 6), color: "#d97706" },
-                    { label: "Flag (6+ days)",    accs: dnfbForRole.filter(a => a.daysInDNFB >= 6), color: "#dc2626" },
+                    { label: "Normal (1–3 days)", accs: dnfbFiltered.filter(a => a.daysInDNFB <= 3), color: "#16a34a" },
+                    { label: "Watch (3–5 days)",  accs: dnfbFiltered.filter(a => a.daysInDNFB > 3 && a.daysInDNFB < 6), color: "#d97706" },
+                    { label: "Flag (6+ days)",    accs: dnfbFiltered.filter(a => a.daysInDNFB >= 6), color: "#dc2626" },
                   ];
                   return tiers.map((t, i) => (
                     <div key={t.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 7, marginBottom: 7, borderBottom: i < 2 ? "1px solid #f1f5f9" : "none" }}>
@@ -3239,13 +3239,13 @@ export default function WIPPlatform() {
                     </div>
                   ));
                 })()}
-                <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 4 }}>Total unbilled: {fmt(dnfbForRole.reduce((s,a) => s+a.amount, 0))} · {dnfbForRole.length} accounts</div>
+                <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 4 }}>Total unbilled: {fmt(dnfbFiltered.reduce((s,a) => s+a.amount, 0))} · {dnfbFiltered.length} accounts{siteFilter ? " — " + siteFilter : ""}</div>
               </div>
-              <DonutChartPanel accounts={dnfbForRole} title="Billing WIP by responsible area" onFilter={setAreaFilter} activeFilter={areaFilter} />
+              <DonutChartPanel accounts={dnfbFiltered} title="Billing WIP by responsible area" onFilter={setAreaFilter} activeFilter={areaFilter} />
               <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 16px" }}>
                 <div style={{ fontSize: 10, color: "#c2410c", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>Follow-up WIP — Collections</div>
                 {(() => {
-                  const pastDue = ar.filter(a => daysSince(a.lastContact) >= 21);
+                  const pastDue = arFiltered.filter(a => daysSince(a.lastContact) >= 21);
                   const tiers = [
                     { label: "$10K+",    accs: pastDue.filter(a => a.amount >= 10000), color: "#b91c1c" },
                     { label: "$1K–$10K", accs: pastDue.filter(a => a.amount >= 1000 && a.amount < 10000), color: "#c2410c" },
@@ -3261,22 +3261,22 @@ export default function WIPPlatform() {
                     </div>
                   ));
                 })()}
-                <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 4 }}>Accounts &gt;21 days without contact · {ar.filter(a => daysSince(a.lastContact) >= 21).length} total past due</div>
+                <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 4 }}>Accounts &gt;21 days without contact · {arFiltered.filter(a => daysSince(a.lastContact) >= 21).length} total past due</div>
               </div>
-              <DonutChartPanel accounts={arForRole} title="Collections WIP by responsible area" onFilter={setAreaFilter} activeFilter={areaFilter} />
+              <DonutChartPanel accounts={arFiltered} title="Collections WIP by responsible area" onFilter={setAreaFilter} activeFilter={areaFilter} />
             </div>
 
             {/* NCR + Denial Rate — CFO metrics tab only */}
             {(() => {
-              const totalGrossAR = ar.reduce((s,a) => s+a.amount, 0);
-              const totalEV = ar.reduce((s,a) => s+a.expectedValue, 0);
+              const totalGrossAR = arFiltered.reduce((s,a) => s+a.amount, 0);
+              const totalEV = arFiltered.reduce((s,a) => s+a.expectedValue, 0);
               const totalNPR = totalGrossAR * 0.82;
               const ncr = totalNPR > 0 ? Math.round(totalEV / totalNPR * 100) : 0;
               const ncrColor = ncr >= 95 ? "#16a34a" : ncr >= 85 ? "#d97706" : "#dc2626";
               const ncrLabel = ncr >= 95 ? "Excellent" : ncr >= 85 ? "Acceptable" : "Needs attention";
-              const totalDenied = ar.filter(a => a.denialCode !== null).length;
-              const denialRate = ar.length > 0 ? Math.round(totalDenied / ar.length * 100) : 0;
-              const deniedBalance = ar.filter(a => a.denialCode !== null).reduce((s,a) => s+a.amount, 0);
+              const totalDenied = arFiltered.filter(a => a.denialCode !== null).length;
+              const denialRate = arFiltered.length > 0 ? Math.round(totalDenied / arFiltered.length * 100) : 0;
+              const deniedBalance = arFiltered.filter(a => a.denialCode !== null).reduce((s,a) => s+a.amount, 0);
               const denialBalanceRate = totalGrossAR > 0 ? Math.round(deniedBalance / totalGrossAR * 100) : 0;
               const denialColor = denialRate <= 5 ? "#16a34a" : denialRate <= 10 ? "#d97706" : "#dc2626";
               const denialLabel = denialRate <= 5 ? "Excellent" : denialRate <= 10 ? "Acceptable" : "Needs attention";
@@ -3301,7 +3301,7 @@ export default function WIPPlatform() {
                       <div style={{ fontSize: 28, fontWeight: 700, color: denialColor, letterSpacing: "-0.02em" }}>{denialRate}%</div>
                       <div style={{ fontSize: 12, color: denialColor, fontWeight: 600 }}>{denialLabel}</div>
                     </div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>{totalDenied} of {ar.length} accounts · {fmt(deniedBalance)} denied balance ({denialBalanceRate}%)</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>{totalDenied} of {arFiltered.length} accounts · {fmt(deniedBalance)} denied balance ({denialBalanceRate}%)</div>
                     <div style={{ position: "relative", height: 5, background: "#f1f5f9", borderRadius: 3, marginBottom: 5 }}>
                       <div style={{ width: Math.min(denialRate * 4, 100) + "%", height: "100%", background: denialColor, borderRadius: 3 }} />
                       <div style={{ position: "absolute", left: "20%", top: -3, width: 2, height: 11, background: "#0f172a", borderRadius: 1 }} />
