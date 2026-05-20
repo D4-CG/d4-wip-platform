@@ -1046,14 +1046,14 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
         ? <div style={{ marginTop: 10 }}><WorkLinkForm acc={a} defaultRequestType={WORKLINK_HOLD_MAP[a.holdCode]?.requestType} defaultTargetArea={WORKLINK_HOLD_MAP[a.holdCode]?.targetArea} autoGenerateNote={!!WORKLINK_HOLD_MAP[a.holdCode]} onSubmit={(wl) => { onWorkLink(wl); setWlAccount(null); }} onCancel={() => setWlAccount(null)} /></div>
         : (
           <div style={{ marginTop: 10 }}>
-            {WORKLINK_HOLD_MAP[a.holdCode] && onWorkLink && (
+            {WORKLINK_HOLD_MAP[a.holdCode] && onWorkLink && WORKLINK_HOLD_MAP[a.holdCode].targetArea !== area && (
               <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "8px 12px", marginBottom: 6 }}>
                 <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 700, marginBottom: 6 }}>
-                  ⇄ WorkLink draft ready — {WORKLINK_HOLD_MAP[a.holdCode].requestIcon} {WORKLINK_HOLD_MAP[a.holdCode].requestLabel} → {WORKLINK_HOLD_MAP[a.holdCode].targetArea}
+                  ✦ AI WorkLink draft ready — {WORKLINK_HOLD_MAP[a.holdCode].requestIcon} {WORKLINK_HOLD_MAP[a.holdCode].requestLabel} → {WORKLINK_HOLD_MAP[a.holdCode].targetArea}
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={() => setWlAccount(a.id)}
-                    style={{ flex: 1, padding: "6px 12px", background: "#2563eb", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>
+                    style={{ flex: 1, padding: "6px 12px", background: "#7c3aed", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>
                     Review & Send
                   </button>
                 </div>
@@ -1070,9 +1070,15 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
                   ⇄ Send WorkLink Request
                 </button>
               )}
-              {onWorkLink && WORKLINK_HOLD_MAP[a.holdCode] && (
+              {onWorkLink && WORKLINK_HOLD_MAP[a.holdCode] && WORKLINK_HOLD_MAP[a.holdCode].targetArea !== area && (
                 <button onClick={() => setWlAccount(a.id)} style={{ background: "#fff", border: "1.5px solid #2563eb", borderRadius: 20, color: "#2563eb", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", padding: "6px 16px", display: "flex", alignItems: "center", gap: 6 }}>
                   ⇄ Different WorkLink
+                </button>
+              )}
+              {onWorkLink && (!WORKLINK_HOLD_MAP[a.holdCode] || WORKLINK_HOLD_MAP[a.holdCode].targetArea === area) && WORKLINK_HOLD_MAP[a.holdCode]?.targetArea === area && (
+                <button onClick={() => setWlAccount(a.id)}
+                  style={{ background: "#fff", border: "1.5px solid #2563eb", borderRadius: 20, color: "#2563eb", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", padding: "6px 16px", display: "flex", alignItems: "center", gap: 6 }}>
+                  ⇄ Send WorkLink Request
                 </button>
               )}
             </div>
@@ -1884,6 +1890,8 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
         const actionKey = acc.action.value;
         const isCall = actionKey === "call" || actionKey === "outbound_call";
         const draft = WORKLINK_ACTION_MAP[actionKey];
+        // Suppress draft if account area already matches the draft's target area
+        const draftActive = draft && draft.targetArea !== acc.area;
 
         if (worklinkSent) return (
           <div style={{ margin: "10px 22px 0", padding: "10px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1893,10 +1901,10 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
 
         return (
           <div style={{ padding: "10px 22px 0" }}>
-            {draft && !showWorkLink && (
+            {draftActive && !showWorkLink && (
               <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
                 <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 700, marginBottom: 6 }}>
-                  ⇄ WorkLink draft ready — {draft.requestIcon} {draft.requestLabel} → {draft.targetArea}
+                  ✦ AI WorkLink draft ready — {draftActive.requestIcon} {draftActive.requestLabel} → {draftActive.targetArea}
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={() => setShowWorkLink(true)}
@@ -1918,9 +1926,9 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
             )}
             {showWorkLink && (
               <WorkLinkForm acc={acc}
-                defaultRequestType={draft?.requestType}
-                defaultTargetArea={draft?.targetArea}
-                autoGenerateNote={!!draft}
+                defaultRequestType={draftActive?.requestType}
+                defaultTargetArea={draftActive?.targetArea}
+                autoGenerateNote={!!draftActive}
                 onSubmit={(req) => { onWorkLink(req); setWorklinkSent(true); setShowWorkLink(false); }}
                 onCancel={() => setShowWorkLink(false)} />
             )}
