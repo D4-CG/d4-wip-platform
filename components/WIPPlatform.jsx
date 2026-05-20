@@ -11,8 +11,30 @@ function useWindowWidth() {
 }
 
 const PAYER_BASELINES = {
-  "Medicare": 88, "Blue Cross": 84, "Blue Shield": 82, "Aetna": 79,
-  "United Health": 76, "Cigna": 74, "Humana": 72, "Medicaid": 56, "Worker Comp": 40,
+  // Medicare
+  "Medicare": 88, "Medicare Advantage": 85, "Medicare Part B": 88,
+  // Blue Cross / Blue Shield
+  "Blue Cross": 84, "Blue Shield": 82, "BCBS": 83, "Blue Cross Blue Shield": 83,
+  "Anthem": 81, "Anthem BCBS": 81, "Highmark": 80, "Carefirst": 80,
+  "Independence Blue Cross": 81, "Regence": 80, "Premera": 80,
+  // Aetna / CVS
+  "Aetna": 79, "Aetna Better Health": 62, "CVS Aetna": 79,
+  // United Health
+  "United Health": 76, "UnitedHealthcare": 76, "UHC": 76, "United Healthcare": 76,
+  "United Community Plan": 60, "Optum": 76,
+  // Cigna
+  "Cigna": 74, "Cigna Behavioral": 72, "Evernorth": 74,
+  // Humana
+  "Humana": 72, "Humana Medicare": 85,
+  // Other commercial
+  "Molina Healthcare": 58, "Centene": 57, "WellCare": 57,
+  "Centene / WellCare": 57, "AmeriHealth Caritas": 60,
+  "Buckeye Health Plan": 59, "Magellan": 68, "Beacon Health": 68,
+  "Tricare": 82, "VA": 84, "CHAMPVA": 82,
+  // Medicaid
+  "Medicaid": 56,
+  // Workers Comp
+  "Worker Comp": 40, "Workers Comp": 40, "Workers Compensation": 40,
 };
 
 const HOLD_CONFIG = {
@@ -1442,47 +1464,69 @@ function WorkLinkForm({ acc, onSubmit, onCancel, defaultRequestType, defaultTarg
   );
 
   return (
-    <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 10, padding: "16px 18px", marginTop: 12 }}>
-      <div style={{ fontSize: 10, color: "#0369a1", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 12 }}>
-        ⇄ WIP WorkLink — Send request
+    <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 10, padding: "16px 18px", marginTop: 12 }}>
+      <div style={{ fontSize: 10, color: "#7c3aed", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 12 }}>
+        ✦ WorkLink — Send request
       </div>
 
-      {/* Request type grid */}
-      <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Request type</div>
+      {/* Step 1: Request type — one tap, auto-selects target area and triggers AI note */}
+      <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>What type of request?</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6, marginBottom: 12 }}>
         {WORKLINK_REQUEST_TYPES.map(rt => (
-          <button key={rt.value} onClick={() => handleTypeSelect(rt)}
-            style={{ padding: "8px 10px", background: requestType === rt.value ? "#0369a1" : "#fff", border: `1px solid ${requestType === rt.value ? "#0369a1" : "#e2e8f0"}`, borderRadius: 8, color: requestType === rt.value ? "#fff" : "#334155", cursor: "pointer", fontSize: 12, fontFamily: "inherit", textAlign: "left", display: "flex", alignItems: "center", gap: 8 }}>
+          <button key={rt.value} onClick={() => { handleTypeSelect(rt); if (!noteReady && !generating) generateNote(rt.value, rt.targetArea || targetArea); }}
+            style={{ padding: "8px 10px", background: requestType === rt.value ? "#7c3aed" : "#fff", border: `1px solid ${requestType === rt.value ? "#7c3aed" : "#e2e8f0"}`, borderRadius: 8, color: requestType === rt.value ? "#fff" : "#334155", cursor: "pointer", fontSize: 12, fontFamily: "inherit", textAlign: "left", display: "flex", alignItems: "center", gap: 8 }}>
             <span>{rt.icon}</span> {rt.label}
           </button>
         ))}
       </div>
 
-      {/* Target area — override if "other" */}
-      <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Target area</div>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-        {WORKLINK_TARGET_AREAS.map(area => (
-          <button key={area} onClick={() => setTargetArea(area)}
-            style={{ padding: "5px 12px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${targetArea === area ? "#0369a1" : "#e2e8f0"}`, borderRadius: 6, background: targetArea === area ? "#0369a1" : "#fff", color: targetArea === area ? "#fff" : "#64748b", fontWeight: targetArea === area ? 600 : 400 }}>
-            {area}
+      {/* Target area override — only when "Other" */}
+      {requestType === "other" && (
+        <>
+          <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Target area</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+            {WORKLINK_TARGET_AREAS.map(area => (
+              <button key={area} onClick={() => setTargetArea(area)}
+                style={{ padding: "5px 12px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${targetArea === area ? "#7c3aed" : "#e2e8f0"}`, borderRadius: 6, background: targetArea === area ? "#7c3aed" : "#fff", color: targetArea === area ? "#fff" : "#64748b", fontWeight: targetArea === area ? 600 : 400 }}>
+                {area}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* AI-generated note — appears automatically after type selection */}
+      {generating && (
+        <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 12, color: "#7c3aed" }}>
+          ✦ Generating note...
+        </div>
+      )}
+      {noteReady && !generating && (
+        <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
+          <div style={{ fontSize: 9, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 6 }}>✦ AI-generated note — edit if needed</div>
+          <textarea value={noteReady} onChange={e => setNoteReady(e.target.value)} rows={3}
+            style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", fontSize: 12, border: "1px solid #e9d5ff", borderRadius: 6, background: "#fff", color: "#334155", fontFamily: "inherit", resize: "vertical", outline: "none" }} />
+        </div>
+      )}
+
+      {/* Step 2: Send — appears once type is selected */}
+      {requestType && targetArea && (
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => { if (noteReady) { const sla = getWorklinkSLA(acc.cfg?.severity || "MODERATE", requestType); const rt = WORKLINK_REQUEST_TYPES.find(r => r.value === requestType); onSubmit({ id: `WL-${Date.now()}`, accountId: acc.id, patient: acc.patient, payer: acc.payer, vertical: acc.vertical, amount: acc.amount, expectedValue: acc.expectedValue, requestType, requestLabel: rt?.label, requestIcon: rt?.icon, targetArea, note: noteReady, status: "open", slaDue: sla.due, slaHrs: sla.hrs, slaSeverity: acc.cfg?.severity || "MODERATE", createdAt: new Date().toISOString() }); } }}
+            disabled={!noteReady || generating}
+            style={{ flex: 1, padding: "10px", background: !noteReady || generating ? "#f1f5f9" : "#7c3aed", border: "none", borderRadius: 8, color: !noteReady || generating ? "#94a3b8" : "#fff", cursor: !noteReady || generating ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
+            Send to {targetArea} →
           </button>
-        ))}
-      </div>
-
-      {/* Scratch notes */}
-      <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Notes for the {targetArea || "receiving team"}</div>
-      <textarea value={scratch} onChange={e => setScratch(e.target.value)} placeholder="Add context — what did you find, what's needed, any urgency..." rows={3}
-        style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 13, border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff", color: "#0f172a", fontFamily: "inherit", resize: "vertical", outline: "none", marginBottom: 10 }} />
-
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={() => generateNote()} disabled={!requestType || !targetArea || generating}
-          style={{ flex: 1, padding: "10px", background: !requestType || !targetArea ? "#f1f5f9" : "#0f172a", border: "none", borderRadius: 8, color: !requestType || !targetArea ? "#94a3b8" : "#fff", cursor: !requestType || !targetArea ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
-          {generating ? "Generating request note..." : "✦ Generate request note →"}
-        </button>
-        <button onClick={onCancel} style={{ padding: "10px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#94a3b8", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
+          <button onClick={onCancel} style={{ padding: "10px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#94a3b8", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
+            Cancel
+          </button>
+        </div>
+      )}
+      {!requestType && (
+        <button onClick={onCancel} style={{ padding: "8px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#94a3b8", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
           Cancel
         </button>
-      </div>
+      )}
     </div>
   );
 }
@@ -1692,17 +1736,21 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
               <span style={{ fontSize: 10, fontWeight: 600, background: sev.bg, color: sev.text, border: `1px solid ${sev.border}`, padding: "2px 8px", borderRadius: 4 }}>{acc.cfg.severity}</span>
               <span style={{ fontSize: 10, fontWeight: 600, background: acc.cfg.color + "12", color: acc.cfg.color, border: `1px solid ${acc.cfg.color}30`, padding: "2px 8px", borderRadius: 4 }}>{acc.area === 'Collections' ? acc.cfg.label.split(' — ')[0].toUpperCase() : acc.area.toUpperCase()}</span>
             </div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#0f172a", marginBottom: 3 }}>{acc.patient}</div>
-            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>{acc.id} · {acc.site} · {acc.vertical} · {acc.payer}{acc.subPayer ? ` — ${acc.subPayer}` : ""}</div>
-            <div style={{ fontSize: 12, color: "#475569" }}>{acc.cfg.label}</div>
+            {/* Patient name — heavy anchor */}
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", marginBottom: 4, letterSpacing: "-0.01em" }}>{acc.patient}</div>
+            {/* Account metadata — lighter, smaller */}
+            <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6 }}>{acc.id} · {acc.site} · {acc.vertical}</div>
+            <div style={{ fontSize: 12, color: "#475569", fontWeight: 500 }}>{acc.payer}{acc.subPayer ? <span style={{ color: "#94a3b8", fontWeight: 400 }}> — {acc.subPayer}</span> : ""}</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{acc.cfg.label}</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
             <ProbCircle prob={acc.prob} payer={acc.payer} />
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 3 }}>Expected value</div>
-              <div style={{ fontSize: 26, fontWeight: 700, color: "#2563eb", letterSpacing: "-0.02em" }}>{fmt(acc.expectedValue)}</div>
-              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{fmt(acc.amount)} balance</div>
-              <div style={{ fontSize: 11, color: "#94a3b8" }}>{acc.daysOut} days out</div>
+              {/* EV — dominant visual element */}
+              <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 2, letterSpacing: "0.06em", textTransform: "uppercase" }}>Expected value</div>
+              <div style={{ fontSize: 30, fontWeight: 800, color: "#2563eb", letterSpacing: "-0.03em", lineHeight: 1 }}>{fmt(acc.expectedValue)}</div>
+              {/* Balance and days — muted reference info */}
+              <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>{fmt(acc.amount)} balance · {acc.daysOut}d out</div>
             </div>
           </div>
         </div>
@@ -1898,10 +1946,31 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
   const [sessionStart] = useState(() => Date.now());
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResult, setSearchResult] = useState(null);
+  const [sortMode, setSortMode] = useState("ev"); // "ev" | "triage"
 
   const openWorklinkIds = new Set(worklinks.filter(w => w.status === "open").map(w => w.accountId));
   const workedIds = new Set(workedAccounts.map(w => w.id));
-  const queue = arScored.filter(a => !workedIds.has(a.id) && !openWorklinkIds.has(a.id));
+
+  // Triage urgency factor — exponential as timely filing approaches
+  const urgencyFactor = (acc) => {
+    const daysToFiling = 120 - (acc.daysOut || 0); // assume 120d timely filing window
+    if (daysToFiling < 0) return 0.1; // past filing — de-prioritize
+    if (daysToFiling < 3) return 10.0;
+    if (daysToFiling < 7) return 5.0;
+    if (daysToFiling < 14) return 2.0;
+    return 1.0;
+  };
+
+  const hasFiling = arScored.some(a => (120 - (a.daysOut || 0)) < 14);
+
+  const sortedQueue = arScored
+    .filter(a => !workedIds.has(a.id) && !openWorklinkIds.has(a.id))
+    .sort((a, b) => {
+      if (sortMode === "triage") return (b.expectedValue * urgencyFactor(b)) - (a.expectedValue * urgencyFactor(a));
+      return b.expectedValue - a.expectedValue;
+    });
+
+  const queue = sortedQueue;
   const suppressed = worklinks.filter(w => w.status === "open");
   const currentAccount = searchResult || queue[0] || null;
 
@@ -1946,6 +2015,25 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
             <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{sub}</div>
           </div>
         ))}
+      </div>
+
+      {/* Sort toggle */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 11, color: "#94a3b8" }}>Sort:</span>
+        <button onClick={() => setSortMode("ev")}
+          style={{ padding: "4px 12px", fontSize: 11, fontWeight: sortMode === "ev" ? 600 : 400, border: `1px solid ${sortMode === "ev" ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: sortMode === "ev" ? "#2563eb" : "#fff", color: sortMode === "ev" ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
+          Expected Value
+        </button>
+        <button onClick={() => setSortMode("triage")}
+          style={{ padding: "4px 12px", fontSize: 11, fontWeight: sortMode === "triage" ? 600 : 400, border: `1px solid ${sortMode === "triage" ? "#dc2626" : "#e2e8f0"}`, borderRadius: 20, background: sortMode === "triage" ? "#dc2626" : "#fff", color: sortMode === "triage" ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
+          ⚡ Triage
+        </button>
+        {hasFiling && sortMode === "ev" && (
+          <span style={{ fontSize: 11, color: "#dc2626", fontWeight: 600 }}>⚠ Timely filing risk in queue — consider Triage sort</span>
+        )}
+        {sortMode === "triage" && (
+          <span style={{ fontSize: 11, color: "#64748b" }}>Weighted by EV × filing urgency</span>
+        )}
       </div>
 
       {/* Search */}
