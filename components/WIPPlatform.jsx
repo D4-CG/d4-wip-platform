@@ -157,7 +157,27 @@ const AREAS = ["Coding","Physician/Doc","Charge Capture","Credentialing","Author
 // Revenue cycle order: Authorization → Charge Capture → Coding → HIM → Billing/Scrubber
 const RC_AREA_ORDER = ["Authorization","Charge Capture","Coding","Clinical/HIM","Billing/Scrubber","Credentialing","Physician/Doc"];
 
-const WORKLINK_REQUEST_TYPES = [
+// Recommended action → WorkLink auto-draft mapping
+const WORKLINK_ACTION_MAP = {
+  "chase_auth":     { requestType: "chase_auth",     requestLabel: "Chase authorization", requestIcon: "🔐", targetArea: "Authorization" },
+  "recode":         { requestType: "recode",          requestLabel: "Recode account",      requestIcon: "💻", targetArea: "Coding" },
+  "him_deficiency": { requestType: "him_deficiency",  requestLabel: "HIM deficiency",      requestIcon: "📄", targetArea: "Clinical/HIM" },
+  "physician_query":{ requestType: "physician_query", requestLabel: "Physician query",     requestIcon: "👨‍⚕️", targetArea: "Physician/Doc" },
+  "resubmit":       { requestType: "resubmit",        requestLabel: "Resubmit claim",      requestIcon: "🔄", targetArea: "Billing/Scrubber" },
+  "missing_charge": { requestType: "missing_charge",  requestLabel: "Missing charge",      requestIcon: "⚡", targetArea: "Charge Capture" },
+  "cred_gap":       { requestType: "cred_gap",        requestLabel: "Credentialing gap",   requestIcon: "📋", targetArea: "Credentialing" },
+};
+
+// Hold code → WorkLink auto-draft mapping (for area worklists)
+const WORKLINK_HOLD_MAP = {
+  "PHYSICIAN_QUERY_NEEDED": { requestType: "physician_query", requestLabel: "Physician query",     requestIcon: "👨‍⚕️", targetArea: "Physician/Doc" },
+  "HIM_DEFICIENCY":         { requestType: "him_deficiency",  requestLabel: "HIM deficiency",      requestIcon: "📄", targetArea: "Clinical/HIM" },
+  "AUTH_MISSING":           { requestType: "chase_auth",      requestLabel: "Chase authorization", requestIcon: "🔐", targetArea: "Authorization" },
+  "AUTH_EXPIRED":           { requestType: "chase_auth",      requestLabel: "Chase authorization", requestIcon: "🔐", targetArea: "Authorization" },
+  "CHARGE_MISSING":         { requestType: "missing_charge",  requestLabel: "Missing charge",      requestIcon: "⚡", targetArea: "Charge Capture" },
+  "CODING_UNASSIGNED":      { requestType: "recode",          requestLabel: "Recode account",      requestIcon: "💻", targetArea: "Coding" },
+  "CREDENTIALING_GAP":      { requestType: "cred_gap",        requestLabel: "Credentialing gap",   requestIcon: "📋", targetArea: "Credentialing" },
+};
   { value: "chase_auth",    label: "Chase authorization",      icon: "🔐", targetArea: "Authorization" },
   { value: "missing_charge",label: "Missing charge",           icon: "⚡", targetArea: "Charge Capture" },
   { value: "recode",        label: "Recode account",           icon: "💻", targetArea: "Coding" },
@@ -968,19 +988,39 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
         </div>
       </div>
       {wlAccount === a.id
-        ? <div style={{ marginTop: 10 }}><WorkLinkForm acc={a} onSubmit={(wl) => { onWorkLink(wl); setWlAccount(null); }} onCancel={() => setWlAccount(null)} /></div>
+        ? <div style={{ marginTop: 10 }}><WorkLinkForm acc={a} defaultRequestType={WORKLINK_HOLD_MAP[a.holdCode]?.requestType} defaultTargetArea={WORKLINK_HOLD_MAP[a.holdCode]?.targetArea} autoGenerateNote={!!WORKLINK_HOLD_MAP[a.holdCode]} onSubmit={(wl) => { onWorkLink(wl); setWlAccount(null); }} onCancel={() => setWlAccount(null)} /></div>
         : (
-          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button onClick={() => setWorked(prev => new Set([...prev, a.id]))}
-              style={{ flex: 1, padding: "8px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
-              Mark worked ✓
-            </button>
-            {onWorkLink && (
-              <button onClick={() => setWlAccount(a.id)}
-                style={{ padding: "8px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, color: "#2563eb", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
-                ⇄ WorkLink
-              </button>
+          <div style={{ marginTop: 10 }}>
+            {WORKLINK_HOLD_MAP[a.holdCode] && onWorkLink && (
+              <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "8px 12px", marginBottom: 6 }}>
+                <div style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700, marginBottom: 6 }}>
+                  ⇄ WorkLink draft ready — {WORKLINK_HOLD_MAP[a.holdCode].requestIcon} {WORKLINK_HOLD_MAP[a.holdCode].requestLabel} → {WORKLINK_HOLD_MAP[a.holdCode].targetArea}
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => setWlAccount(a.id)}
+                    style={{ flex: 1, padding: "6px 12px", background: "#2563eb", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>
+                    Review & Send
+                  </button>
+                </div>
+              </div>
             )}
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button onClick={() => setWorked(prev => new Set([...prev, a.id]))}
+                style={{ flex: 1, padding: "8px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
+                Mark worked ✓
+              </button>
+              {onWorkLink && !WORKLINK_HOLD_MAP[a.holdCode] && (
+                <button onClick={() => setWlAccount(a.id)}
+                  style={{ padding: "8px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, color: "#2563eb", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
+                  ⇄ WorkLink
+                </button>
+              )}
+              {onWorkLink && WORKLINK_HOLD_MAP[a.holdCode] && (
+                <button onClick={() => setWlAccount(a.id)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 11, fontFamily: "inherit", textDecoration: "underline", padding: 0 }}>
+                  different WorkLink
+                </button>
+              )}
+            </div>
           </div>
         )
       }
@@ -1288,9 +1328,9 @@ function WorkLinkReporting({ worklinks, isMobile }) {
 
 // ─── WIP WorkLink Components ──────────────────────────────────────────────────
 
-function WorkLinkForm({ acc, onSubmit, onCancel }) {
-  const [requestType, setRequestType] = useState("");
-  const [targetArea, setTargetArea] = useState("");
+function WorkLinkForm({ acc, onSubmit, onCancel, defaultRequestType, defaultTargetArea, autoGenerateNote }) {
+  const [requestType, setRequestType] = useState(defaultRequestType || "");
+  const [targetArea, setTargetArea] = useState(defaultTargetArea || "");
   const [scratch, setScratch] = useState("");
   const [noteReady, setNoteReady] = useState(null);
   const [generating, setGenerating] = useState(false);
@@ -1298,14 +1338,24 @@ function WorkLinkForm({ acc, onSubmit, onCancel }) {
 
   const selectedType = WORKLINK_REQUEST_TYPES.find(r => r.value === requestType);
 
+  // Auto-generate note on mount if autoGenerateNote is true and defaults are set
+  useEffect(() => {
+    if (autoGenerateNote && defaultRequestType && defaultTargetArea) {
+      generateNote(defaultRequestType, defaultTargetArea);
+    }
+  }, []);
+
   const handleTypeSelect = (type) => {
     setRequestType(type.value);
     if (type.targetArea) setTargetArea(type.targetArea);
   };
 
-  const generateNote = async () => {
+  const generateNote = async (rtOverride, taOverride) => {
+    const rt = WORKLINK_REQUEST_TYPES.find(r => r.value === (rtOverride || requestType));
+    const ta = taOverride || targetArea;
     setGenerating(true);
-    const prompt = `You are a healthcare revenue cycle specialist creating a structured internal work request. Generate a concise, professional work request note in 2-3 sentences. Account: ${acc.id} · ${acc.patient} · ${acc.payer} · Balance: ${fmt(acc.amount)} · EV: ${fmt(acc.expectedValue)} · Hold: ${acc.cfg?.label || acc.area}. Request type: ${selectedType?.label}. Target area: ${targetArea}. Collector notes: "${scratch || "No additional notes provided"}". Write the note as a direct communication to the ${targetArea} team. Be specific about what action is needed and why it is urgent. Return only the note text, no preamble.`;
+    const verticalCtx = CLIENT_CONFIG.verticalContext[CLIENT_CONFIG.vertical] || "";
+    const prompt = `You are a healthcare revenue cycle specialist creating a structured internal work request.${verticalCtx ? " " + verticalCtx : ""} Generate a concise, professional work request note in 2-3 sentences. Account: ${acc.id} · ${acc.patient} · ${acc.payer} · Balance: ${fmt(acc.amount)} · EV: ${fmt(acc.expectedValue)} · Hold: ${acc.cfg?.label || acc.area || ""}. Request type: ${rt?.label || "WorkLink"}. Target area: ${ta}. ${scratch ? `Sender notes: "${scratch}".` : ""} Write as a direct communication to the ${ta} team. Be specific about what action is needed and why it is urgent. Return only the note text, no preamble.`;
     try {
       const res = await fetch("/api/claude", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -1421,7 +1471,7 @@ function WorkLinkForm({ acc, onSubmit, onCancel }) {
         style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 13, border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff", color: "#0f172a", fontFamily: "inherit", resize: "vertical", outline: "none", marginBottom: 10 }} />
 
       <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={generateNote} disabled={!requestType || !targetArea || generating}
+        <button onClick={() => generateNote()} disabled={!requestType || !targetArea || generating}
           style={{ flex: 1, padding: "10px", background: !requestType || !targetArea ? "#f1f5f9" : "#0f172a", border: "none", borderRadius: 8, color: !requestType || !targetArea ? "#94a3b8" : "#fff", cursor: !requestType || !targetArea ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
           {generating ? "Generating request note..." : "✦ Generate request note →"}
         </button>
@@ -1668,14 +1718,14 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
             </div>
             <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.65, marginBottom: 14 }}>{acc.action.text}</div>
             {!approved && (
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => setApproved(true)} style={{ flex: 1, padding: "9px 20px", background: "#2563eb", border: "1px solid #2563eb", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
+              <>
+                <button onClick={() => setApproved(true)} style={{ width: "100%", padding: "9px 20px", background: "#2563eb", border: "1px solid #2563eb", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", marginBottom: 6 }}>
                   Approve action
                 </button>
-                <button onClick={() => setOverriding(true)} style={{ padding: "9px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
-                  Override
+                <button onClick={() => setOverriding(true)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 11, fontFamily: "inherit", textDecoration: "underline", padding: 0 }}>
+                  ↺ Override recommended action
                 </button>
-              </div>
+              </>
             )}
             {approved && (
               <div style={{ padding: "9px 20px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, color: "#16a34a", fontSize: 13, fontWeight: 600, textAlign: "center" }}>
@@ -1704,26 +1754,54 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
         )}
       </div>
 
-      {/* WIP WorkLink — send request */}
-      {!worklinkSent && (
-        <div style={{ padding: "10px 22px 0" }}>
-          {!showWorkLink ? (
-            <button onClick={() => setShowWorkLink(true)}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, color: "#0369a1", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
-              <span>⇄</span> Send WorkLink request
-            </button>
-          ) : (
-            <WorkLinkForm acc={acc}
-              onSubmit={(req) => { onWorkLink(req); setWorklinkSent(true); setShowWorkLink(false); }}
-              onCancel={() => setShowWorkLink(false)} />
-          )}
-        </div>
-      )}
-      {worklinkSent && (
-        <div style={{ margin: "10px 22px 0", padding: "10px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 12, color: "#0369a1", fontWeight: 600 }}>⇄ WorkLink request sent — account suppressed from queue</span>
-        </div>
-      )}
+      {/* Agentic WorkLink — auto-draft when action maps to a cross-area request */}
+      {(() => {
+        const actionKey = acc.action.value;
+        const isCall = actionKey === "call" || actionKey === "outbound_call";
+        const draft = WORKLINK_ACTION_MAP[actionKey];
+
+        if (worklinkSent) return (
+          <div style={{ margin: "10px 22px 0", padding: "10px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: "#0369a1", fontWeight: 600 }}>⇄ WorkLink sent — account suppressed from queue</span>
+          </div>
+        );
+
+        return (
+          <div style={{ padding: "10px 22px 0" }}>
+            {draft && !showWorkLink && (
+              <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
+                <div style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700, marginBottom: 6 }}>
+                  ⇄ WorkLink draft ready — {draft.requestIcon} {draft.requestLabel} → {draft.targetArea}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setShowWorkLink(true)}
+                    style={{ flex: 1, padding: "7px 14px", background: "#2563eb", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
+                    Review & Send
+                  </button>
+                  <button onClick={() => setShowWorkLink(false)}
+                    style={{ padding: "7px 12px", background: "#fff", border: "1px solid #bfdbfe", borderRadius: 6, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
+            {!showWorkLink && (
+              <button onClick={() => setShowWorkLink(true)}
+                style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 11, fontFamily: "inherit", textDecoration: "underline", padding: 0, marginBottom: 8 }}>
+                {draft ? "or send different WorkLink" : "⇄ Send WorkLink request"}
+              </button>
+            )}
+            {showWorkLink && (
+              <WorkLinkForm acc={acc}
+                defaultRequestType={draft?.requestType}
+                defaultTargetArea={draft?.targetArea}
+                autoGenerateNote={!!draft}
+                onSubmit={(req) => { onWorkLink(req); setWorklinkSent(true); setShowWorkLink(false); }}
+                onCancel={() => setShowWorkLink(false)} />
+            )}
+          </div>
+        );
+      })()}
 
       {/* Outcome selector — appears after approval */}
       {approved && (
@@ -2655,9 +2733,8 @@ function CFOEscalationSection() {
 
 
 
-function CFOCriticalHolds({ accounts, onWorkLink }) {
+function CFOCriticalHolds({ accounts }) {
   const [open, setOpen] = useState(false);
-  const [wlAccount, setWlAccount] = useState(null);
   const crits = accounts.filter(a => a.cfg.severity === "CRITICAL");
   if (crits.length === 0) return null;
   return (
@@ -2672,27 +2749,16 @@ function CFOCriticalHolds({ accounts, onWorkLink }) {
       {open && (
         <div style={{ borderTop: "1px solid #fed7aa", padding: "10px 18px" }}>
           {crits.map(a => (
-            <div key={a.id} style={{ paddingBottom: 10, borderBottom: "1px solid #fff7ed", marginBottom: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: "#0f172a" }}>{a.patient}</div>
-                  <div style={{ fontSize: 11, color: "#64748b" }}>{a.id} · {a.payer} · {a.vertical} · {a.daysOut}d</div>
-                  <div style={{ fontSize: 11, color: "#c2410c", marginTop: 2 }}>{a.cfg.label}</div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{fmt(a.amount)}</div>
-                  <div style={{ fontSize: 11, color: "#64748b" }}>EV: {fmt(a.expectedValue)}</div>
-                </div>
+            <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #fff7ed" }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: "#0f172a" }}>{a.patient}</div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>{a.id} · {a.payer} · {a.vertical} · {a.daysOut}d</div>
+                <div style={{ fontSize: 11, color: "#c2410c", marginTop: 2 }}>{a.cfg.label}</div>
               </div>
-              {wlAccount === a.id
-                ? <div style={{ marginTop: 8 }}><WorkLinkForm acc={a} onSubmit={(wl) => { onWorkLink(wl); setWlAccount(null); }} onCancel={() => setWlAccount(null)} /></div>
-                : onWorkLink && (
-                  <button onClick={() => setWlAccount(a.id)}
-                    style={{ marginTop: 8, padding: "6px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, color: "#2563eb", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>
-                    ⇄ Send WorkLink
-                  </button>
-                )
-              }
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{fmt(a.amount)}</div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>EV: {fmt(a.expectedValue)}</div>
+              </div>
             </div>
           ))}
         </div>
@@ -3217,7 +3283,7 @@ export default function WIPPlatform() {
                 </div>
               )}
             </div>
-            <CFOCriticalHolds accounts={arFiltered} onWorkLink={handleSendWorklink} />
+            <CFOCriticalHolds accounts={arFiltered} />
             {/* Headline KPIs */}
             {(() => {
               const grossAR = arFiltered.reduce((s,a) => s+a.amount, 0);
