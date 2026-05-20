@@ -159,7 +159,7 @@ const CLIENT_CONFIG = {
 
 const ROLE_DEFS = {
   commercial_collector: { label: "Commercial Collector",    paneLabel: "Commercial accounts only",              filter: ["commercial"],  mode: "collector" },
-  medicare_bc:          { label: "Medicare B/C",            paneLabel: "Medicare only — portal workflow",        filter: ["medicare"],    mode: "medicare_bc" },
+  medicare_bc:          { label: "Medicare Part B",            paneLabel: "Medicare Part B — MAC portal workflow",        filter: ["medicare"],    mode: "medicare_bc" },
   medicaid:             { label: "Medicaid Specialist",     paneLabel: "Medicaid accounts only",                filter: ["medicaid"],    mode: "collector" },
   wc:                   { label: "Worker's Comp",           paneLabel: "Worker's Comp accounts only",           filter: ["workers_comp"],mode: "collector" },
   biller:               { label: "Biller — All Payers",    paneLabel: "All payer types",                       filter: ["all"],         mode: "biller" },
@@ -2028,6 +2028,8 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResult, setSearchResult] = useState(null);
   const [sortMode, setSortMode] = useState("ev"); // "ev" | "triage"
+  const [viewMode, setViewMode] = useState("worklist"); // "worklist" | "focus"
+  const [expandedId, setExpandedId] = useState(null);
 
   const openWorklinkIds = new Set(worklinks.filter(w => w.status === "open").map(w => w.accountId));
   const workedIds = new Set(workedAccounts.map(w => w.id));
@@ -2098,23 +2100,35 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
         ))}
       </div>
 
-      {/* Sort toggle */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 11, color: "#94a3b8" }}>Sort:</span>
-        <button onClick={() => setSortMode("ev")}
-          style={{ padding: "4px 12px", fontSize: 11, fontWeight: sortMode === "ev" ? 600 : 400, border: `1px solid ${sortMode === "ev" ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: sortMode === "ev" ? "#2563eb" : "#fff", color: sortMode === "ev" ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
-          Expected Value
-        </button>
-        <button onClick={() => setSortMode("triage")}
-          style={{ padding: "4px 12px", fontSize: 11, fontWeight: sortMode === "triage" ? 600 : 400, border: `1px solid ${sortMode === "triage" ? "#dc2626" : "#e2e8f0"}`, borderRadius: 20, background: sortMode === "triage" ? "#dc2626" : "#fff", color: sortMode === "triage" ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
-          ⚡ Triage
-        </button>
-        {hasFiling && sortMode === "ev" && (
-          <span style={{ fontSize: 11, color: "#dc2626", fontWeight: 600 }}>⚠ Timely filing risk in queue — consider Triage sort</span>
-        )}
-        {sortMode === "triage" && (
-          <span style={{ fontSize: 11, color: "#64748b" }}>Weighted by EV × filing urgency</span>
-        )}
+      {/* Sort + View mode controls */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, color: "#94a3b8" }}>Sort:</span>
+          <button onClick={() => setSortMode("ev")}
+            style={{ padding: "4px 12px", fontSize: 11, fontWeight: sortMode === "ev" ? 600 : 400, border: `1px solid ${sortMode === "ev" ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: sortMode === "ev" ? "#2563eb" : "#fff", color: sortMode === "ev" ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
+            Expected Value
+          </button>
+          <button onClick={() => setSortMode("triage")}
+            style={{ padding: "4px 12px", fontSize: 11, fontWeight: sortMode === "triage" ? 600 : 400, border: `1px solid ${sortMode === "triage" ? "#dc2626" : "#e2e8f0"}`, borderRadius: 20, background: sortMode === "triage" ? "#dc2626" : "#fff", color: sortMode === "triage" ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
+            ⚡ Triage
+          </button>
+          {hasFiling && sortMode === "ev" && (
+            <span style={{ fontSize: 11, color: "#dc2626", fontWeight: 600 }}>⚠ Timely filing risk in queue — consider Triage sort</span>
+          )}
+          {sortMode === "triage" && (
+            <span style={{ fontSize: 11, color: "#64748b" }}>Weighted by EV × filing urgency</span>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, background: "#f1f5f9", borderRadius: 8, padding: 3 }}>
+          <button onClick={() => setViewMode("worklist")}
+            style={{ padding: "4px 12px", fontSize: 11, fontWeight: viewMode === "worklist" ? 600 : 400, border: "none", borderRadius: 6, background: viewMode === "worklist" ? "#fff" : "transparent", color: viewMode === "worklist" ? "#0f172a" : "#64748b", cursor: "pointer", fontFamily: "inherit", boxShadow: viewMode === "worklist" ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>
+            ☰ Worklist
+          </button>
+          <button onClick={() => setViewMode("focus")}
+            style={{ padding: "4px 12px", fontSize: 11, fontWeight: viewMode === "focus" ? 600 : 400, border: "none", borderRadius: 6, background: viewMode === "focus" ? "#fff" : "transparent", color: viewMode === "focus" ? "#0f172a" : "#64748b", cursor: "pointer", fontFamily: "inherit", boxShadow: viewMode === "focus" ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>
+            ⊙ Focus
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -2145,8 +2159,56 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
         </div>
       )}
 
-      {/* Current account */}
-      {currentAccount ? (
+      {/* Worklist mode — compact list */}
+      {viewMode === "worklist" && (
+        <div style={{ marginBottom: 16 }}>
+          {queue.length > 0 && (
+            <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>
+              {queue.length} accounts · {fmt(queue.reduce((s,a)=>s+a.expectedValue,0))} EV · click any row to expand
+            </div>
+          )}
+          {(searchResult ? [searchResult] : queue).map(acc => {
+            const sev = SEV[acc.cfg.severity] || SEV.ROUTINE;
+            const isExpanded = expandedId === acc.id;
+            return (
+              <div key={acc.id} style={{ marginBottom: 4 }}>
+                {!isExpanded ? (
+                  <div onClick={() => setExpandedId(acc.id)}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, cursor: "pointer" }}
+                    onMouseEnter={e => e.currentTarget.style.background="#f8fafc"}
+                    onMouseLeave={e => e.currentTarget.style.background="#fff"}>
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3, background: sev.bg, color: sev.text, border: `1px solid ${sev.border}`, flexShrink: 0 }}>{acc.cfg.severity}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{acc.patient}</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8" }}>{acc.id} · {acc.payer}{acc.subPayer ? ` — ${acc.subPayer}` : ""} · {acc.daysOut}d out</div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#2563eb" }}>{fmt(acc.expectedValue)}</div>
+                      <div style={{ fontSize: 10, color: "#94a3b8" }}>{acc.prob}% likely</div>
+                    </div>
+                    <span style={{ fontSize: 10, color: "#94a3b8" }}>▼</span>
+                  </div>
+                ) : (
+                  <div>
+                    <button onClick={() => setExpandedId(null)} style={{ fontSize: 11, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textDecoration: "underline", padding: "0 0 4px 0" }}>▲ collapse</button>
+                    <CollectorAccountCard key={acc.id} acc={acc} onLog={handleLog} onWorkLink={onWorkLink} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {queue.length === 0 && !searchResult && (
+            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "40px 24px", textAlign: "center" }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "#16a34a", marginBottom: 6 }}>Queue complete</div>
+              <div style={{ fontSize: 13, color: "#166534" }}>All {arScored.length} accounts worked this session. {fmt(totalEV)} expected recovery logged.</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Focus mode — single account at a time */}
+      {viewMode === "focus" && (currentAccount ? (
         <CollectorAccountCard key={currentAccount.id + workedAccounts.length} acc={currentAccount} onLog={handleLog} onWorkLink={onWorkLink} />
       ) : !searchQuery ? (
         <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "40px 24px", textAlign: "center" }}>
@@ -2154,7 +2216,7 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
           <div style={{ fontSize: 15, fontWeight: 600, color: "#16a34a", marginBottom: 6 }}>Queue complete</div>
           <div style={{ fontSize: 13, color: "#166534" }}>All {arScored.length} accounts worked this session. {fmt(totalEV)} expected recovery logged.</div>
         </div>
-      ) : null}
+      ) : null)}
 
       {/* Worked list */}
       <WorkedList worked={workedAccounts} />
@@ -3198,9 +3260,9 @@ Return JSON with:
                 <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Collectors &amp; Billers</div>
                 <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
                   {seg("Biller", "biller")}
-                  {seg("Comm.", "commercial_collector")}
-                  {!isMobile && seg("Medicare B/C", "medicare_bc")}
-                  {isMobile && seg("MC B/C", "medicare_bc")}
+                  {seg("Commercial", "commercial_collector")}
+                  {!isMobile && seg("Medicare Part B", "medicare_bc")}
+                  {isMobile && seg("Medicare", "medicare_bc")}
                   {seg("Medicaid", "medicaid")}
                   {seg("Self-Pay", "self_pay")}
                   {seg("WC", "wc")}
@@ -3266,7 +3328,7 @@ Return JSON with:
                 <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Other roles</div>
                 <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
                   {seg("Biller", "biller")}
-                  {seg("Comm.", "commercial_collector")}
+                  {seg("Commercial", "commercial_collector")}
                   {seg("Supervisor", "supervisor")}
                   {seg("CFO", "cfo")}
                 </div>
@@ -3354,9 +3416,9 @@ Return JSON with:
                   <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Collectors &amp; Billers</div>
                   <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
                     {seg("Biller", "biller")}
-                    {seg("Comm.", "commercial_collector")}
-                    {!isMobile && seg("Medicare B/C", "medicare_bc")}
-                    {isMobile && seg("MC B/C", "medicare_bc")}
+                    {seg("Commercial", "commercial_collector")}
+                    {!isMobile && seg("Medicare Part B", "medicare_bc")}
+                    {isMobile && seg("Medicare", "medicare_bc")}
                     {seg("Medicaid", "medicaid")}
                     {seg("Self-Pay", "self_pay")}
                     {seg("WC", "wc")}
