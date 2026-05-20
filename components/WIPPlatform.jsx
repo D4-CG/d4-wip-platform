@@ -717,7 +717,7 @@ Notes:\n${noteText}`;
     try {
       const res = await fetch("/api/claude", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 400, messages: [{ role: "user", content: prompt }] })
+        body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 400, messages: [{ role: "user", content: prompt }] })
       });
       const data = await res.json();
       setSummary(data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "Summary unavailable.");
@@ -787,7 +787,7 @@ Requirements:
     try {
       const res = await fetch("/api/claude", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 300, messages: [{ role: "user", content: prompt }] })
+        body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 300, messages: [{ role: "user", content: prompt }] })
       });
       const data = await res.json();
       const note = data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "";
@@ -1295,7 +1295,7 @@ function WorkLinkForm({ acc, onSubmit, onCancel }) {
     try {
       const res = await fetch("/api/claude", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 200, messages: [{ role: "user", content: prompt }] })
+        body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 200, messages: [{ role: "user", content: prompt }] })
       });
       const data = await res.json();
       const text = data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "";
@@ -2769,7 +2769,7 @@ export default function WIPPlatform() {
     try {
       const res = await fetch("/api/claude", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 600, messages: [{ role: "user", content: prompt }] })
+        body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 600, messages: [{ role: "user", content: prompt }] })
       });
       const data = await res.json();
       if (!res.ok) {
