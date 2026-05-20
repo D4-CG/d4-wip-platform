@@ -896,7 +896,7 @@ Requirements:
 
 // ─── Area Worklist ────────────────────────────────────────────────────────────
 
-function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn }) {
+function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWorkLink }) {
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
   const [activeTab, setActiveTab] = useState("asap");
@@ -905,6 +905,7 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn }) {
   const [resolutionNote, setResolutionNote] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [goals, setGoals] = useState({ ...DEFAULT_GOALS });
+  const [wlAccount, setWlAccount] = useState(null);
 
   // Account buckets
   const allNative = dnfbScored.filter(a => a.area === area && !worked.has(a.id));
@@ -966,10 +967,23 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn }) {
           <div style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(a.amount)} balance</div>
         </div>
       </div>
-      <button onClick={() => setWorked(prev => new Set([...prev, a.id]))}
-        style={{ marginTop: 10, width: "100%", padding: "8px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
-        Mark worked ✓
-      </button>
+      {wlAccount === a.id
+        ? <div style={{ marginTop: 10 }}><WorkLinkForm acc={a} onSubmit={(wl) => { onWorkLink(wl); setWlAccount(null); }} onCancel={() => setWlAccount(null)} /></div>
+        : (
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button onClick={() => setWorked(prev => new Set([...prev, a.id]))}
+              style={{ flex: 1, padding: "8px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
+              Mark worked ✓
+            </button>
+            {onWorkLink && (
+              <button onClick={() => setWlAccount(a.id)}
+                style={{ padding: "8px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, color: "#2563eb", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
+                ⇄ WorkLink
+              </button>
+            )}
+          </div>
+        )
+      }
     </div>
   );
 
@@ -2641,8 +2655,9 @@ function CFOEscalationSection() {
 
 
 
-function CFOCriticalHolds({ accounts }) {
+function CFOCriticalHolds({ accounts, onWorkLink }) {
   const [open, setOpen] = useState(false);
+  const [wlAccount, setWlAccount] = useState(null);
   const crits = accounts.filter(a => a.cfg.severity === "CRITICAL");
   if (crits.length === 0) return null;
   return (
@@ -2657,16 +2672,27 @@ function CFOCriticalHolds({ accounts }) {
       {open && (
         <div style={{ borderTop: "1px solid #fed7aa", padding: "10px 18px" }}>
           {crits.map(a => (
-            <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #fff7ed" }}>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 500, color: "#0f172a" }}>{a.patient}</div>
-                <div style={{ fontSize: 11, color: "#64748b" }}>{a.id} · {a.payer} · {a.vertical} · {a.daysOut}d</div>
-                <div style={{ fontSize: 11, color: "#c2410c", marginTop: 2 }}>{a.cfg.label}</div>
+            <div key={a.id} style={{ paddingBottom: 10, borderBottom: "1px solid #fff7ed", marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: "#0f172a" }}>{a.patient}</div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>{a.id} · {a.payer} · {a.vertical} · {a.daysOut}d</div>
+                  <div style={{ fontSize: 11, color: "#c2410c", marginTop: 2 }}>{a.cfg.label}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{fmt(a.amount)}</div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>EV: {fmt(a.expectedValue)}</div>
+                </div>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{fmt(a.amount)}</div>
-                <div style={{ fontSize: 11, color: "#64748b" }}>EV: {fmt(a.expectedValue)}</div>
-              </div>
+              {wlAccount === a.id
+                ? <div style={{ marginTop: 8 }}><WorkLinkForm acc={a} onSubmit={(wl) => { onWorkLink(wl); setWlAccount(null); }} onCancel={() => setWlAccount(null)} /></div>
+                : onWorkLink && (
+                  <button onClick={() => setWlAccount(a.id)}
+                    style={{ marginTop: 8, padding: "6px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, color: "#2563eb", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>
+                    ⇄ Send WorkLink
+                  </button>
+                )
+              }
             </div>
           ))}
         </div>
@@ -2922,7 +2948,7 @@ export default function WIPPlatform() {
             </span>
           )}
         </div>
-        <AreaWorklist area={roleConfig.area} dnfbScored={dnfbForRole} worklinks={worklinks} onResolve={handleResolveWorklink} onReturn={handleReturnWorklink} />
+        <AreaWorklist area={roleConfig.area} dnfbScored={dnfbForRole} worklinks={worklinks} onResolve={handleResolveWorklink} onReturn={handleReturnWorklink} onWorkLink={handleSendWorklink} />
         <div style={{ borderTop: "1px solid #e2e8f0", padding: isMobile ? "12px 16px" : "14px 32px", display: "flex", justifyContent: "space-between", fontSize: 10, color: "#cbd5e1" }}>
           <span>D4 Consulting Group — Proprietary</span>
           {!isMobile && <span>WIP Intelligence Platform v2.1 · Human-in-the-loop · Phase 1 Internal</span>}
@@ -3191,7 +3217,7 @@ export default function WIPPlatform() {
                 </div>
               )}
             </div>
-            <CFOCriticalHolds accounts={arFiltered} />
+            <CFOCriticalHolds accounts={arFiltered} onWorkLink={handleSendWorklink} />
             {/* Headline KPIs */}
             {(() => {
               const grossAR = arFiltered.reduce((s,a) => s+a.amount, 0);
@@ -3379,7 +3405,7 @@ export default function WIPPlatform() {
 
 
         {role === "biller" && tab === "dnfb" && (
-          <AreaWorklist area="Billing/Scrubber" dnfbScored={dnfbForRole} worklinks={worklinks} onResolve={handleResolveWorklink} onReturn={handleReturnWorklink} />
+          <AreaWorklist area="Billing/Scrubber" dnfbScored={dnfbForRole} worklinks={worklinks} onResolve={handleResolveWorklink} onReturn={handleReturnWorklink} onWorkLink={handleSendWorklink} />
         )}
         {(role === "supervisor") && <AreaChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />}
         {role === "cfo" && tab === "dnfb" && (() => {
