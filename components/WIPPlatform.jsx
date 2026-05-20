@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 
 // ─── Anthropic API Key ────────────────────────────────────────────────────────
-// Vercel deployment: set VITE_ANTHROPIC_API_KEY in project environment variables
-// Local dev: set in .env.local as VITE_ANTHROPIC_API_KEY=sk-ant-...
-const ANTHROPIC_API_KEY = (typeof import.meta !== "undefined" && import.meta.env?.VITE_ANTHROPIC_API_KEY) || "";
+// Vercel deployment: set NEXT_PUBLIC_ANTHROPIC_API_KEY in project environment variables
+// Local dev: set in .env.local as NEXT_PUBLIC_ANTHROPIC_API_KEY=sk-ant-...
+const ANTHROPIC_API_KEY = (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_ANTHROPIC_API_KEY) || "";
 const AI_HEADERS = {
   "Content-Type": "application/json",
   "anthropic-version": "2023-06-01",
