@@ -3066,7 +3066,9 @@ export default function WIPPlatform() {
                 const avgDays = siteAR.length ? Math.round(siteAR.reduce((s,a) => s+a.daysOut*a.amount, 0) / Math.max(siteAR.reduce((s,a) => s+a.amount,0),1)) : 0;
                 const openWL = worklinks.filter(w => w.status==="open" && [...siteAR,...siteDNFB].some(a => a.id===w.accountId)).length;
                 return { site: s, totalAR, totalEV, avgDays, openWL };
-              }).sort((a,b) => b.totalEV - a.totalEV);
+              });
+              // Table sorted by EV desc for quick scanning, chips in numeric site order
+              const siteStatsTableSorted = [...siteStats].sort((a,b) => b.totalEV - a.totalEV);
 
               return (
                 <div style={{ marginBottom: 16 }}>
@@ -3076,7 +3078,7 @@ export default function WIPPlatform() {
                       <div style={{ display: "grid", gridTemplateColumns: "1fr repeat(4, auto)", gap: 0, fontSize: 10, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", padding: "8px 16px", borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
                         <span>Site</span><span style={{ textAlign:"right", paddingRight:16 }}>Total AR</span><span style={{ textAlign:"right", paddingRight:16 }}>EV</span><span style={{ textAlign:"right", paddingRight:16 }}>AR Days</span><span style={{ textAlign:"right" }}>WorkLink</span>
                       </div>
-                      {siteStats.map(s => (
+                      {siteStatsTableSorted.map(s => (
                         <div key={s.site} onClick={() => setSiteFilter(siteFilter===s.site ? null : s.site)}
                           style={{ display: "grid", gridTemplateColumns: "1fr repeat(4, auto)", gap: 0, padding: "8px 16px", cursor: "pointer", background: siteFilter===s.site ? "#eff6ff" : "transparent", borderBottom: "1px solid #f8fafc" }}>
                           <span style={{ fontSize: 12, fontWeight: siteFilter===s.site ? 700 : 400, color: siteFilter===s.site ? "#2563eb" : "#0f172a" }}>{s.site}</span>
