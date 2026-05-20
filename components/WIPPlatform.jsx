@@ -111,6 +111,27 @@ const ESCALATION_DATA = {
 
 const AREAS = ["Coding","Physician/Doc","Charge Capture","Credentialing","Authorization","Clinical/HIM","Billing/Scrubber","Pending"];
 
+const WORKLINK_REQUEST_TYPES = [
+  { value: "resubmit",      label: "Resubmit claim",          icon: "🔄", targetArea: "Billing/Scrubber" },
+  { value: "recode",        label: "Recode account",           icon: "💻", targetArea: "Coding" },
+  { value: "chase_auth",    label: "Chase authorization",      icon: "🔐", targetArea: "Authorization" },
+  { value: "cred_gap",      label: "Credentialing gap",        icon: "📋", targetArea: "Credentialing" },
+  { value: "missing_charge",label: "Missing charge",           icon: "⚡", targetArea: "Charge Capture" },
+  { value: "him_deficiency",label: "HIM deficiency",           icon: "📄", targetArea: "Clinical/HIM" },
+  { value: "physician_query",label: "Physician query",         icon: "👨‍⚕️", targetArea: "Physician/Doc" },
+  { value: "other",         label: "Other",                    icon: "📌", targetArea: null },
+];
+
+const WORKLINK_TARGET_AREAS = ["Billing/Scrubber","Coding","Authorization","Credentialing","Charge Capture","Clinical/HIM","Physician/Doc"];
+
+const WORKLINK_SLA_HRS = { CRITICAL: 4, URGENT: 24, MODERATE: 48, ROUTINE: 72 };
+
+function getWorklinkSLA(severity) {
+  const hrs = WORKLINK_SLA_HRS[severity] || 48;
+  const due = new Date(Date.now() + hrs * 3600000);
+  return { hrs, due, label: hrs < 24 ? `${hrs}hr` : `${hrs/24}d` };
+}
+
 const DNFB_DATA = [
   { id:"DNFB-001", patient:"Coastal Infusion Center", payer:"United Health", amount:62000, daysInDNFB:5, serviceDate:"2026-05-11", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 10", vertical:"Infusion" },
   { id:"DNFB-002", patient:"Metro Behavioral Health", payer:"Blue Cross", amount:64000, daysInDNFB:17, serviceDate:"2026-04-29", lastContact:"2026-05-09", holdCode:"PHYSICIAN_QUERY", site:"Site 12", vertical:"Behavioral Health" },
@@ -811,11 +832,331 @@ Requirements:
   );
 }
 
-function CollectorAccountCard({ acc, onLog }) {
+// ─── WIP WorkLink Components ──────────────────────────────────────────────────
+
+function WorkLinkForm({ acc, onSubmit, onCancel }) {
+  const [requestType, setRequestType] = useState("");
+  const [targetArea, setTargetArea] = useState("");
+  const [scratch, setScratch] = useState("");
+  const [noteReady, setNoteReady] = useState(null);
+  const [generating, setGenerating] = useState(false);
+  const [step, setStep] = useState("form"); // form | review | done
+
+  const selectedType = WORKLINK_REQUEST_TYPES.find(r => r.value === requestType);
+
+  const handleTypeSelect = (type) => {
+    setRequestType(type.value);
+    if (type.targetArea) setTargetArea(type.targetArea);
+  };
+
+  const generateNote = async () => {
+    setGenerating(true);
+    const prompt = `You are a healthcare revenue cycle specialist creating a structured internal work request. Generate a concise, professional work request note in 2-3 sentences. Account: ${acc.id} · ${acc.patient} · ${acc.payer} · Balance: ${fmt(acc.amount)} · EV: ${fmt(acc.expectedValue)} · Hold: ${acc.cfg?.label || acc.area}. Request type: ${selectedType?.label}. Target area: ${targetArea}. Collector notes: "${scratch || "No additional notes provided"}". Write the note as a direct communication to the ${targetArea} team. Be specific about what action is needed and why it is urgent. Return only the note text, no preamble.`;
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 200, messages: [{ role: "user", content: prompt }] })
+      });
+      const data = await res.json();
+      const text = data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "";
+      setNoteReady(text.trim());
+      setStep("review");
+    } catch {
+      setNoteReady(`${selectedType?.label} needed for ${acc.patient} (${acc.id}). Balance ${fmt(acc.amount)}, EV ${fmt(acc.expectedValue)}. ${scratch || "Please review and take action."}`);
+      setStep("review");
+    }
+    setGenerating(false);
+  };
+
+  const handleSubmit = () => {
+    const sla = getWorklinkSLA(acc.cfg?.severity || "MODERATE");
+    onSubmit({
+      id: `WL-${Date.now()}`,
+      accountId: acc.id,
+      patient: acc.patient,
+      payer: acc.payer,
+      site: acc.site,
+      vertical: acc.vertical,
+      amount: acc.amount,
+      expectedValue: acc.expectedValue,
+      severity: acc.cfg?.severity || "MODERATE",
+      holdLabel: acc.cfg?.label || acc.area,
+      requestType,
+      requestLabel: selectedType?.label,
+      requestIcon: selectedType?.icon,
+      targetArea,
+      scratch,
+      note: noteReady,
+      sentAt: new Date(),
+      slaHrs: sla.hrs,
+      slaDue: sla.due,
+      slaLabel: sla.label,
+      status: "open",
+      resolvedAt: null,
+      resolutionNote: null,
+    });
+  };
+
+  if (step === "review") return (
+    <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 10, padding: "16px 18px", marginTop: 12 }}>
+      <div style={{ fontSize: 10, color: "#0369a1", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>Review WorkLink request before sending</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+        {[
+          { label: "Request type", value: `${selectedType?.icon} ${selectedType?.label}` },
+          { label: "Target area", value: targetArea },
+          { label: "Account", value: acc.id },
+          { label: "EV", value: fmt(acc.expectedValue) },
+          { label: "SLA", value: getWorklinkSLA(acc.cfg?.severity || "MODERATE").label },
+          { label: "Priority", value: acc.cfg?.severity || "MODERATE" },
+        ].map(f => (
+          <div key={f.label} style={{ background: "#fff", borderRadius: 6, padding: "8px 10px", border: "1px solid #e0f2fe" }}>
+            <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>{f.label}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>{f.value}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ background: "#fff", border: "1px solid #e0f2fe", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
+        <div style={{ fontSize: 9, color: "#0369a1", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 6 }}>Generated request note</div>
+        <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.6 }}>{noteReady}</div>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={handleSubmit} style={{ flex: 1, padding: "10px", background: "#0369a1", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
+          Send to {targetArea} →
+        </button>
+        <button onClick={() => setStep("form")} style={{ padding: "10px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
+          Edit
+        </button>
+        <button onClick={onCancel} style={{ padding: "10px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#94a3b8", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 10, padding: "16px 18px", marginTop: 12 }}>
+      <div style={{ fontSize: 10, color: "#0369a1", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 12 }}>
+        ⇄ WIP WorkLink — Send request
+      </div>
+
+      {/* Request type grid */}
+      <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Request type</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6, marginBottom: 12 }}>
+        {WORKLINK_REQUEST_TYPES.map(rt => (
+          <button key={rt.value} onClick={() => handleTypeSelect(rt)}
+            style={{ padding: "8px 10px", background: requestType === rt.value ? "#0369a1" : "#fff", border: `1px solid ${requestType === rt.value ? "#0369a1" : "#e2e8f0"}`, borderRadius: 8, color: requestType === rt.value ? "#fff" : "#334155", cursor: "pointer", fontSize: 12, fontFamily: "inherit", textAlign: "left", display: "flex", alignItems: "center", gap: 8 }}>
+            <span>{rt.icon}</span> {rt.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Target area — override if "other" */}
+      <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Target area</div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+        {WORKLINK_TARGET_AREAS.map(area => (
+          <button key={area} onClick={() => setTargetArea(area)}
+            style={{ padding: "5px 12px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${targetArea === area ? "#0369a1" : "#e2e8f0"}`, borderRadius: 6, background: targetArea === area ? "#0369a1" : "#fff", color: targetArea === area ? "#fff" : "#64748b", fontWeight: targetArea === area ? 600 : 400 }}>
+            {area}
+          </button>
+        ))}
+      </div>
+
+      {/* Scratch notes */}
+      <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Notes for the {targetArea || "receiving team"}</div>
+      <textarea value={scratch} onChange={e => setScratch(e.target.value)} placeholder="Add context — what did you find, what's needed, any urgency..." rows={3}
+        style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 13, border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff", color: "#0f172a", fontFamily: "inherit", resize: "vertical", outline: "none", marginBottom: 10 }} />
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={generateNote} disabled={!requestType || !targetArea || generating}
+          style={{ flex: 1, padding: "10px", background: !requestType || !targetArea ? "#f1f5f9" : "#0f172a", border: "none", borderRadius: 8, color: !requestType || !targetArea ? "#94a3b8" : "#fff", cursor: !requestType || !targetArea ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
+          {generating ? "Generating request note..." : "✦ Generate request note →"}
+        </button>
+        <button onClick={onCancel} style={{ padding: "10px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#94a3b8", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function WorkLinkQueue({ worklinks, onResolve, onReturn }) {
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 768;
+  const [resolving, setResolving] = useState(null);
+  const [resolutionNote, setResolutionNote] = useState("");
+
+  const open = worklinks.filter(w => w.status === "open").sort((a,b) => b.expectedValue - a.expectedValue);
+  const resolved = worklinks.filter(w => w.status !== "open").sort((a,b) => new Date(b.resolvedAt) - new Date(a.resolvedAt));
+
+  const totalEV = open.reduce((s,w) => s+w.expectedValue, 0);
+  const breached = open.filter(w => new Date() > w.slaDue);
+  const avgAge = open.length ? Math.round(open.reduce((s,w) => s + (Date.now() - new Date(w.sentAt)) / 3600000, 0) / open.length) : 0;
+
+  const slaColor = (w) => new Date() > w.slaDue ? "#dc2626" : (new Date(w.slaDue) - Date.now()) < 3600000 ? "#d97706" : "#16a34a";
+  const slaRemaining = (w) => {
+    const ms = new Date(w.slaDue) - Date.now();
+    if (ms < 0) return "SLA breached";
+    const hrs = Math.floor(ms / 3600000);
+    const mins = Math.floor((ms % 3600000) / 60000);
+    return hrs > 0 ? `${hrs}h ${mins}m remaining` : `${mins}m remaining`;
+  };
+
+  return (
+    <div style={{ padding: isMobile ? "16px 12px 80px" : "24px 32px" }}>
+      {/* Header metrics */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Open requests", value: open.length, sub: "pending action", color: "#0369a1" },
+          { label: "Total EV in queue", value: fmt(totalEV), sub: "expected recovery at stake", color: "#2563eb" },
+          { label: "SLA breached", value: breached.length, sub: breached.length > 0 ? "needs immediate attention" : "all within SLA", color: breached.length > 0 ? "#dc2626" : "#16a34a" },
+          { label: "Resolved this session", value: resolved.length, sub: `${fmt(resolved.reduce((s,w) => s+w.expectedValue,0))} EV released`, color: "#16a34a" },
+        ].map(m => (
+          <div key={m.label} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
+            <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>{m.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: m.color, letterSpacing: "-0.01em" }}>{m.value}</div>
+            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{m.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Open queue */}
+      {open.length === 0 ? (
+        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "40px 24px", textAlign: "center", marginBottom: 20 }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#16a34a" }}>WorkLink queue clear</div>
+          <div style={{ fontSize: 13, color: "#166534", marginTop: 4 }}>No open requests — all requests resolved.</div>
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 11, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>Open requests — sorted by expected value ({open.length})</div>
+          {open.map(w => (
+            <div key={w.id} style={{ background: "#fff", border: `1px solid ${new Date() > w.slaDue ? "#fca5a5" : "#e0f2fe"}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
+              {/* Card header */}
+              <div style={{ padding: "14px 18px", background: new Date() > w.slaDue ? "#fff7f7" : "#f0f9ff", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#0369a1", background: "#e0f2fe", padding: "2px 8px", borderRadius: 4 }}>{w.requestIcon} {w.requestLabel}</span>
+                    <span style={{ fontSize: 10, color: "#64748b", background: "#f1f5f9", padding: "2px 8px", borderRadius: 4 }}>{w.targetArea}</span>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: slaColor(w), background: slaColor(w) + "14", padding: "2px 8px", borderRadius: 4 }}>⏱ {slaRemaining(w)}</span>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 2 }}>{w.patient}</div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>{w.accountId} · {w.payer} · {w.vertical} · {w.holdLabel}</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>From collector · {w.sentAt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} · SLA: {w.slaLabel}</div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 2 }}>Expected value</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: "#2563eb", letterSpacing: "-0.02em" }}>{fmt(w.expectedValue)}</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(w.amount)} balance</div>
+                </div>
+              </div>
+              {/* Note */}
+              <div style={{ padding: "12px 18px", borderBottom: "1px solid #f1f5f9" }}>
+                <div style={{ fontSize: 9, color: "#0369a1", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 4 }}>Request note</div>
+                <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.6 }}>{w.note}</div>
+              </div>
+              {/* Actions */}
+              <div style={{ padding: "12px 18px" }}>
+                {resolving === w.id ? (
+                  <>
+                    <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Resolution note (optional)</div>
+                    <textarea value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} placeholder="What action did you take? Any follow-up needed?" rows={2}
+                      style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", fontSize: 13, border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff", color: "#0f172a", fontFamily: "inherit", resize: "none", outline: "none", marginBottom: 8 }} />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => { onResolve(w.id, resolutionNote); setResolving(null); setResolutionNote(""); }}
+                        style={{ flex: 1, padding: "9px", background: "#16a34a", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
+                        ✓ Mark resolved
+                      </button>
+                      <button onClick={() => setResolving(null)} style={{ padding: "9px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>Cancel</button>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setResolving(w.id)}
+                      style={{ flex: 1, padding: "8px 14px", background: "#0f172a", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
+                      Resolve
+                    </button>
+                    <button onClick={() => onReturn(w.id)}
+                      style={{ padding: "8px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
+                      Return to sender
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+
+      {/* Resolved audit trail */}
+      {resolved.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <div style={{ fontSize: 11, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>Resolved this session ({resolved.length})</div>
+          {resolved.map(w => (
+            <div key={w.id} style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "12px 16px", marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <div>
+                <div style={{ display: "flex", gap: 6, marginBottom: 4, alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 700 }}>✓ {w.status === "returned" ? "Returned" : "Resolved"}</span>
+                  <span style={{ fontSize: 11, color: "#64748b" }}>{w.requestIcon} {w.requestLabel}</span>
+                  <span style={{ fontSize: 10, color: "#94a3b8" }}>· {w.targetArea}</span>
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: "#0f172a" }}>{w.patient} · {w.accountId}</div>
+                {w.resolutionNote && <div style={{ fontSize: 11, color: "#475569", marginTop: 3, fontStyle: "italic" }}>{w.resolutionNote}</div>}
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#16a34a" }}>{fmt(w.expectedValue)}</div>
+                <div style={{ fontSize: 10, color: "#94a3b8" }}>EV released</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WorkLinkSuppressedPanel({ suppressed }) {
+  const [open, setOpen] = useState(false);
+  if (suppressed.length === 0) return null;
+  const totalEV = suppressed.reduce((s,w) => s+w.expectedValue, 0);
+  return (
+    <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 10, marginTop: 20, overflow: "hidden" }}>
+      <div onClick={() => setOpen(o => !o)} style={{ padding: "12px 18px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, background: "#0369a1", color: "#fff", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.08em" }}>⇄ WORKLINK</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{suppressed.length} account{suppressed.length > 1 ? "s" : ""} suppressed pending resolution</span>
+          <span style={{ fontSize: 12, color: "#0369a1", fontWeight: 600 }}>{fmt(totalEV)} EV</span>
+        </div>
+        <span style={{ fontSize: 11, color: "#94a3b8" }}>{open ? "▲ hide" : "▼ view all"}</span>
+      </div>
+      {open && (
+        <div style={{ borderTop: "1px solid #bae6fd", padding: "10px 18px" }}>
+          <div style={{ fontSize: 10, color: "#64748b", marginBottom: 10 }}>These accounts are removed from your active queue until the WorkLink request is resolved by the receiving area.</div>
+          {suppressed.map(w => (
+            <div key={w.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #e0f2fe" }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: "#0f172a" }}>{w.patient}</div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>{w.accountId} · {w.requestIcon} {w.requestLabel} → {w.targetArea}</div>
+                <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>Sent {w.sentAt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} · SLA {w.slaLabel}</div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#0369a1" }}>{fmt(w.expectedValue)}</div>
+                <div style={{ fontSize: 10, color: "#94a3b8" }}>EV</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CollectorAccountCard({ acc, onLog, onWorkLink }) {
   const [approved, setApproved] = useState(false);
   const [outcome, setOutcome] = useState("");
   const [overriding, setOverriding] = useState(false);
   const [overrideAction, setOverrideAction] = useState(null);
+  const [showWorkLink, setShowWorkLink] = useState(false);
+  const [worklinkSent, setWorklinkSent] = useState(false);
   const sev = SEV[acc.cfg.severity];
 
   const [noteReady, setNoteReady] = useState(null);
@@ -909,6 +1250,27 @@ function CollectorAccountCard({ acc, onLog }) {
         )}
       </div>
 
+      {/* WIP WorkLink — send request */}
+      {!worklinkSent && (
+        <div style={{ padding: "10px 22px 0" }}>
+          {!showWorkLink ? (
+            <button onClick={() => setShowWorkLink(true)}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, color: "#0369a1", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
+              <span>⇄</span> Send WorkLink request
+            </button>
+          ) : (
+            <WorkLinkForm acc={acc}
+              onSubmit={(req) => { onWorkLink(req); setWorklinkSent(true); setShowWorkLink(false); }}
+              onCancel={() => setShowWorkLink(false)} />
+          )}
+        </div>
+      )}
+      {worklinkSent && (
+        <div style={{ margin: "10px 22px 0", padding: "10px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 12, color: "#0369a1", fontWeight: 600 }}>⇄ WorkLink request sent — account suppressed from queue</span>
+        </div>
+      )}
+
       {/* Outcome selector — appears after approval */}
       {approved && (
         <div style={{ padding: "16px 22px" }}>
@@ -991,7 +1353,7 @@ function WorkedList({ worked }) {
   );
 }
 
-function CollectorView({ arScored, dnfbScored, isMedicareBc }) {
+function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLink }) {
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
   const isTablet = windowWidth >= 768 && windowWidth < 1024;
@@ -1001,8 +1363,10 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResult, setSearchResult] = useState(null);
 
+  const openWorklinkIds = new Set(worklinks.filter(w => w.status === "open").map(w => w.accountId));
   const workedIds = new Set(workedAccounts.map(w => w.id));
-  const queue = arScored.filter(a => !workedIds.has(a.id));
+  const queue = arScored.filter(a => !workedIds.has(a.id) && !openWorklinkIds.has(a.id));
+  const suppressed = worklinks.filter(w => w.status === "open");
   const currentAccount = searchResult || queue[0] || null;
 
   const handleSearch = useCallback(q => {
@@ -1078,7 +1442,7 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc }) {
 
       {/* Current account */}
       {currentAccount ? (
-        <CollectorAccountCard key={currentAccount.id + workedAccounts.length} acc={currentAccount} onLog={handleLog} />
+        <CollectorAccountCard key={currentAccount.id + workedAccounts.length} acc={currentAccount} onLog={handleLog} onWorkLink={onWorkLink} />
       ) : !searchQuery ? (
         <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "40px 24px", textAlign: "center" }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
@@ -1089,6 +1453,9 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc }) {
 
       {/* Worked list */}
       <WorkedList worked={workedAccounts} />
+
+      {/* WorkLink suppressed panel */}
+      <WorkLinkSuppressedPanel suppressed={suppressed} />
     </div>
   );
 }
@@ -1878,6 +2245,11 @@ export default function WIPPlatform() {
   const [critFilter, setCritFilter] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [donutExpanded, setDonutExpanded] = useState(false);
+  const [worklinks, setWorklinks] = useState([]);
+
+  const handleSendWorklink = (req) => setWorklinks(prev => [...prev, req]);
+  const handleResolveWorklink = (id, note) => setWorklinks(prev => prev.map(w => w.id === id ? {...w, status: "resolved", resolvedAt: new Date(), resolutionNote: note} : w));
+  const handleReturnWorklink = (id) => setWorklinks(prev => prev.map(w => w.id === id ? {...w, status: "returned", resolvedAt: new Date(), resolutionNote: "Returned to sender"} : w));
 
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
@@ -2038,7 +2410,7 @@ export default function WIPPlatform() {
           <span style={{ fontSize: 12, color: "#64748b" }}>{roleConfig?.label} — {roleConfig?.mode === "medicare_bc" ? "Unified DNFB + AR" : "Collections Queue"}</span>
           <span style={{ fontSize: 11, color: "#94a3b8" }}>· {arForRole.length} accounts · sorted by expected value</span>
         </div>
-        <CollectorView arScored={arForRole} dnfbScored={dnfbForRole} isMedicareBc={roleConfig?.mode === "medicare_bc"} />
+        <CollectorView arScored={arForRole} dnfbScored={dnfbForRole} isMedicareBc={roleConfig?.mode === "medicare_bc"} worklinks={worklinks} onWorkLink={handleSendWorklink} />
       </div>
     );
   }
@@ -2097,6 +2469,14 @@ export default function WIPPlatform() {
           {role === "biller" && (
             <button style={tabStyle(tab === "dnfb")} onClick={() => { setTab("dnfb"); setAreaFilter(null); setSeverityFilter(null); setSearchQuery(""); setAiText(null); }}>Billing WIP — Read Only ({dnfbForRole.length})</button>
           )}
+          {role === "biller" && (
+            <button onClick={() => setTab("worklink")} style={{ ...tabStyle(tab === "worklink"), color: tab === "worklink" ? "#0369a1" : "#64748b", borderBottomColor: tab === "worklink" ? "#0369a1" : "transparent" }}>
+              WIP WorkLink
+              {worklinks.filter(w => w.status === "open").length > 0 && (
+                <span style={{ background: "#0369a1", color: "#fff", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 700, marginLeft: 6 }}>{worklinks.filter(w => w.status === "open").length}</span>
+              )}
+            </button>
+          )}
           {role === "supervisor" && (
             <button style={{...tabStyle(tab === "escalation"), color: tab === "escalation" ? "#dc2626" : "#64748b", borderBottomColor: tab === "escalation" ? "#dc2626" : "transparent"}} onClick={() => { setTab("escalation"); setAreaFilter(null); setSearchQuery(""); }}>
               Escalation Queue <span style={{ background: "#fee2e2", color: "#b91c1c", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 700, marginLeft: 4 }}>{ESCALATION_DATA.escalated.length + ESCALATION_DATA.slaBreach.length}</span>
@@ -2144,7 +2524,10 @@ export default function WIPPlatform() {
       {tab === "escalation" && role === "supervisor" && (
         <EscalationQueue arScored={arForRole} dnfbScored={dnfbForRole} />
       )}
-      {tab !== "escalation" && (
+      {tab === "worklink" && role === "biller" && (
+        <WorkLinkQueue worklinks={worklinks} onResolve={handleResolveWorklink} onReturn={handleReturnWorklink} />
+      )}
+      {tab !== "escalation" && tab !== "worklink" && (
       <div style={{ padding: isMobile ? "16px 12px 80px" : isTablet ? "20px 20px" : "24px 32px" }}>
         {role === "cfo" && tab === "metrics" ? (
           <div>
