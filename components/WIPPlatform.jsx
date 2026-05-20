@@ -101,7 +101,29 @@ const PAYER_BENCHMARKS = {
   workers_comp: { min: 45, max: 65, label: "Worker's Comp" },
 };
 
-// Payer-type-aware probability color thresholds
+// Payer portal quick-links — opens provider portal in new tab
+const PAYER_PORTALS = {
+  "Medicare": "https://www.cms.gov/medicare/provider-enrollment-and-certification",
+  "Medicare Advantage": "https://www.cms.gov/medicare/provider-enrollment-and-certification",
+  "United Health": "https://www.uhcprovider.com",
+  "UnitedHealthcare": "https://www.uhcprovider.com",
+  "UHC": "https://www.uhcprovider.com",
+  "Aetna": "https://www.aetna.com/health-care-professionals.html",
+  "Aetna Better Health": "https://www.aetnabetterhealth.com/providers",
+  "Cigna": "https://hcpportal.cigna.com",
+  "Humana": "https://www.availity.com",
+  "Blue Cross": "https://www.availity.com",
+  "Blue Shield": "https://www.availity.com",
+  "Anthem": "https://www.availity.com",
+  "BCBS": "https://www.availity.com",
+  "Medicaid": "https://www.availity.com",
+  "Molina Healthcare": "https://providers.molinahealthcare.com",
+  "Centene / WellCare": "https://www.availity.com",
+  "AmeriHealth Caritas": "https://www.amerihealthcaritaspa.com/provider",
+  "United Community Plan": "https://www.uhcprovider.com",
+  "Buckeye Health Plan": "https://www.buckeyehealthplan.com/providers",
+  "Worker Comp": "https://www.availity.com",
+};
 // Green starts where the payer benchmark minimum starts — internally consistent
 const PROB_THRESHOLDS = {
   medicare:     { green: 82, amber: 55 },
@@ -244,7 +266,7 @@ const DNFB_DATA = [
   { id:"DNFB-006", patient:"Coastal Infusion Center", payer:"Aetna", amount:25000, daysInDNFB:28, serviceDate:"2026-04-18", lastContact:"2026-05-03", holdCode:"CHARGE_MISSING", site:"Site 5", vertical:"Infusion" },
   { id:"DNFB-007", patient:"Comfort Home Services", payer:"Blue Cross", amount:167000, daysInDNFB:6, serviceDate:"2026-05-09", lastContact:"2026-05-14", holdCode:"HIM_DEFICIENCY", site:"Site 8", vertical:"Home Health" },
   { id:"DNFB-008", patient:"Smile Partners DSO", payer:"Cigna", amount:63000, daysInDNFB:27, serviceDate:"2026-04-19", lastContact:"2026-05-03", holdCode:"CODING_UNASSIGNED", site:"Site 5", vertical:"Dental" },
-  { id:"DNFB-009", patient:"Comfort Home Services", payer:"Aetna", amount:132000, daysInDNFB:13, serviceDate:"2026-04-30", lastContact:"2026-05-13", holdCode:"SCRUBBER_EDIT", site:"Site 5", vertical:"Home Health" },
+  { id:"DNFB-009", patient:"Comfort Home Services", payer:"Aetna", amount:132000, daysInDNFB:13, serviceDate:"2026-04-30", lastContact:"2026-05-13", holdCode:"SCRUBBER_EDIT", site:"Site 5", vertical:"Home Health", scrubberEdit:"Edit 4010 — Missing modifier 59 on unbundled service"  },
   { id:"DNFB-010", patient:"Comfort Home Services", payer:"Humana", amount:107000, daysInDNFB:12, serviceDate:"2026-05-04", lastContact:"2026-05-07", holdCode:"HIM_DEFICIENCY", site:"Site 8", vertical:"Home Health" },
   { id:"DNFB-011", patient:"Harborview BH", payer:"Blue Cross", amount:165000, daysInDNFB:6, serviceDate:"2026-05-07", lastContact:"2026-05-11", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 2", vertical:"Behavioral Health" },
   { id:"DNFB-012", patient:"Heartland Hospice", payer:"Worker Comp", amount:146000, daysInDNFB:28, serviceDate:"2026-04-18", lastContact:"2026-04-24", holdCode:"CHARGE_MISSING", site:"Site 9", vertical:"Hospice" },
@@ -253,21 +275,21 @@ const DNFB_DATA = [
   { id:"DNFB-015", patient:"Regional Eye Associates", payer:"Aetna", amount:66000, daysInDNFB:29, serviceDate:"2026-04-17", lastContact:"2026-05-13", holdCode:"CODING_UNASSIGNED", site:"Site 12", vertical:"Ophthalmology" },
   { id:"DNFB-016", patient:"Cardiology Associates", payer:"United Health", amount:160000, daysInDNFB:14, serviceDate:"2026-05-02", lastContact:"2026-05-04", holdCode:"AUTH_EXPIRED", site:"Site 5", vertical:"Cardiology" },
   { id:"DNFB-017", patient:"Summit Ophthalmology", payer:"Worker Comp", amount:35000, daysInDNFB:8, serviceDate:"2026-05-08", lastContact:"2026-05-13", holdCode:"AUTH_MISSING", site:"Site 1", vertical:"Ophthalmology" },
-  { id:"DNFB-018", patient:"Harbor Home Health", payer:"Blue Cross", amount:20000, daysInDNFB:8, serviceDate:"2026-05-08", lastContact:"2026-05-09", holdCode:"SCRUBBER_EDIT", site:"Site 6", vertical:"Home Health" },
-  { id:"DNFB-019", patient:"Cardiology Associates", payer:"United Health", amount:129000, daysInDNFB:7, serviceDate:"2026-05-08", lastContact:"2026-05-10", holdCode:"SCRUBBER_EDIT", site:"Site 10", vertical:"Cardiology" },
+  { id:"DNFB-018", patient:"Harbor Home Health", payer:"Blue Cross", amount:20000, daysInDNFB:8, serviceDate:"2026-05-08", lastContact:"2026-05-09", holdCode:"SCRUBBER_EDIT", site:"Site 6", vertical:"Home Health", scrubberEdit:"Edit 4010 — Missing modifier 59 on unbundled service"  },
+  { id:"DNFB-019", patient:"Cardiology Associates", payer:"United Health", amount:129000, daysInDNFB:7, serviceDate:"2026-05-08", lastContact:"2026-05-10", holdCode:"SCRUBBER_EDIT", site:"Site 10", vertical:"Cardiology", scrubberEdit:"Edit 3015 — Place of service mismatch: verify facility vs professional claim type"  },
   { id:"DNFB-020", patient:"Genesis Home Health", payer:"Humana", amount:29000, daysInDNFB:4, serviceDate:"2026-05-09", lastContact:"2026-05-14", holdCode:"PHYSICIAN_QUERY", site:"Site 7", vertical:"Home Health" },
-  { id:"DNFB-021", patient:"Regional Urology Associates", payer:"Medicare", amount:172000, daysInDNFB:21, serviceDate:"2026-04-25", lastContact:"2026-05-03", holdCode:"SCRUBBER_EDIT", site:"Site 12", vertical:"Urology" },
+  { id:"DNFB-021", patient:"Regional Urology Associates", payer:"Medicare", amount:172000, daysInDNFB:21, serviceDate:"2026-04-25", lastContact:"2026-05-03", holdCode:"SCRUBBER_EDIT", site:"Site 12", vertical:"Urology", scrubberEdit:"Edit 5020 — Unbundling conflict: CPT codes cannot be billed together"  },
   { id:"DNFB-022", patient:"Peak MSK Partners", payer:"Blue Shield", amount:123000, daysInDNFB:8, serviceDate:"2026-05-08", lastContact:"2026-05-09", holdCode:"CHARGE_MISSING", site:"Site 9", vertical:"Orthopedics" },
   { id:"DNFB-023", patient:"Northgate Psychiatry", payer:"Worker Comp", amount:28000, daysInDNFB:30, serviceDate:"2026-04-16", lastContact:"2026-05-02", holdCode:"CODING_UNASSIGNED", site:"Site 8", vertical:"Behavioral Health" },
   { id:"DNFB-024", patient:"Legacy Hospice Group", payer:"Medicaid", amount:113000, daysInDNFB:23, serviceDate:"2026-04-19", lastContact:"2026-04-24", holdCode:"CHARGE_MISSING", site:"Site 12", vertical:"Hospice", subPayer:"Aetna Better Health"  },
   { id:"DNFB-025", patient:"Heart Partners", payer:"Cigna", amount:17000, daysInDNFB:19, serviceDate:"2026-04-26", lastContact:"2026-05-14", holdCode:"CODING_UNASSIGNED", site:"Site 9", vertical:"Cardiology" },
-  { id:"DNFB-026", patient:"Summit Orthopedics", payer:"Blue Cross", amount:65000, daysInDNFB:13, serviceDate:"2026-05-03", lastContact:"2026-05-06", holdCode:"SCRUBBER_EDIT", site:"Site 10", vertical:"Orthopedics" },
+  { id:"DNFB-026", patient:"Summit Orthopedics", payer:"Blue Cross", amount:65000, daysInDNFB:13, serviceDate:"2026-05-03", lastContact:"2026-05-06", holdCode:"SCRUBBER_EDIT", site:"Site 10", vertical:"Orthopedics", scrubberEdit:"Edit 5020 — Unbundling conflict: CPT codes cannot be billed together"  },
   { id:"DNFB-027", patient:"MedCore Infusion", payer:"Worker Comp", amount:71000, daysInDNFB:7, serviceDate:"2026-05-04", lastContact:"2026-05-13", holdCode:"CHARGE_LAG", site:"Site 4", vertical:"Infusion" },
   { id:"DNFB-028", patient:"Comfort Care Partners", payer:"United Health", amount:85000, daysInDNFB:30, serviceDate:"2026-04-16", lastContact:"2026-05-01", holdCode:"AUTH_MISSING", site:"Site 10", vertical:"Hospice" },
   { id:"DNFB-029", patient:"Premier Infusion Partners", payer:"Worker Comp", amount:38000, daysInDNFB:30, serviceDate:"2026-04-16", lastContact:"2026-04-17", holdCode:"CHARGE_MISSING", site:"Site 4", vertical:"Infusion" },
   { id:"DNFB-030", patient:"Northgate Psychiatry", payer:"Worker Comp", amount:174000, daysInDNFB:4, serviceDate:"2026-05-11", lastContact:"2026-05-15", holdCode:"CHARGE_MISSING", site:"Site 2", vertical:"Behavioral Health" },
   { id:"DNFB-031", patient:"Bright Dental Alliance", payer:"Aetna", amount:57000, daysInDNFB:22, serviceDate:"2026-04-22", lastContact:"2026-04-29", holdCode:"CHARGE_LAG", site:"Site 8", vertical:"Dental" },
-  { id:"DNFB-032", patient:"Summit Mental Health", payer:"Blue Shield", amount:72000, daysInDNFB:6, serviceDate:"2026-05-07", lastContact:"2026-05-11", holdCode:"SCRUBBER_EDIT", site:"Site 12", vertical:"Behavioral Health" },
+  { id:"DNFB-032", patient:"Summit Mental Health", payer:"Blue Shield", amount:72000, daysInDNFB:6, serviceDate:"2026-05-07", lastContact:"2026-05-11", holdCode:"SCRUBBER_EDIT", site:"Site 12", vertical:"Behavioral Health", scrubberEdit:"Edit 5020 — Unbundling conflict: CPT codes cannot be billed together"  },
   { id:"DNFB-033", patient:"Heart Partners", payer:"Blue Cross", amount:181000, daysInDNFB:29, serviceDate:"2026-04-17", lastContact:"2026-04-19", holdCode:"CODING_COMPLEX", site:"Site 6", vertical:"Cardiology" },
   { id:"DNFB-034", patient:"Comfort Care Partners", payer:"Medicare", amount:98000, daysInDNFB:29, serviceDate:"2026-04-17", lastContact:"2026-05-09", holdCode:"CHARGE_MISSING", site:"Site 11", vertical:"Hospice" },
   { id:"DNFB-035", patient:"Alliance Infusion Services", payer:"Worker Comp", amount:163000, daysInDNFB:24, serviceDate:"2026-04-22", lastContact:"2026-05-10", holdCode:"CREDENTIALING", site:"Site 3", vertical:"Infusion" },
@@ -275,7 +297,7 @@ const DNFB_DATA = [
   { id:"DNFB-037", patient:"Legacy Hospice Group", payer:"United Health", amount:76000, daysInDNFB:12, serviceDate:"2026-04-30", lastContact:"2026-05-09", holdCode:"CODING_COMPLEX", site:"Site 11", vertical:"Hospice" },
   { id:"DNFB-038", patient:"Metro Behavioral Health", payer:"United Health", amount:153000, daysInDNFB:9, serviceDate:"2026-05-07", lastContact:"2026-05-09", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 6", vertical:"Behavioral Health" },
   { id:"DNFB-039", patient:"Serenity Hospice", payer:"Humana", amount:53000, daysInDNFB:9, serviceDate:"2026-05-07", lastContact:"2026-05-15", holdCode:"HIM_DEFICIENCY", site:"Site 9", vertical:"Hospice" },
-  { id:"DNFB-040", patient:"Summit Ophthalmology", payer:"Blue Cross", amount:89000, daysInDNFB:20, serviceDate:"2026-04-24", lastContact:"2026-05-12", holdCode:"SCRUBBER_EDIT", site:"Site 12", vertical:"Ophthalmology" },
+  { id:"DNFB-040", patient:"Summit Ophthalmology", payer:"Blue Cross", amount:89000, daysInDNFB:20, serviceDate:"2026-04-24", lastContact:"2026-05-12", holdCode:"SCRUBBER_EDIT", site:"Site 12", vertical:"Ophthalmology", scrubberEdit:"Edit 4010 — Missing modifier 59 on unbundled service"  },
   { id:"DNFB-041", patient:"Smile Partners DSO", payer:"Aetna", amount:175000, daysInDNFB:13, serviceDate:"2026-04-28", lastContact:"2026-05-13", holdCode:"CREDENTIALING", site:"Site 10", vertical:"Dental" },
   { id:"DNFB-042", patient:"Serenity Hospice", payer:"United Health", amount:58000, daysInDNFB:14, serviceDate:"2026-04-28", lastContact:"2026-05-05", holdCode:"CHARGE_MISSING", site:"Site 6", vertical:"Hospice" },
   { id:"DNFB-043", patient:"Metro Urology Group", payer:"Aetna", amount:126000, daysInDNFB:26, serviceDate:"2026-04-19", lastContact:"2026-04-24", holdCode:"AUTH_EXPIRED", site:"Site 2", vertical:"Urology" },
@@ -315,7 +337,7 @@ const DNFB_DATA = [
   { id:"DNFB-077", patient:"Serenity Hospice", payer:"Worker Comp", amount:170000, daysInDNFB:5, serviceDate:"2026-05-11", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 1", vertical:"Hospice" },
   { id:"DNFB-078", patient:"Bright Dental Alliance", payer:"Medicaid", amount:124000, daysInDNFB:23, serviceDate:"2026-04-21", lastContact:"2026-05-03", holdCode:"CODING_COMPLEX", site:"Site 5", vertical:"Dental", subPayer:"Aetna Better Health"  },
   { id:"DNFB-079", patient:"Lakeside Dental Group", payer:"Blue Cross", amount:177000, daysInDNFB:27, serviceDate:"2026-04-15", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 11", vertical:"Dental" },
-  { id:"DNFB-080", patient:"Smile Partners DSO", payer:"Humana", amount:130000, daysInDNFB:3, serviceDate:"2026-05-11", lastContact:"2026-05-14", holdCode:"SCRUBBER_EDIT", site:"Site 6", vertical:"Dental" },
+  { id:"DNFB-080", patient:"Smile Partners DSO", payer:"Humana", amount:130000, daysInDNFB:3, serviceDate:"2026-05-11", lastContact:"2026-05-14", holdCode:"SCRUBBER_EDIT", site:"Site 6", vertical:"Dental", scrubberEdit:"Edit 6010 — Diagnosis code not covered for this procedure — medical necessity documentation required"  },
   { id:"DNFB-081", patient:"Premier Infusion Partners", payer:"Cigna", amount:182000, daysInDNFB:16, serviceDate:"2026-04-28", lastContact:"2026-05-09", holdCode:"CREDENTIALING", site:"Site 9", vertical:"Infusion" },
   { id:"DNFB-082", patient:"Advanced Urology Partners", payer:"Cigna", amount:87000, daysInDNFB:4, serviceDate:"2026-05-12", lastContact:"2026-05-13", holdCode:"CHARGE_MISSING", site:"Site 9", vertical:"Urology" },
   { id:"DNFB-083", patient:"Serenity Hospice", payer:"Aetna", amount:97000, daysInDNFB:20, serviceDate:"2026-04-23", lastContact:"2026-05-14", holdCode:"AUTH_EXPIRED", site:"Site 4", vertical:"Hospice" },
@@ -339,106 +361,106 @@ const DNFB_DATA = [
 ];
 
 const AR_DATA = [
-  { id:"AR-001", patient:"Betty Allen", payer:"Aetna", amount:50000, daysOut:9, serviceDate:"2026-05-01", lastContact:"2026-05-11", denialCode:null, site:"Site 12", vertical:"Hospice" },
-  { id:"AR-002", patient:"Carol Scott", payer:"Aetna", amount:161000, daysOut:56, serviceDate:"2026-03-11", lastContact:"2026-03-24", denialCode:null, site:"Site 7", vertical:"Home Health" },
-  { id:"AR-003", patient:"Sandra White", payer:"Cigna", amount:140000, daysOut:63, serviceDate:"2026-03-02", lastContact:"2026-04-25", denialCode:"CO-16", site:"Site 7", vertical:"Behavioral Health" },
-  { id:"AR-004", patient:"Sandra Adams", payer:"Aetna", amount:123000, daysOut:192, serviceDate:"2025-10-29", lastContact:"2026-05-02", denialCode:null, site:"Site 12", vertical:"Orthopedics" },
-  { id:"AR-005", patient:"Brian Hill", payer:"Medicare", amount:158000, daysOut:95, serviceDate:"2026-01-27", lastContact:"2026-04-19", denialCode:"CO-22", site:"Site 2", vertical:"Infusion" },
-  { id:"AR-006", patient:"Jennifer Clark", payer:"Blue Shield", amount:109000, daysOut:11, serviceDate:"2026-04-22", lastContact:"2026-05-10", denialCode:"CO-22", site:"Site 8", vertical:"Home Health" },
-  { id:"AR-007", patient:"Patricia Hall", payer:"Blue Shield", amount:133000, daysOut:23, serviceDate:"2026-04-18", lastContact:"2026-05-05", denialCode:"CO-16", site:"Site 4", vertical:"Hospice" },
-  { id:"AR-008", patient:"Margaret Young", payer:"Humana", amount:99000, daysOut:36, serviceDate:"2026-04-05", lastContact:"2026-04-22", denialCode:null, site:"Site 12", vertical:"Hospice" },
-  { id:"AR-009", patient:"William Lewis", payer:"Aetna", amount:103000, daysOut:29, serviceDate:"2026-04-11", lastContact:"2026-05-01", denialCode:"CO-50", site:"Site 7", vertical:"Dental" },
-  { id:"AR-010", patient:"Paul Clark", payer:"Cigna", amount:141000, daysOut:13, serviceDate:"2026-04-22", lastContact:"2026-05-11", denialCode:null, site:"Site 7", vertical:"Orthopedics" },
-  { id:"AR-011", patient:"Anthony Mitchell", payer:"Medicaid", amount:102000, daysOut:11, serviceDate:"2026-04-25", lastContact:"2026-05-15", denialCode:"CO-50", site:"Site 11", vertical:"Ophthalmology", subPayer:"AmeriHealth Caritas"  },
-  { id:"AR-012", patient:"Joseph Jackson", payer:"United Health", amount:64000, daysOut:58, serviceDate:"2026-03-09", lastContact:"2026-04-03", denialCode:null, site:"Site 7", vertical:"Behavioral Health" },
-  { id:"AR-013", patient:"Paul Baker", payer:"Aetna", amount:138000, daysOut:26, serviceDate:"2026-04-13", lastContact:"2026-04-29", denialCode:"CO-4", site:"Site 8", vertical:"Home Health" },
-  { id:"AR-014", patient:"Joseph Johnson", payer:"Blue Cross", amount:24000, daysOut:32, serviceDate:"2026-04-03", lastContact:"2026-05-06", denialCode:"CO-97", site:"Site 6", vertical:"Cardiology" },
-  { id:"AR-015", patient:"Charles Lopez", payer:"Cigna", amount:38000, daysOut:176, serviceDate:"2025-11-10", lastContact:"2026-04-19", denialCode:"CO-22", site:"Site 9", vertical:"Orthopedics" },
-  { id:"AR-016", patient:"Andrew Garcia", payer:"Medicaid", amount:8000, daysOut:30, serviceDate:"2026-04-04", lastContact:"2026-05-13", denialCode:null, site:"Site 6", vertical:"Behavioral Health", subPayer:"United Community Plan"  },
-  { id:"AR-017", patient:"Richard Anderson", payer:"Medicare", amount:14000, daysOut:21, serviceDate:"2026-04-17", lastContact:"2026-04-28", denialCode:null, site:"Site 5", vertical:"Orthopedics" },
-  { id:"AR-018", patient:"Linda Hernandez", payer:"Aetna", amount:34000, daysOut:39, serviceDate:"2026-03-29", lastContact:"2026-04-22", denialCode:"CO-50", site:"Site 2", vertical:"Cardiology" },
-  { id:"AR-019", patient:"Rebecca Gonzalez", payer:"Blue Shield", amount:172000, daysOut:155, serviceDate:"2025-12-06", lastContact:"2026-03-29", denialCode:null, site:"Site 11", vertical:"Infusion" },
-  { id:"AR-020", patient:"Kenneth Wright", payer:"Blue Cross", amount:47000, daysOut:102, serviceDate:"2026-01-25", lastContact:"2026-04-25", denialCode:"CO-22", site:"Site 10", vertical:"Behavioral Health" },
-  { id:"AR-021", patient:"Carol Thompson", payer:"Worker Comp", amount:177000, daysOut:14, serviceDate:"2026-04-21", lastContact:"2026-05-09", denialCode:"CO-22", site:"Site 9", vertical:"Home Health" },
-  { id:"AR-022", patient:"Kimberly Hernandez", payer:"Medicare", amount:66000, daysOut:66, serviceDate:"2026-02-25", lastContact:"2026-05-09", denialCode:"CO-50", site:"Site 7", vertical:"Behavioral Health" },
-  { id:"AR-023", patient:"Paul Young", payer:"Medicaid", amount:47000, daysOut:41, serviceDate:"2026-03-25", lastContact:"2026-05-07", denialCode:"CO-16", site:"Site 8", vertical:"Infusion", subPayer:"Centene / WellCare"  },
-  { id:"AR-024", patient:"Dorothy Perez", payer:"Aetna", amount:39000, daysOut:59, serviceDate:"2026-03-10", lastContact:"2026-05-04", denialCode:"CO-22", site:"Site 11", vertical:"Dental" },
-  { id:"AR-025", patient:"Amanda Adams", payer:"Worker Comp", amount:24000, daysOut:21, serviceDate:"2026-04-17", lastContact:"2026-05-02", denialCode:null, site:"Site 7", vertical:"Cardiology" },
-  { id:"AR-026", patient:"Sarah Martinez", payer:"Cigna", amount:90000, daysOut:34, serviceDate:"2026-03-28", lastContact:"2026-05-14", denialCode:null, site:"Site 1", vertical:"Hospice" },
-  { id:"AR-027", patient:"Daniel Harris", payer:"Medicare", amount:52000, daysOut:26, serviceDate:"2026-04-11", lastContact:"2026-05-15", denialCode:"CO-97", site:"Site 10", vertical:"Cardiology" },
-  { id:"AR-028", patient:"Jennifer Rodriguez", payer:"Worker Comp", amount:55000, daysOut:31, serviceDate:"2026-04-05", lastContact:"2026-05-08", denialCode:"CO-97", site:"Site 3", vertical:"Infusion" },
-  { id:"AR-029", patient:"Andrew Thomas", payer:"Blue Cross", amount:12000, daysOut:12, serviceDate:"2026-04-24", lastContact:"2026-05-06", denialCode:"CO-4", site:"Site 5", vertical:"Infusion" },
-  { id:"AR-030", patient:"Dorothy Taylor", payer:"Humana", amount:99000, daysOut:48, serviceDate:"2026-03-18", lastContact:"2026-04-10", denialCode:"CO-16", site:"Site 11", vertical:"Dental" },
-  { id:"AR-031", patient:"Michael Brown", payer:"Aetna", amount:88000, daysOut:69, serviceDate:"2026-02-27", lastContact:"2026-04-06", denialCode:"CO-97", site:"Site 10", vertical:"Home Health" },
-  { id:"AR-032", patient:"Donald Wright", payer:"Worker Comp", amount:159000, daysOut:63, serviceDate:"2026-03-03", lastContact:"2026-05-08", denialCode:"CO-4", site:"Site 12", vertical:"Behavioral Health" },
-  { id:"AR-033", patient:"Christopher Young", payer:"Aetna", amount:156000, daysOut:150, serviceDate:"2025-12-05", lastContact:"2026-04-24", denialCode:"CO-16", site:"Site 10", vertical:"Infusion" },
-  { id:"AR-034", patient:"Nancy White", payer:"Humana", amount:166000, daysOut:13, serviceDate:"2026-04-20", lastContact:"2026-05-11", denialCode:null, site:"Site 5", vertical:"Orthopedics" },
-  { id:"AR-035", patient:"George Taylor", payer:"Medicare", amount:22000, daysOut:17, serviceDate:"2026-04-22", lastContact:"2026-05-06", denialCode:null, site:"Site 10", vertical:"Urology" },
-  { id:"AR-036", patient:"Rebecca Green", payer:"United Health", amount:69000, daysOut:51, serviceDate:"2026-03-19", lastContact:"2026-04-16", denialCode:null, site:"Site 5", vertical:"Orthopedics" },
-  { id:"AR-037", patient:"Margaret Green", payer:"Blue Shield", amount:63000, daysOut:80, serviceDate:"2026-02-12", lastContact:"2026-05-11", denialCode:null, site:"Site 4", vertical:"Cardiology" },
-  { id:"AR-038", patient:"Joseph Taylor", payer:"Blue Shield", amount:84000, daysOut:22, serviceDate:"2026-04-09", lastContact:"2026-04-25", denialCode:"CO-97", site:"Site 4", vertical:"Infusion" },
-  { id:"AR-039", patient:"Daniel Johnson", payer:"Aetna", amount:108000, daysOut:6, serviceDate:"2026-04-28", lastContact:"2026-04-28", denialCode:"CO-97", site:"Site 11", vertical:"Dental" },
-  { id:"AR-040", patient:"Andrew Perez", payer:"Cigna", amount:94000, daysOut:27, serviceDate:"2026-04-09", lastContact:"2026-04-23", denialCode:"CO-50", site:"Site 9", vertical:"Home Health" },
-  { id:"AR-041", patient:"Ryan Adams", payer:"Humana", amount:46000, daysOut:78, serviceDate:"2026-02-20", lastContact:"2026-03-30", denialCode:null, site:"Site 9", vertical:"Cardiology" },
-  { id:"AR-042", patient:"Melissa Gonzalez", payer:"United Health", amount:49000, daysOut:53, serviceDate:"2026-03-18", lastContact:"2026-03-30", denialCode:null, site:"Site 9", vertical:"Dental" },
-  { id:"AR-043", patient:"Kevin Lee", payer:"Humana", amount:167000, daysOut:10, serviceDate:"2026-04-21", lastContact:"2026-05-14", denialCode:"CO-50", site:"Site 8", vertical:"Hospice" },
-  { id:"AR-044", patient:"Andrew Baker", payer:"Humana", amount:156000, daysOut:90, serviceDate:"2026-02-04", lastContact:"2026-04-29", denialCode:null, site:"Site 2", vertical:"Home Health" },
-  { id:"AR-045", patient:"Karen Hernandez", payer:"Blue Shield", amount:175000, daysOut:174, serviceDate:"2025-11-16", lastContact:"2026-04-27", denialCode:"CO-22", site:"Site 12", vertical:"Behavioral Health" },
-  { id:"AR-046", patient:"David Lopez", payer:"Blue Cross", amount:148000, daysOut:162, serviceDate:"2025-11-25", lastContact:"2026-03-27", denialCode:null, site:"Site 12", vertical:"Cardiology" },
-  { id:"AR-047", patient:"Michael Williams", payer:"Aetna", amount:120000, daysOut:21, serviceDate:"2026-04-13", lastContact:"2026-04-30", denialCode:"CO-4", site:"Site 11", vertical:"Behavioral Health" },
-  { id:"AR-048", patient:"George Brown", payer:"Aetna", amount:168000, daysOut:59, serviceDate:"2026-03-11", lastContact:"2026-03-21", denialCode:"CO-22", site:"Site 9", vertical:"Urology" },
-  { id:"AR-049", patient:"Ryan Brown", payer:"Aetna", amount:105000, daysOut:115, serviceDate:"2026-01-09", lastContact:"2026-03-28", denialCode:null, site:"Site 3", vertical:"Dental" },
-  { id:"AR-050", patient:"Thomas White", payer:"Medicare", amount:140000, daysOut:100, serviceDate:"2026-01-27", lastContact:"2026-04-25", denialCode:"CO-22", site:"Site 7", vertical:"Ophthalmology" },
-  { id:"AR-051", patient:"Emily Carter", payer:"Blue Shield", amount:59000, daysOut:56, serviceDate:"2026-03-10", lastContact:"2026-04-24", denialCode:null, site:"Site 7", vertical:"Cardiology" },
-  { id:"AR-052", patient:"Ryan Garcia", payer:"Humana", amount:67000, daysOut:68, serviceDate:"2026-02-27", lastContact:"2026-05-10", denialCode:"CO-22", site:"Site 3", vertical:"Behavioral Health" },
-  { id:"AR-053", patient:"Amanda Gonzalez", payer:"Humana", amount:169000, daysOut:39, serviceDate:"2026-03-31", lastContact:"2026-05-06", denialCode:null, site:"Site 8", vertical:"Ophthalmology" },
-  { id:"AR-054", patient:"Steven Wright", payer:"Medicaid", amount:121000, daysOut:76, serviceDate:"2026-02-15", lastContact:"2026-04-07", denialCode:"CO-22", site:"Site 5", vertical:"Cardiology", subPayer:"Buckeye Health Plan"  },
-  { id:"AR-055", patient:"Emily King", payer:"Worker Comp", amount:33000, daysOut:28, serviceDate:"2026-04-10", lastContact:"2026-05-11", denialCode:"CO-4", site:"Site 4", vertical:"Dental" },
-  { id:"AR-056", patient:"Matthew Davis", payer:"Medicare", amount:14000, daysOut:24, serviceDate:"2026-04-14", lastContact:"2026-05-09", denialCode:"CO-50", site:"Site 9", vertical:"Behavioral Health" },
-  { id:"AR-057", patient:"Sandra Martinez", payer:"Medicaid", amount:98000, daysOut:15, serviceDate:"2026-04-23", lastContact:"2026-05-11", denialCode:null, site:"Site 1", vertical:"Urology", subPayer:"Aetna Better Health"  },
-  { id:"AR-058", patient:"Richard Carter", payer:"Medicare", amount:107000, daysOut:139, serviceDate:"2025-12-18", lastContact:"2026-04-24", denialCode:"CO-50", site:"Site 3", vertical:"Urology" },
-  { id:"AR-059", patient:"William Johnson", payer:"Humana", amount:5000, daysOut:16, serviceDate:"2026-04-20", lastContact:"2026-05-06", denialCode:null, site:"Site 6", vertical:"Dental" },
-  { id:"AR-060", patient:"Stephanie Martinez", payer:"Humana", amount:159000, daysOut:112, serviceDate:"2026-01-15", lastContact:"2026-03-23", denialCode:"CO-22", site:"Site 9", vertical:"Infusion" },
-  { id:"AR-061", patient:"Kevin Hill", payer:"Blue Cross", amount:179000, daysOut:16, serviceDate:"2026-04-19", lastContact:"2026-05-02", denialCode:"CO-16", site:"Site 6", vertical:"Home Health" },
-  { id:"AR-062", patient:"Linda Anderson", payer:"Worker Comp", amount:148000, daysOut:57, serviceDate:"2026-03-05", lastContact:"2026-05-15", denialCode:"CO-97", site:"Site 6", vertical:"Ophthalmology" },
-  { id:"AR-063", patient:"Anthony Robinson", payer:"Medicaid", amount:48000, daysOut:158, serviceDate:"2025-11-24", lastContact:"2026-05-14", denialCode:"CO-22", site:"Site 11", vertical:"Behavioral Health", subPayer:"Molina Healthcare"  },
-  { id:"AR-064", patient:"Linda Anderson", payer:"United Health", amount:153000, daysOut:15, serviceDate:"2026-04-23", lastContact:"2026-05-15", denialCode:null, site:"Site 4", vertical:"Dental" },
-  { id:"AR-065", patient:"Patricia Mitchell", payer:"Blue Cross", amount:50000, daysOut:23, serviceDate:"2026-04-08", lastContact:"2026-05-09", denialCode:null, site:"Site 6", vertical:"Urology" },
-  { id:"AR-066", patient:"Lisa Anderson", payer:"Aetna", amount:114000, daysOut:105, serviceDate:"2026-01-22", lastContact:"2026-04-19", denialCode:"CO-50", site:"Site 4", vertical:"Urology" },
-  { id:"AR-067", patient:"Sandra Martin", payer:"Blue Cross", amount:14000, daysOut:11, serviceDate:"2026-04-26", lastContact:"2026-05-09", denialCode:null, site:"Site 1", vertical:"Infusion" },
-  { id:"AR-068", patient:"Richard Johnson", payer:"Aetna", amount:36000, daysOut:7, serviceDate:"2026-05-04", lastContact:"2026-05-04", denialCode:"CO-16", site:"Site 12", vertical:"Dental" },
-  { id:"AR-069", patient:"Rebecca Hall", payer:"Blue Shield", amount:103000, daysOut:44, serviceDate:"2026-03-26", lastContact:"2026-04-15", denialCode:null, site:"Site 4", vertical:"Cardiology" },
-  { id:"AR-070", patient:"Joshua Brown", payer:"Aetna", amount:16000, daysOut:41, serviceDate:"2026-03-21", lastContact:"2026-04-30", denialCode:"CO-50", site:"Site 10", vertical:"Urology" },
-  { id:"AR-071", patient:"Karen Gonzalez", payer:"Humana", amount:36000, daysOut:20, serviceDate:"2026-04-20", lastContact:"2026-05-10", denialCode:"CO-50", site:"Site 4", vertical:"Orthopedics" },
-  { id:"AR-072", patient:"Ryan King", payer:"Blue Cross", amount:72000, daysOut:12, serviceDate:"2026-04-26", lastContact:"2026-05-07", denialCode:null, site:"Site 9", vertical:"Behavioral Health" },
-  { id:"AR-073", patient:"Melissa Mitchell", payer:"Medicaid", amount:74000, daysOut:69, serviceDate:"2026-02-23", lastContact:"2026-04-17", denialCode:null, site:"Site 3", vertical:"Cardiology", subPayer:"AmeriHealth Caritas"  },
-  { id:"AR-074", patient:"Kimberly Carter", payer:"Humana", amount:9000, daysOut:10, serviceDate:"2026-04-21", lastContact:"2026-05-10", denialCode:"CO-97", site:"Site 10", vertical:"Behavioral Health" },
-  { id:"AR-075", patient:"Joshua Harris", payer:"Worker Comp", amount:97000, daysOut:9, serviceDate:"2026-04-22", lastContact:"2026-05-08", denialCode:"CO-97", site:"Site 6", vertical:"Urology" },
-  { id:"AR-076", patient:"Margaret Hall", payer:"Aetna", amount:176000, daysOut:12, serviceDate:"2026-04-20", lastContact:"2026-05-07", denialCode:"CO-50", site:"Site 10", vertical:"Infusion" },
-  { id:"AR-077", patient:"Brian Nelson", payer:"Blue Shield", amount:76000, daysOut:75, serviceDate:"2026-02-23", lastContact:"2026-05-02", denialCode:null, site:"Site 10", vertical:"Dental" },
-  { id:"AR-078", patient:"Kimberly Lopez", payer:"United Health", amount:98000, daysOut:17, serviceDate:"2026-04-22", lastContact:"2026-05-07", denialCode:"CO-4", site:"Site 9", vertical:"Infusion" },
-  { id:"AR-079", patient:"Anthony Green", payer:"Blue Shield", amount:100000, daysOut:5, serviceDate:"2026-04-28", lastContact:"2026-04-28", denialCode:null, site:"Site 2", vertical:"Urology" },
-  { id:"AR-080", patient:"Joshua King", payer:"United Health", amount:107000, daysOut:119, serviceDate:"2026-01-04", lastContact:"2026-03-29", denialCode:null, site:"Site 8", vertical:"Behavioral Health" },
-  { id:"AR-081", patient:"Jessica Allen", payer:"Medicaid", amount:19000, daysOut:23, serviceDate:"2026-04-17", lastContact:"2026-05-13", denialCode:"CO-97", site:"Site 7", vertical:"Orthopedics", subPayer:"United Community Plan"  },
-  { id:"AR-082", patient:"Brian Perez", payer:"Blue Shield", amount:150000, daysOut:40, serviceDate:"2026-03-31", lastContact:"2026-05-10", denialCode:"CO-50", site:"Site 2", vertical:"Ophthalmology" },
-  { id:"AR-083", patient:"Betty Garcia", payer:"Worker Comp", amount:126000, daysOut:22, serviceDate:"2026-04-14", lastContact:"2026-04-27", denialCode:"CO-97", site:"Site 7", vertical:"Ophthalmology" },
-  { id:"AR-084", patient:"Donald Anderson", payer:"Aetna", amount:109000, daysOut:39, serviceDate:"2026-03-28", lastContact:"2026-04-21", denialCode:"CO-22", site:"Site 6", vertical:"Infusion" },
-  { id:"AR-085", patient:"Jessica Scott", payer:"Worker Comp", amount:10000, daysOut:59, serviceDate:"2026-03-07", lastContact:"2026-04-11", denialCode:null, site:"Site 1", vertical:"Home Health" },
-  { id:"AR-086", patient:"Donald Carter", payer:"Humana", amount:9000, daysOut:7, serviceDate:"2026-05-01", lastContact:"2026-05-01", denialCode:null, site:"Site 9", vertical:"Hospice" },
-  { id:"AR-087", patient:"David Thompson", payer:"Cigna", amount:171000, daysOut:114, serviceDate:"2026-01-07", lastContact:"2026-04-23", denialCode:null, site:"Site 12", vertical:"Infusion" },
-  { id:"AR-088", patient:"Melissa Jackson", payer:"Medicare", amount:154000, daysOut:47, serviceDate:"2026-03-20", lastContact:"2026-04-13", denialCode:"CO-16", site:"Site 5", vertical:"Urology" },
-  { id:"AR-089", patient:"Stephanie Brown", payer:"Medicaid", amount:45000, daysOut:120, serviceDate:"2026-01-01", lastContact:"2026-04-21", denialCode:"CO-22", site:"Site 6", vertical:"Behavioral Health", subPayer:"Centene / WellCare"  },
-  { id:"AR-090", patient:"Robert Harris", payer:"Blue Cross", amount:140000, daysOut:10, serviceDate:"2026-04-24", lastContact:"2026-05-10", denialCode:null, site:"Site 2", vertical:"Urology" },
-  { id:"AR-091", patient:"Donald Mitchell", payer:"Blue Shield", amount:140000, daysOut:12, serviceDate:"2026-04-26", lastContact:"2026-05-11", denialCode:"CO-4", site:"Site 12", vertical:"Orthopedics" },
-  { id:"AR-092", patient:"Maria Martinez", payer:"United Health", amount:125000, daysOut:103, serviceDate:"2026-01-21", lastContact:"2026-04-09", denialCode:null, site:"Site 5", vertical:"Infusion" },
-  { id:"AR-093", patient:"Timothy Moore", payer:"Medicare", amount:95000, daysOut:41, serviceDate:"2026-03-27", lastContact:"2026-04-29", denialCode:null, site:"Site 3", vertical:"Infusion" },
-  { id:"AR-094", patient:"Kevin Davis", payer:"United Health", amount:141000, daysOut:18, serviceDate:"2026-04-15", lastContact:"2026-05-12", denialCode:"CO-16", site:"Site 5", vertical:"Cardiology" },
-  { id:"AR-095", patient:"Sandra Thompson", payer:"Blue Shield", amount:97000, daysOut:71, serviceDate:"2026-02-21", lastContact:"2026-04-29", denialCode:"CO-22", site:"Site 7", vertical:"Infusion" },
-  { id:"AR-096", patient:"Donna Scott", payer:"Blue Shield", amount:169000, daysOut:79, serviceDate:"2026-02-17", lastContact:"2026-03-20", denialCode:null, site:"Site 8", vertical:"Infusion" },
-  { id:"AR-097", patient:"Richard Mitchell", payer:"Medicare", amount:63000, daysOut:19, serviceDate:"2026-04-14", lastContact:"2026-05-09", denialCode:"CO-16", site:"Site 10", vertical:"Hospice" },
-  { id:"AR-098", patient:"Susan Harris", payer:"Medicaid", amount:91000, daysOut:30, serviceDate:"2026-04-04", lastContact:"2026-04-18", denialCode:null, site:"Site 2", vertical:"Behavioral Health", subPayer:"Buckeye Health Plan"  },
-  { id:"AR-099", patient:"Margaret Young", payer:"United Health", amount:81000, daysOut:7, serviceDate:"2026-05-02", lastContact:"2026-05-02", denialCode:"CO-50", site:"Site 10", vertical:"Behavioral Health" },
-  { id:"AR-100", patient:"Daniel Nelson", payer:"Cigna", amount:54000, daysOut:27, serviceDate:"2026-04-08", lastContact:"2026-05-10", denialCode:null, site:"Site 4", vertical:"Behavioral Health" }
+  { id:"AR-001", patient:"Betty Allen", payer:"Aetna", amount:50000, daysOut:9, serviceDate:"2026-05-01", lastContact:"2026-05-11", denialCode:null, site:"Site 12", vertical:"Hospice", claimStatus:"At Payer"  },
+  { id:"AR-002", patient:"Carol Scott", payer:"Aetna", amount:161000, daysOut:56, serviceDate:"2026-03-11", lastContact:"2026-03-24", denialCode:null, site:"Site 7", vertical:"Home Health", claimStatus:"At Payer"  },
+  { id:"AR-003", patient:"Sandra White", payer:"Cigna", amount:140000, daysOut:63, serviceDate:"2026-03-02", lastContact:"2026-04-25", denialCode:"CO-16", site:"Site 7", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-004", patient:"Sandra Adams", payer:"Aetna", amount:123000, daysOut:192, serviceDate:"2025-10-29", lastContact:"2026-05-02", denialCode:null, site:"Site 12", vertical:"Orthopedics", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-005", patient:"Brian Hill", payer:"Medicare", amount:158000, daysOut:95, serviceDate:"2026-01-27", lastContact:"2026-04-19", denialCode:"CO-22", site:"Site 2", vertical:"Infusion", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-006", patient:"Jennifer Clark", payer:"Blue Shield", amount:109000, daysOut:11, serviceDate:"2026-04-22", lastContact:"2026-05-10", denialCode:"CO-22", site:"Site 8", vertical:"Home Health", claimStatus:"At Payer"  },
+  { id:"AR-007", patient:"Patricia Hall", payer:"Blue Shield", amount:133000, daysOut:23, serviceDate:"2026-04-18", lastContact:"2026-05-05", denialCode:"CO-16", site:"Site 4", vertical:"Hospice", claimStatus:"At Payer"  },
+  { id:"AR-008", patient:"Margaret Young", payer:"Humana", amount:99000, daysOut:36, serviceDate:"2026-04-05", lastContact:"2026-04-22", denialCode:null, site:"Site 12", vertical:"Hospice", claimStatus:"At Payer"  },
+  { id:"AR-009", patient:"William Lewis", payer:"Aetna", amount:103000, daysOut:29, serviceDate:"2026-04-11", lastContact:"2026-05-01", denialCode:"CO-50", site:"Site 7", vertical:"Dental", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-010", patient:"Paul Clark", payer:"Cigna", amount:141000, daysOut:13, serviceDate:"2026-04-22", lastContact:"2026-05-11", denialCode:null, site:"Site 7", vertical:"Orthopedics", claimStatus:"At Payer"  },
+  { id:"AR-011", patient:"Anthony Mitchell", payer:"Medicaid", amount:102000, daysOut:11, serviceDate:"2026-04-25", lastContact:"2026-05-15", denialCode:"CO-50", site:"Site 11", vertical:"Ophthalmology", subPayer:"AmeriHealth Caritas" , claimStatus:"At Payer"  },
+  { id:"AR-012", patient:"Joseph Jackson", payer:"United Health", amount:64000, daysOut:58, serviceDate:"2026-03-09", lastContact:"2026-04-03", denialCode:null, site:"Site 7", vertical:"Behavioral Health", claimStatus:"At Payer"  },
+  { id:"AR-013", patient:"Paul Baker", payer:"Aetna", amount:138000, daysOut:26, serviceDate:"2026-04-13", lastContact:"2026-04-29", denialCode:"CO-4", site:"Site 8", vertical:"Home Health", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-014", patient:"Joseph Johnson", payer:"Blue Cross", amount:24000, daysOut:32, serviceDate:"2026-04-03", lastContact:"2026-05-06", denialCode:"CO-97", site:"Site 6", vertical:"Cardiology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-015", patient:"Charles Lopez", payer:"Cigna", amount:38000, daysOut:176, serviceDate:"2025-11-10", lastContact:"2026-04-19", denialCode:"CO-22", site:"Site 9", vertical:"Orthopedics", claimStatus:"At Payer"  },
+  { id:"AR-016", patient:"Andrew Garcia", payer:"Medicaid", amount:8000, daysOut:30, serviceDate:"2026-04-04", lastContact:"2026-05-13", denialCode:null, site:"Site 6", vertical:"Behavioral Health", subPayer:"United Community Plan" , claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-017", patient:"Richard Anderson", payer:"Medicare", amount:14000, daysOut:21, serviceDate:"2026-04-17", lastContact:"2026-04-28", denialCode:null, site:"Site 5", vertical:"Orthopedics", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-018", patient:"Linda Hernandez", payer:"Aetna", amount:34000, daysOut:39, serviceDate:"2026-03-29", lastContact:"2026-04-22", denialCode:"CO-50", site:"Site 2", vertical:"Cardiology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-019", patient:"Rebecca Gonzalez", payer:"Blue Shield", amount:172000, daysOut:155, serviceDate:"2025-12-06", lastContact:"2026-03-29", denialCode:null, site:"Site 11", vertical:"Infusion", claimStatus:"Pending Submission"  },
+  { id:"AR-020", patient:"Kenneth Wright", payer:"Blue Cross", amount:47000, daysOut:102, serviceDate:"2026-01-25", lastContact:"2026-04-25", denialCode:"CO-22", site:"Site 10", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-021", patient:"Carol Thompson", payer:"Worker Comp", amount:177000, daysOut:14, serviceDate:"2026-04-21", lastContact:"2026-05-09", denialCode:"CO-22", site:"Site 9", vertical:"Home Health", claimStatus:"At Payer"  },
+  { id:"AR-022", patient:"Kimberly Hernandez", payer:"Medicare", amount:66000, daysOut:66, serviceDate:"2026-02-25", lastContact:"2026-05-09", denialCode:"CO-50", site:"Site 7", vertical:"Behavioral Health", claimStatus:"At Payer"  },
+  { id:"AR-023", patient:"Paul Young", payer:"Medicaid", amount:47000, daysOut:41, serviceDate:"2026-03-25", lastContact:"2026-05-07", denialCode:"CO-16", site:"Site 8", vertical:"Infusion", subPayer:"Centene / WellCare" , claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-024", patient:"Dorothy Perez", payer:"Aetna", amount:39000, daysOut:59, serviceDate:"2026-03-10", lastContact:"2026-05-04", denialCode:"CO-22", site:"Site 11", vertical:"Dental", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-025", patient:"Amanda Adams", payer:"Worker Comp", amount:24000, daysOut:21, serviceDate:"2026-04-17", lastContact:"2026-05-02", denialCode:null, site:"Site 7", vertical:"Cardiology", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-026", patient:"Sarah Martinez", payer:"Cigna", amount:90000, daysOut:34, serviceDate:"2026-03-28", lastContact:"2026-05-14", denialCode:null, site:"Site 1", vertical:"Hospice", claimStatus:"At Payer"  },
+  { id:"AR-027", patient:"Daniel Harris", payer:"Medicare", amount:52000, daysOut:26, serviceDate:"2026-04-11", lastContact:"2026-05-15", denialCode:"CO-97", site:"Site 10", vertical:"Cardiology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-028", patient:"Jennifer Rodriguez", payer:"Worker Comp", amount:55000, daysOut:31, serviceDate:"2026-04-05", lastContact:"2026-05-08", denialCode:"CO-97", site:"Site 3", vertical:"Infusion", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-029", patient:"Andrew Thomas", payer:"Blue Cross", amount:12000, daysOut:12, serviceDate:"2026-04-24", lastContact:"2026-05-06", denialCode:"CO-4", site:"Site 5", vertical:"Infusion", claimStatus:"At Payer"  },
+  { id:"AR-030", patient:"Dorothy Taylor", payer:"Humana", amount:99000, daysOut:48, serviceDate:"2026-03-18", lastContact:"2026-04-10", denialCode:"CO-16", site:"Site 11", vertical:"Dental", claimStatus:"At Payer"  },
+  { id:"AR-031", patient:"Michael Brown", payer:"Aetna", amount:88000, daysOut:69, serviceDate:"2026-02-27", lastContact:"2026-04-06", denialCode:"CO-97", site:"Site 10", vertical:"Home Health", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-032", patient:"Donald Wright", payer:"Worker Comp", amount:159000, daysOut:63, serviceDate:"2026-03-03", lastContact:"2026-05-08", denialCode:"CO-4", site:"Site 12", vertical:"Behavioral Health", claimStatus:"At Payer"  },
+  { id:"AR-033", patient:"Christopher Young", payer:"Aetna", amount:156000, daysOut:150, serviceDate:"2025-12-05", lastContact:"2026-04-24", denialCode:"CO-16", site:"Site 10", vertical:"Infusion", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-034", patient:"Nancy White", payer:"Humana", amount:166000, daysOut:13, serviceDate:"2026-04-20", lastContact:"2026-05-11", denialCode:null, site:"Site 5", vertical:"Orthopedics", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-035", patient:"George Taylor", payer:"Medicare", amount:22000, daysOut:17, serviceDate:"2026-04-22", lastContact:"2026-05-06", denialCode:null, site:"Site 10", vertical:"Urology", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-036", patient:"Rebecca Green", payer:"United Health", amount:69000, daysOut:51, serviceDate:"2026-03-19", lastContact:"2026-04-16", denialCode:null, site:"Site 5", vertical:"Orthopedics", claimStatus:"At Payer"  },
+  { id:"AR-037", patient:"Margaret Green", payer:"Blue Shield", amount:63000, daysOut:80, serviceDate:"2026-02-12", lastContact:"2026-05-11", denialCode:null, site:"Site 4", vertical:"Cardiology", claimStatus:"Pending Submission"  },
+  { id:"AR-038", patient:"Joseph Taylor", payer:"Blue Shield", amount:84000, daysOut:22, serviceDate:"2026-04-09", lastContact:"2026-04-25", denialCode:"CO-97", site:"Site 4", vertical:"Infusion", claimStatus:"At Payer"  },
+  { id:"AR-039", patient:"Daniel Johnson", payer:"Aetna", amount:108000, daysOut:6, serviceDate:"2026-04-28", lastContact:"2026-04-28", denialCode:"CO-97", site:"Site 11", vertical:"Dental", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-040", patient:"Andrew Perez", payer:"Cigna", amount:94000, daysOut:27, serviceDate:"2026-04-09", lastContact:"2026-04-23", denialCode:"CO-50", site:"Site 9", vertical:"Home Health", claimStatus:"At Payer"  },
+  { id:"AR-041", patient:"Ryan Adams", payer:"Humana", amount:46000, daysOut:78, serviceDate:"2026-02-20", lastContact:"2026-03-30", denialCode:null, site:"Site 9", vertical:"Cardiology", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-042", patient:"Melissa Gonzalez", payer:"United Health", amount:49000, daysOut:53, serviceDate:"2026-03-18", lastContact:"2026-03-30", denialCode:null, site:"Site 9", vertical:"Dental", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-043", patient:"Kevin Lee", payer:"Humana", amount:167000, daysOut:10, serviceDate:"2026-04-21", lastContact:"2026-05-14", denialCode:"CO-50", site:"Site 8", vertical:"Hospice", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-044", patient:"Andrew Baker", payer:"Humana", amount:156000, daysOut:90, serviceDate:"2026-02-04", lastContact:"2026-04-29", denialCode:null, site:"Site 2", vertical:"Home Health", claimStatus:"At Payer"  },
+  { id:"AR-045", patient:"Karen Hernandez", payer:"Blue Shield", amount:175000, daysOut:174, serviceDate:"2025-11-16", lastContact:"2026-04-27", denialCode:"CO-22", site:"Site 12", vertical:"Behavioral Health", claimStatus:"At Payer"  },
+  { id:"AR-046", patient:"David Lopez", payer:"Blue Cross", amount:148000, daysOut:162, serviceDate:"2025-11-25", lastContact:"2026-03-27", denialCode:null, site:"Site 12", vertical:"Cardiology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-047", patient:"Michael Williams", payer:"Aetna", amount:120000, daysOut:21, serviceDate:"2026-04-13", lastContact:"2026-04-30", denialCode:"CO-4", site:"Site 11", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-048", patient:"George Brown", payer:"Aetna", amount:168000, daysOut:59, serviceDate:"2026-03-11", lastContact:"2026-03-21", denialCode:"CO-22", site:"Site 9", vertical:"Urology", claimStatus:"At Payer"  },
+  { id:"AR-049", patient:"Ryan Brown", payer:"Aetna", amount:105000, daysOut:115, serviceDate:"2026-01-09", lastContact:"2026-03-28", denialCode:null, site:"Site 3", vertical:"Dental", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-050", patient:"Thomas White", payer:"Medicare", amount:140000, daysOut:100, serviceDate:"2026-01-27", lastContact:"2026-04-25", denialCode:"CO-22", site:"Site 7", vertical:"Ophthalmology", claimStatus:"At Payer"  },
+  { id:"AR-051", patient:"Emily Carter", payer:"Blue Shield", amount:59000, daysOut:56, serviceDate:"2026-03-10", lastContact:"2026-04-24", denialCode:null, site:"Site 7", vertical:"Cardiology", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-052", patient:"Ryan Garcia", payer:"Humana", amount:67000, daysOut:68, serviceDate:"2026-02-27", lastContact:"2026-05-10", denialCode:"CO-22", site:"Site 3", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-053", patient:"Amanda Gonzalez", payer:"Humana", amount:169000, daysOut:39, serviceDate:"2026-03-31", lastContact:"2026-05-06", denialCode:null, site:"Site 8", vertical:"Ophthalmology", claimStatus:"Pending Submission"  },
+  { id:"AR-054", patient:"Steven Wright", payer:"Medicaid", amount:121000, daysOut:76, serviceDate:"2026-02-15", lastContact:"2026-04-07", denialCode:"CO-22", site:"Site 5", vertical:"Cardiology", subPayer:"Buckeye Health Plan" , claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-055", patient:"Emily King", payer:"Worker Comp", amount:33000, daysOut:28, serviceDate:"2026-04-10", lastContact:"2026-05-11", denialCode:"CO-4", site:"Site 4", vertical:"Dental", claimStatus:"At Payer"  },
+  { id:"AR-056", patient:"Matthew Davis", payer:"Medicare", amount:14000, daysOut:24, serviceDate:"2026-04-14", lastContact:"2026-05-09", denialCode:"CO-50", site:"Site 9", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-057", patient:"Sandra Martinez", payer:"Medicaid", amount:98000, daysOut:15, serviceDate:"2026-04-23", lastContact:"2026-05-11", denialCode:null, site:"Site 1", vertical:"Urology", subPayer:"Aetna Better Health" , claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-058", patient:"Richard Carter", payer:"Medicare", amount:107000, daysOut:139, serviceDate:"2025-12-18", lastContact:"2026-04-24", denialCode:"CO-50", site:"Site 3", vertical:"Urology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-059", patient:"William Johnson", payer:"Humana", amount:5000, daysOut:16, serviceDate:"2026-04-20", lastContact:"2026-05-06", denialCode:null, site:"Site 6", vertical:"Dental", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-060", patient:"Stephanie Martinez", payer:"Humana", amount:159000, daysOut:112, serviceDate:"2026-01-15", lastContact:"2026-03-23", denialCode:"CO-22", site:"Site 9", vertical:"Infusion", claimStatus:"At Payer"  },
+  { id:"AR-061", patient:"Kevin Hill", payer:"Blue Cross", amount:179000, daysOut:16, serviceDate:"2026-04-19", lastContact:"2026-05-02", denialCode:"CO-16", site:"Site 6", vertical:"Home Health", claimStatus:"At Payer"  },
+  { id:"AR-062", patient:"Linda Anderson", payer:"Worker Comp", amount:148000, daysOut:57, serviceDate:"2026-03-05", lastContact:"2026-05-15", denialCode:"CO-97", site:"Site 6", vertical:"Ophthalmology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-063", patient:"Anthony Robinson", payer:"Medicaid", amount:48000, daysOut:158, serviceDate:"2025-11-24", lastContact:"2026-05-14", denialCode:"CO-22", site:"Site 11", vertical:"Behavioral Health", subPayer:"Molina Healthcare" , claimStatus:"At Payer"  },
+  { id:"AR-064", patient:"Linda Anderson", payer:"United Health", amount:153000, daysOut:15, serviceDate:"2026-04-23", lastContact:"2026-05-15", denialCode:null, site:"Site 4", vertical:"Dental", claimStatus:"Pending Submission"  },
+  { id:"AR-065", patient:"Patricia Mitchell", payer:"Blue Cross", amount:50000, daysOut:23, serviceDate:"2026-04-08", lastContact:"2026-05-09", denialCode:null, site:"Site 6", vertical:"Urology", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-066", patient:"Lisa Anderson", payer:"Aetna", amount:114000, daysOut:105, serviceDate:"2026-01-22", lastContact:"2026-04-19", denialCode:"CO-50", site:"Site 4", vertical:"Urology", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-067", patient:"Sandra Martin", payer:"Blue Cross", amount:14000, daysOut:11, serviceDate:"2026-04-26", lastContact:"2026-05-09", denialCode:null, site:"Site 1", vertical:"Infusion", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-068", patient:"Richard Johnson", payer:"Aetna", amount:36000, daysOut:7, serviceDate:"2026-05-04", lastContact:"2026-05-04", denialCode:"CO-16", site:"Site 12", vertical:"Dental", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-069", patient:"Rebecca Hall", payer:"Blue Shield", amount:103000, daysOut:44, serviceDate:"2026-03-26", lastContact:"2026-04-15", denialCode:null, site:"Site 4", vertical:"Cardiology", claimStatus:"At Payer"  },
+  { id:"AR-070", patient:"Joshua Brown", payer:"Aetna", amount:16000, daysOut:41, serviceDate:"2026-03-21", lastContact:"2026-04-30", denialCode:"CO-50", site:"Site 10", vertical:"Urology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-071", patient:"Karen Gonzalez", payer:"Humana", amount:36000, daysOut:20, serviceDate:"2026-04-20", lastContact:"2026-05-10", denialCode:"CO-50", site:"Site 4", vertical:"Orthopedics", claimStatus:"At Payer"  },
+  { id:"AR-072", patient:"Ryan King", payer:"Blue Cross", amount:72000, daysOut:12, serviceDate:"2026-04-26", lastContact:"2026-05-07", denialCode:null, site:"Site 9", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-073", patient:"Melissa Mitchell", payer:"Medicaid", amount:74000, daysOut:69, serviceDate:"2026-02-23", lastContact:"2026-04-17", denialCode:null, site:"Site 3", vertical:"Cardiology", subPayer:"AmeriHealth Caritas" , claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-074", patient:"Kimberly Carter", payer:"Humana", amount:9000, daysOut:10, serviceDate:"2026-04-21", lastContact:"2026-05-10", denialCode:"CO-97", site:"Site 10", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-075", patient:"Joshua Harris", payer:"Worker Comp", amount:97000, daysOut:9, serviceDate:"2026-04-22", lastContact:"2026-05-08", denialCode:"CO-97", site:"Site 6", vertical:"Urology", claimStatus:"At Payer"  },
+  { id:"AR-076", patient:"Margaret Hall", payer:"Aetna", amount:176000, daysOut:12, serviceDate:"2026-04-20", lastContact:"2026-05-07", denialCode:"CO-50", site:"Site 10", vertical:"Infusion", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-077", patient:"Brian Nelson", payer:"Blue Shield", amount:76000, daysOut:75, serviceDate:"2026-02-23", lastContact:"2026-05-02", denialCode:null, site:"Site 10", vertical:"Dental", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-078", patient:"Kimberly Lopez", payer:"United Health", amount:98000, daysOut:17, serviceDate:"2026-04-22", lastContact:"2026-05-07", denialCode:"CO-4", site:"Site 9", vertical:"Infusion", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-079", patient:"Anthony Green", payer:"Blue Shield", amount:100000, daysOut:5, serviceDate:"2026-04-28", lastContact:"2026-04-28", denialCode:null, site:"Site 2", vertical:"Urology", claimStatus:"Pending Submission"  },
+  { id:"AR-080", patient:"Joshua King", payer:"United Health", amount:107000, daysOut:119, serviceDate:"2026-01-04", lastContact:"2026-03-29", denialCode:null, site:"Site 8", vertical:"Behavioral Health", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-081", patient:"Jessica Allen", payer:"Medicaid", amount:19000, daysOut:23, serviceDate:"2026-04-17", lastContact:"2026-05-13", denialCode:"CO-97", site:"Site 7", vertical:"Orthopedics", subPayer:"United Community Plan" , claimStatus:"Pending Submission"  },
+  { id:"AR-082", patient:"Brian Perez", payer:"Blue Shield", amount:150000, daysOut:40, serviceDate:"2026-03-31", lastContact:"2026-05-10", denialCode:"CO-50", site:"Site 2", vertical:"Ophthalmology", claimStatus:"At Payer"  },
+  { id:"AR-083", patient:"Betty Garcia", payer:"Worker Comp", amount:126000, daysOut:22, serviceDate:"2026-04-14", lastContact:"2026-04-27", denialCode:"CO-97", site:"Site 7", vertical:"Ophthalmology", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-084", patient:"Donald Anderson", payer:"Aetna", amount:109000, daysOut:39, serviceDate:"2026-03-28", lastContact:"2026-04-21", denialCode:"CO-22", site:"Site 6", vertical:"Infusion", claimStatus:"At Payer"  },
+  { id:"AR-085", patient:"Jessica Scott", payer:"Worker Comp", amount:10000, daysOut:59, serviceDate:"2026-03-07", lastContact:"2026-04-11", denialCode:null, site:"Site 1", vertical:"Home Health", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-086", patient:"Donald Carter", payer:"Humana", amount:9000, daysOut:7, serviceDate:"2026-05-01", lastContact:"2026-05-01", denialCode:null, site:"Site 9", vertical:"Hospice", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-087", patient:"David Thompson", payer:"Cigna", amount:171000, daysOut:114, serviceDate:"2026-01-07", lastContact:"2026-04-23", denialCode:null, site:"Site 12", vertical:"Infusion", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-088", patient:"Melissa Jackson", payer:"Medicare", amount:154000, daysOut:47, serviceDate:"2026-03-20", lastContact:"2026-04-13", denialCode:"CO-16", site:"Site 5", vertical:"Urology", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-089", patient:"Stephanie Brown", payer:"Medicaid", amount:45000, daysOut:120, serviceDate:"2026-01-01", lastContact:"2026-04-21", denialCode:"CO-22", site:"Site 6", vertical:"Behavioral Health", subPayer:"Centene / WellCare" , claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-090", patient:"Robert Harris", payer:"Blue Cross", amount:140000, daysOut:10, serviceDate:"2026-04-24", lastContact:"2026-05-10", denialCode:null, site:"Site 2", vertical:"Urology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-091", patient:"Donald Mitchell", payer:"Blue Shield", amount:140000, daysOut:12, serviceDate:"2026-04-26", lastContact:"2026-05-11", denialCode:"CO-4", site:"Site 12", vertical:"Orthopedics", claimStatus:"At Payer"  },
+  { id:"AR-092", patient:"Maria Martinez", payer:"United Health", amount:125000, daysOut:103, serviceDate:"2026-01-21", lastContact:"2026-04-09", denialCode:null, site:"Site 5", vertical:"Infusion", claimStatus:"Pending Submission"  },
+  { id:"AR-093", patient:"Timothy Moore", payer:"Medicare", amount:95000, daysOut:41, serviceDate:"2026-03-27", lastContact:"2026-04-29", denialCode:null, site:"Site 3", vertical:"Infusion", claimStatus:"At Payer"  },
+  { id:"AR-094", patient:"Kevin Davis", payer:"United Health", amount:141000, daysOut:18, serviceDate:"2026-04-15", lastContact:"2026-05-12", denialCode:"CO-16", site:"Site 5", vertical:"Cardiology", claimStatus:"At Payer"  },
+  { id:"AR-095", patient:"Sandra Thompson", payer:"Blue Shield", amount:97000, daysOut:71, serviceDate:"2026-02-21", lastContact:"2026-04-29", denialCode:"CO-22", site:"Site 7", vertical:"Infusion", claimStatus:"At Payer"  },
+  { id:"AR-096", patient:"Donna Scott", payer:"Blue Shield", amount:169000, daysOut:79, serviceDate:"2026-02-17", lastContact:"2026-03-20", denialCode:null, site:"Site 8", vertical:"Infusion", claimStatus:"At Payer"  },
+  { id:"AR-097", patient:"Richard Mitchell", payer:"Medicare", amount:63000, daysOut:19, serviceDate:"2026-04-14", lastContact:"2026-05-09", denialCode:"CO-16", site:"Site 10", vertical:"Hospice", claimStatus:"At Payer"  },
+  { id:"AR-098", patient:"Susan Harris", payer:"Medicaid", amount:91000, daysOut:30, serviceDate:"2026-04-04", lastContact:"2026-04-18", denialCode:null, site:"Site 2", vertical:"Behavioral Health", subPayer:"Buckeye Health Plan" , claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-099", patient:"Margaret Young", payer:"United Health", amount:81000, daysOut:7, serviceDate:"2026-05-02", lastContact:"2026-05-02", denialCode:"CO-50", site:"Site 10", vertical:"Behavioral Health", claimStatus:"At Payer"  },
+  { id:"AR-100", patient:"Daniel Nelson", payer:"Cigna", amount:54000, daysOut:27, serviceDate:"2026-04-08", lastContact:"2026-05-10", denialCode:null, site:"Site 4", vertical:"Behavioral Health", claimStatus:"Rejected by Clearinghouse"  }
 ];
 
 const fmt = n => "$" + n.toLocaleString();
@@ -1002,8 +1024,17 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
             <span style={{ fontSize: 10, fontWeight: 600, color: a.daysInDNFB > 3 ? "#dc2626" : "#64748b", background: a.daysInDNFB > 3 ? "#fee2e2" : "#f8fafc", padding: "2px 8px", borderRadius: 4, border: "1px solid transparent" }}>{a.daysInDNFB}d in DNFB</span>
           </div>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 2 }}>{a.patient}</div>
-          <div style={{ fontSize: 11, color: "#64748b" }}>{a.id} · {a.site} · {a.vertical} · {a.payer}</div>
+          <div style={{ fontSize: 11, color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}>
+            {a.id} · {a.site} · {a.vertical} · {a.payer}{a.subPayer ? ` — ${a.subPayer}` : ""}
+            {(PAYER_PORTALS[a.payer] || PAYER_PORTALS[a.subPayer]) && (
+              <a href={PAYER_PORTALS[a.payer] || PAYER_PORTALS[a.subPayer] || "https://www.availity.com"} target="_blank" rel="noopener noreferrer"
+                style={{ color: "#2563eb", fontSize: 10, textDecoration: "none" }} title="Open provider portal">↗</a>
+            )}
+          </div>
           <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Service: {a.serviceDate}</div>
+          {a.scrubberEdit && (
+            <div style={{ marginTop: 4, fontSize: 11, color: "#dc2626", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 6, padding: "3px 8px" }}>⚠ {a.scrubberEdit}</div>
+          )}
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 2 }}>Expected value</div>
@@ -1081,10 +1112,28 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
               <button onClick={() => setResolving(null)} style={{ padding: "8px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Cancel</button>
             </div>
           </>
+        ) : resolving === `return-${w.id}` ? (
+          <>
+            <input value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} placeholder="Reason for returning (required)..." 
+              style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff", color: "#0f172a", fontFamily: "inherit", outline: "none", marginBottom: 8 }} />
+            <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Redirect to different area? (optional)</div>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+              {RC_AREA_ORDER.filter(a => a !== area).map(a => (
+                <button key={a} onClick={() => { onReturn(w.id, resolutionNote, a); setResolving(null); setResolutionNote(""); }}
+                  style={{ padding: "4px 10px", fontSize: 10, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 6, color: "#475569", cursor: "pointer", fontFamily: "inherit" }}>{a}</button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => { if (resolutionNote) { onReturn(w.id, resolutionNote, null); setResolving(null); setResolutionNote(""); } }}
+                disabled={!resolutionNote}
+                style={{ flex: 1, padding: "8px", background: resolutionNote ? "#64748b" : "#f1f5f9", border: "none", borderRadius: 8, color: resolutionNote ? "#fff" : "#94a3b8", cursor: resolutionNote ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>Return to sender</button>
+              <button onClick={() => { setResolving(null); setResolutionNote(""); }} style={{ padding: "8px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Cancel</button>
+            </div>
+          </>
         ) : (
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => setResolving(w.id)} style={{ flex: 1, padding: "8px", background: "#0369a1", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>Resolve</button>
-            <button onClick={() => onReturn(w.id)} style={{ padding: "8px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>Return</button>
+            <button onClick={() => { setResolving(`return-${w.id}`); setResolutionNote(""); }} style={{ padding: "8px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>Return</button>
           </div>
         )}
       </div>
@@ -1740,8 +1789,32 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
             <div style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", marginBottom: 4, letterSpacing: "-0.01em" }}>{acc.patient}</div>
             {/* Account metadata — lighter, smaller */}
             <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6 }}>{acc.id} · {acc.site} · {acc.vertical}</div>
-            <div style={{ fontSize: 12, color: "#475569", fontWeight: 500 }}>{acc.payer}{acc.subPayer ? <span style={{ color: "#94a3b8", fontWeight: 400 }}> — {acc.subPayer}</span> : ""}</div>
+            <div style={{ fontSize: 12, color: "#475569", fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}>
+              {acc.payer}{acc.subPayer ? <span style={{ color: "#94a3b8", fontWeight: 400 }}> — {acc.subPayer}</span> : ""}
+              {(PAYER_PORTALS[acc.payer] || PAYER_PORTALS[acc.subPayer]) && (
+                <a href={PAYER_PORTALS[acc.payer] || PAYER_PORTALS[acc.subPayer] || "https://www.availity.com"} target="_blank" rel="noopener noreferrer"
+                  style={{ color: "#2563eb", fontSize: 10, marginLeft: 2, textDecoration: "none" }} title="Open provider portal">↗</a>
+              )}
+            </div>
             <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{acc.cfg.label}</div>
+            {/* Claim status */}
+            {acc.claimStatus && (
+              <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4,
+                  background: acc.claimStatus === "Adjudicated — Paid" ? "#f0fdf4" : acc.claimStatus === "Adjudicated — Denied" || acc.claimStatus === "Rejected by Clearinghouse" ? "#fee2e2" : acc.claimStatus === "At Payer" ? "#fffbeb" : "#f1f5f9",
+                  color: acc.claimStatus === "Adjudicated — Paid" ? "#16a34a" : acc.claimStatus === "Adjudicated — Denied" || acc.claimStatus === "Rejected by Clearinghouse" ? "#dc2626" : acc.claimStatus === "At Payer" ? "#d97706" : "#64748b",
+                  border: `1px solid ${acc.claimStatus === "Adjudicated — Paid" ? "#bbf7d0" : acc.claimStatus === "Adjudicated — Denied" || acc.claimStatus === "Rejected by Clearinghouse" ? "#fca5a5" : acc.claimStatus === "At Payer" ? "#fed7aa" : "#e2e8f0"}`
+                }}>
+                  {acc.claimStatus}
+                </span>
+              </div>
+            )}
+            {/* Scrubber edit code */}
+            {acc.scrubberEdit && (
+              <div style={{ marginTop: 6, fontSize: 11, color: "#dc2626", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 6, padding: "4px 8px" }}>
+                ⚠ {acc.scrubberEdit}
+              </div>
+            )}
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
             <ProbCircle prob={acc.prob} payer={acc.payer} />
@@ -2892,7 +2965,16 @@ export default function WIPPlatform() {
 
   const handleSendWorklink = (req) => setWorklinks(prev => [...prev, req]);
   const handleResolveWorklink = (id, note) => setWorklinks(prev => prev.map(w => w.id === id ? {...w, status: "resolved", resolvedAt: new Date(), resolutionNote: note} : w));
-  const handleReturnWorklink = (id) => setWorklinks(prev => prev.map(w => w.id === id ? {...w, status: "returned", resolvedAt: new Date(), resolutionNote: "Returned to sender"} : w));
+  const handleReturnWorklink = (id, reason, redirectArea) => {
+    setWorklinks(prev => prev.map(w => {
+      if (w.id !== id) return w;
+      if (redirectArea) {
+        // Re-route to correct area instead of returning
+        return { ...w, targetArea: redirectArea, returnReason: reason, returnedBy: w.targetArea, status: "open" };
+      }
+      return { ...w, status: "returned", resolvedAt: new Date(), resolutionNote: reason || "Returned to sender" };
+    }));
+  };
 
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
