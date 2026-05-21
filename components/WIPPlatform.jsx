@@ -4187,6 +4187,14 @@ Return JSON with:
     return items;
   }, [worklinks, arForRole]);
 
+  const markRead = (id) => {
+    setReadNotifications(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  };
+  const markAllRead = () => setReadNotifications(new Set(notifications.map(n => n.id)));
   const unreadCount = notifications.filter(n => !readNotifications.has(n.id)).length;
   const urgencyColor = { critical: "#dc2626", high: "#d97706", medium: "#2563eb" };
   const urgencyBg = { critical: "#fee2e2", high: "#fef3c7", medium: "#eff6ff" };
@@ -4247,14 +4255,14 @@ Return JSON with:
                   <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between" }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Notifications {unreadCount > 0 && <span style={{ fontSize: 10, color: "#2563eb", fontWeight: 400, marginLeft: 4 }}>{unreadCount} unread</span>}</span>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      {unreadCount > 0 && <button onClick={() => setReadNotifications(new Set(notifications.map(n=>n.id)))} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 10 }}>Mark all read</button>}
+                      {unreadCount > 0 && <button onClick={() => markAllRead()} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 10 }}>Mark all read</button>}
                       <button onClick={() => setShowNotifications(false)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 12 }}>✕</button>
                     </div>
                   </div>
                   {notifications.length === 0 ? (
                     <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 12, color: "#94a3b8" }}>No active notifications</div>
                   ) : notifications.map(n => (
-                    <div key={n.id} onClick={() => { setReadNotifications(prev => new Set([...prev, n.id])); if (n.role) setRoleAndPersist(n.role); setTab(n.tab || "metrics"); setShowNotifications(false); }}
+                    <div key={n.id} onClick={() => { markRead(n.id); setShowNotifications(false); if (n.role) setRoleAndPersist(n.role); if (n.tab) setTab(n.tab); }}
                       style={{ padding: "12px 16px", borderBottom: "1px solid #f8fafc", cursor: "pointer", background: urgencyBg[n.urgency] + "40", display: "flex", gap: 10 }}
                       onMouseEnter={e => e.currentTarget.style.background = urgencyBg[n.urgency]}
                       onMouseLeave={e => e.currentTarget.style.background = urgencyBg[n.urgency] + "40"}>
@@ -4353,14 +4361,14 @@ Return JSON with:
                   <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between" }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Notifications {unreadCount > 0 && <span style={{ fontSize: 10, color: "#2563eb", fontWeight: 400, marginLeft: 4 }}>{unreadCount} unread</span>}</span>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      {unreadCount > 0 && <button onClick={() => setReadNotifications(new Set(notifications.map(n=>n.id)))} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 10 }}>Mark all read</button>}
+                      {unreadCount > 0 && <button onClick={() => markAllRead()} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 10 }}>Mark all read</button>}
                       <button onClick={() => setShowNotifications(false)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 12 }}>✕</button>
                     </div>
                   </div>
                   {notifications.length === 0 ? (
                     <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 12, color: "#94a3b8" }}>No active notifications</div>
                   ) : notifications.map(n => (
-                    <div key={n.id} onClick={() => { setReadNotifications(prev => new Set([...prev, n.id])); if (n.role) setRoleAndPersist(n.role); setTab(n.tab || "metrics"); setShowNotifications(false); }}
+                    <div key={n.id} onClick={() => { markRead(n.id); setShowNotifications(false); if (n.role) setRoleAndPersist(n.role); if (n.tab) setTab(n.tab); }}
                       style={{ padding: "12px 16px", borderBottom: "1px solid #f8fafc", cursor: "pointer", background: urgencyBg[n.urgency] + "40", display: "flex", gap: 10 }}
                       onMouseEnter={e => e.currentTarget.style.background = urgencyBg[n.urgency]}
                       onMouseLeave={e => e.currentTarget.style.background = urgencyBg[n.urgency] + "40"}>
@@ -4470,7 +4478,7 @@ Return JSON with:
                 {notifications.length === 0 ? (
                   <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 12, color: "#94a3b8" }}>No active notifications</div>
                 ) : notifications.map(n => (
-                  <div key={n.id} onClick={() => { setReadNotifications(prev => new Set([...prev, n.id])); if (n.role) setRoleAndPersist(n.role); setTab(n.tab || "metrics"); setShowNotifications(false); }}
+                  <div key={n.id} onClick={() => { markRead(n.id); setShowNotifications(false); if (n.role) setRoleAndPersist(n.role); if (n.tab) setTab(n.tab); }}
                     style={{ padding: "12px 16px", borderBottom: "1px solid #f8fafc", cursor: "pointer", background: urgencyBg[n.urgency] + "40", display: "flex", gap: 10, alignItems: "flex-start" }}
                     onMouseEnter={e => e.currentTarget.style.background = urgencyBg[n.urgency]}
                     onMouseLeave={e => e.currentTarget.style.background = urgencyBg[n.urgency] + "40"}>
@@ -5147,56 +5155,37 @@ Return JSON with:
                   </span>
                   {activeTier && <button onClick={() => setActiveTier(null)} style={{ fontSize: 9, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Show all ×</button>}
                 </div>
+                {/* Inline drilldown — expands when tier is selected */}
+                {activeTier && (() => {
+                  const tierAccs = activeTierData ? activeTierData.accs : dnfbForRole;
+                  const drillAccs = areaFilter ? tierAccs.filter(a => a.area === areaFilter) : tierAccs;
+                  const sorted = [...drillAccs].sort((a,b) => b.amount - a.amount).slice(0, 15);
+                  return (
+                    <div style={{ marginTop: 12, borderTop: "1px solid #f1f5f9", paddingTop: 10 }}>
+                      <div style={{ fontSize: 10, color: "#64748b", marginBottom: 8 }}>
+                        {areaFilter ? `${areaFilter} · ` : ""}{drillAccs.length} accounts · {fmt(drillAccs.reduce((s,a)=>s+a.amount,0))} balance
+                        {areaFilter && <button onClick={() => setAreaFilter(null)} style={{ marginLeft: 8, fontSize: 9, color: "#94a3b8", background: "none", border: "none", cursor: "pointer" }}>clear</button>}
+                      </div>
+                      {sorted.map((a, i) => (
+                        <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: i < sorted.length - 1 ? "1px solid #f8fafc" : "none" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 500, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.patient}</div>
+                            <div style={{ fontSize: 10, color: "#94a3b8" }}>{a.id} · {a.payer} · {a.site}</div>
+                            <span style={{ fontSize: 9, fontWeight: 600, background: "#fee2e2", color: "#b91c1c", padding: "1px 5px", borderRadius: 3 }}>{a.holdCode}</span>
+                          </div>
+                          <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>{fmt(a.amount)}</div>
+                            <div style={{ fontSize: 10, color: a.daysInDNFB > 3 ? "#dc2626" : "#64748b" }}>{a.daysInDNFB}d</div>
+                          </div>
+                        </div>
+                      ))}
+                      {drillAccs.length > 15 && <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 6, textAlign: "center" }}>+{drillAccs.length - 15} more · click an area in the donut to narrow →</div>}
+                    </div>
+                  );
+                })()}
               </div>
               <DonutChart accounts={donutAccounts} onFilter={setAreaFilter} activeFilter={areaFilter}
                 title={activeTierData ? `${activeTierData.label} — by area` : "All DNFB — by area"} />
-            </div>
-          );
-        })()}
-        {/* CFO Billing WIP drilldown — show account list when tier or area is selected */}
-        {role === "cfo" && tab === "dnfb" && (areaFilter || activeTier) && (() => {
-          const tiers2 = {
-            normal: dnfbForRole.filter(a => a.daysInDNFB <= 3),
-            watch: dnfbForRole.filter(a => a.daysInDNFB > 3 && a.daysInDNFB < 6),
-            flag: dnfbForRole.filter(a => a.daysInDNFB >= 6),
-          };
-          const tierAccs = activeTier ? tiers2[activeTier] : dnfbForRole;
-          const drillAccs = areaFilter ? tierAccs.filter(a => a.area === areaFilter) : tierAccs;
-          const sortedDrill = [...drillAccs].sort((a,b) => b.amount - a.amount);
-          return (
-            <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px", marginBottom: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#0f172a" }}>
-                  {areaFilter ? `${areaFilter} — ` : ""}{activeTier ? ({normal:"Normal",watch:"Watch",flag:"Flag"}[activeTier]) : "All"} · {drillAccs.length} accounts · {fmt(drillAccs.reduce((s,a)=>s+a.amount,0))} balance
-                </div>
-                <button onClick={() => { setAreaFilter(null); setActiveTier(null); }} style={{ fontSize: 11, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Clear ×</button>
-              </div>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                      {["Patient","Account","Payer","Site","Hold","Days","Balance","EV"].map(h => (
-                        <th key={h} style={{ padding: "6px 8px", textAlign: "left", fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedDrill.slice(0, 25).map((a,i) => (
-                      <tr key={a.id} style={{ borderBottom: "1px solid #f8fafc", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                        <td style={{ padding: "7px 8px", fontWeight: 500, color: "#0f172a" }}>{a.patient}</td>
-                        <td style={{ padding: "7px 8px", color: "#64748b", fontFamily: "monospace", fontSize: 11 }}>{a.id}</td>
-                        <td style={{ padding: "7px 8px", color: "#475569" }}>{a.payer}</td>
-                        <td style={{ padding: "7px 8px", color: "#64748b" }}>{a.site}</td>
-                        <td style={{ padding: "7px 8px" }}><span style={{ fontSize: 10, fontWeight: 600, background: "#fee2e2", color: "#b91c1c", padding: "1px 6px", borderRadius: 3 }}>{a.holdCode}</span></td>
-                        <td style={{ padding: "7px 8px", color: a.daysInDNFB > 3 ? "#dc2626" : "#64748b", fontWeight: a.daysInDNFB > 3 ? 600 : 400 }}>{a.daysInDNFB}d</td>
-                        <td style={{ padding: "7px 8px", fontWeight: 600, color: "#0f172a" }}>{fmt(a.amount)}</td>
-                        <td style={{ padding: "7px 8px", fontWeight: 700, color: "#2563eb" }}>{fmt(a.expectedValue)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {sortedDrill.length > 25 && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8, textAlign: "center" }}>Showing top 25 of {sortedDrill.length} accounts by balance</div>}
-              </div>
             </div>
           );
         })()}
@@ -5231,55 +5220,34 @@ Return JSON with:
                   <span style={{ fontSize: 9, color: "#94a3b8" }}>Accounts &gt;21 days without contact · {pastDue.length} past due</span>
                   {areaFilter && <button onClick={() => setAreaFilter(null)} style={{ fontSize: 9, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Clear ×</button>}
                 </div>
+                {/* Inline drilldown — expands when tier is clicked */}
+                {areaFilter && tiers.find(t => t.label === areaFilter) && (() => {
+                  const selectedTier = tiers.find(t => t.label === areaFilter);
+                  const sorted = [...selectedTier.accs].sort((a,b) => b.amount - a.amount).slice(0, 15);
+                  return (
+                    <div style={{ marginTop: 12, borderTop: "1px solid #f1f5f9", paddingTop: 10 }}>
+                      <div style={{ fontSize: 10, color: "#64748b", marginBottom: 8 }}>
+                        {selectedTier.accs.length} accounts · {fmt(selectedTier.accs.reduce((s,a)=>s+a.amount,0))} balance · {fmt(selectedTier.accs.reduce((s,a)=>s+a.expectedValue,0))} EV
+                      </div>
+                      {sorted.map((a, i) => (
+                        <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: i < sorted.length - 1 ? "1px solid #f8fafc" : "none" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 500, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.patient}</div>
+                            <div style={{ fontSize: 10, color: "#94a3b8" }}>{a.id} · {a.payer}</div>
+                            <div style={{ fontSize: 10, color: daysSince(a.lastContact) > 30 ? "#dc2626" : "#d97706" }}>Last contact: {a.lastContact}</div>
+                          </div>
+                          <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>{fmt(a.amount)}</div>
+                            <div style={{ fontSize: 10, color: "#2563eb" }}>{fmt(a.expectedValue)} EV</div>
+                          </div>
+                        </div>
+                      ))}
+                      {selectedTier.accs.length > 15 && <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 6, textAlign: "center" }}>+{selectedTier.accs.length - 15} more accounts</div>}
+                    </div>
+                  );
+                })()}
               </div>
               <DonutChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />
-            </div>
-          );
-        })()}
-        {/* CFO Collections WIP drilldown — show account list when tier is selected */}
-        {role === "cfo" && tab === "ar" && areaFilter && (() => {
-          const drillAccs = arForRole.filter(a => {
-            const pastDue = daysSince(a.lastContact) >= 21;
-            if (areaFilter === "$10K+") return pastDue && a.amount >= 10000;
-            if (areaFilter === "$1K–$10K") return pastDue && a.amount >= 1000 && a.amount < 10000;
-            if (areaFilter === "<$1K") return pastDue && a.amount < 1000;
-            return a.area === areaFilter;
-          }).sort((a,b) => b.amount - a.amount);
-          return (
-            <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px", marginBottom: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#0f172a" }}>
-                  {areaFilter} · {drillAccs.length} accounts · {fmt(drillAccs.reduce((s,a)=>s+a.amount,0))} balance · {fmt(drillAccs.reduce((s,a)=>s+a.expectedValue,0))} EV
-                </div>
-                <button onClick={() => setAreaFilter(null)} style={{ fontSize: 11, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Clear ×</button>
-              </div>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                      {["Patient","Account","Payer","Site","Days Out","Last Contact","Balance","EV","Status"].map(h => (
-                        <th key={h} style={{ padding: "6px 8px", textAlign: "left", fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {drillAccs.slice(0, 25).map((a,i) => (
-                      <tr key={a.id} style={{ borderBottom: "1px solid #f8fafc", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                        <td style={{ padding: "7px 8px", fontWeight: 500, color: "#0f172a" }}>{a.patient}</td>
-                        <td style={{ padding: "7px 8px", color: "#64748b", fontFamily: "monospace", fontSize: 11 }}>{a.id}</td>
-                        <td style={{ padding: "7px 8px", color: "#475569" }}>{a.payer}</td>
-                        <td style={{ padding: "7px 8px", color: "#64748b" }}>{a.site}</td>
-                        <td style={{ padding: "7px 8px", color: a.daysOut > 90 ? "#dc2626" : a.daysOut > 60 ? "#d97706" : "#475569", fontWeight: a.daysOut > 90 ? 600 : 400 }}>{a.daysOut}d</td>
-                        <td style={{ padding: "7px 8px", color: daysSince(a.lastContact) > 30 ? "#dc2626" : "#64748b" }}>{a.lastContact}</td>
-                        <td style={{ padding: "7px 8px", fontWeight: 600, color: "#0f172a" }}>{fmt(a.amount)}</td>
-                        <td style={{ padding: "7px 8px", fontWeight: 700, color: "#2563eb" }}>{fmt(a.expectedValue)}</td>
-                        <td style={{ padding: "7px 8px" }}>{a.claimStatus && <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 3, background: a.claimStatus.includes("Denied") || a.claimStatus.includes("Rejected") ? "#fee2e2" : a.claimStatus === "At Payer" ? "#fef3c7" : "#f1f5f9", color: a.claimStatus.includes("Denied") || a.claimStatus.includes("Rejected") ? "#dc2626" : a.claimStatus === "At Payer" ? "#d97706" : "#64748b" }}>{a.claimStatus}</span>}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {drillAccs.length > 25 && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8, textAlign: "center" }}>Showing top 25 of {drillAccs.length} accounts by balance</div>}
-              </div>
             </div>
           );
         })()}
