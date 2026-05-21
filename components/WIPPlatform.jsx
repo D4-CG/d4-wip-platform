@@ -2966,6 +2966,8 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
     if (os) {
       const storeValue = os.closed ? "closed" : os.pending ? "pending_cfo" : addBusinessDaysISO(os.followUpDays);
       setFollowUpDate(entry.id, storeValue);
+      // Notify main component so CFO donuts re-render
+      window.dispatchEvent(new CustomEvent("d4_account_logged", { detail: { id: entry.id } }));
     }
     setWorkedAccounts(prev => [...prev, entry]);
     setSearchResult(null);
@@ -4047,6 +4049,15 @@ export default function WIPPlatform() {
   const [siteFilter, setSiteFilter] = useState(null);
   const [activeTier, setActiveTier] = useState(null);
 
+  // Tracks worked account IDs in React state so donuts re-render when accounts are logged
+  const [workedIdSet, setWorkedIdSet] = useState(() => new Set(Object.keys(getFollowUpStore())));
+
+  useEffect(() => {
+    const handler = (e) => setWorkedIdSet(prev => new Set([...prev, e.detail.id]));
+    window.addEventListener("d4_account_logged", handler);
+    return () => window.removeEventListener("d4_account_logged", handler);
+  }, []);
+
   const handleSendWorklink = (req) => setWorklinks(prev => [...prev, req]);
   const handleResolveWorklink = (id, note) => setWorklinks(prev => prev.map(w => w.id === id ? {...w, status: "resolved", resolvedAt: new Date(), resolutionNote: note} : w));
   const handleReturnWorklink = (id, reason, redirectArea) => {
@@ -4095,7 +4106,7 @@ export default function WIPPlatform() {
     }
     // AR follow-up tier filter — set when clicking a Collections tier on Metrics tab
     if (severityFilter && tab === "ar") {
-      const pd = (a) => !getFollowUpStore()[a.id]; // unworked in platform
+      const pd = (a) => !workedIdSet.has(a.id); // unworked in platform
       if (severityFilter === "followup_high") list = list.filter(a => pd(a) && a.amount >= 10000);
       else if (severityFilter === "followup_mid") list = list.filter(a => pd(a) && a.amount >= 1000 && a.amount < 10000);
       else if (severityFilter === "followup_low") list = list.filter(a => pd(a) && a.amount < 1000);
@@ -4902,7 +4913,7 @@ Return JSON with:
               <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 16px" }}>
                 <div style={{ fontSize: 10, color: "#c2410c", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>Follow-up WIP — Collections</div>
                 {(() => {
-                  const pastDue = arFiltered.filter(a => !getFollowUpStore()[a.id]); // unworked in platform
+                  const pastDue = arFiltered.filter(a => !workedIdSet.has(a.id)); // unworked in platform
                   const tiers = [
                     { label: "$10K+",    key: "followup_high", accs: pastDue.filter(a => a.amount >= 10000), color: "#b91c1c" },
                     { label: "$1K–$10K", key: "followup_mid",  accs: pastDue.filter(a => a.amount >= 1000 && a.amount < 10000), color: "#c2410c" },
@@ -4924,9 +4935,9 @@ Return JSON with:
                     </div>
                   ));
                 })()}
-                <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 6, paddingTop: 6, borderTop: "1px solid #f1f5f9" }}>Accounts &gt;21 days without contact · {arFiltered.filter(a => !getFollowUpStore()[a.id]).length} unworked in platform</div>
+                <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 6, paddingTop: 6, borderTop: "1px solid #f1f5f9" }}>Accounts &gt;21 days without contact · {arFiltered.filter(a => !workedIdSet.has(a.id)).length} unworked in platform</div>
               </div>
-              <DonutChartPanel accounts={arFiltered.filter(a => !getFollowUpStore()[a.id])} title="Collections WIP — past due by area" onFilter={(area) => { setTab("ar"); setAreaFilter(area); setSeverityFilter(null); setSearchQuery(""); window.scrollTo(0,0); }} activeFilter={null} />
+              <DonutChartPanel accounts={arFiltered.filter(a => !workedIdSet.has(a.id))} title="Collections WIP — past due by area" onFilter={(area) => { setTab("ar"); setAreaFilter(area); setSeverityFilter(null); setSearchQuery(""); window.scrollTo(0,0); }} activeFilter={null} />
             </div>
             {/* NCR + Denial Rate — CFO metrics tab only */}
             {(() => {
@@ -5186,7 +5197,7 @@ Return JSON with:
         {(role === "supervisor") && <AreaChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />}
 
         {role === "cfo" && tab === "ar" && (() => {
-          const pastDue = arForRole.filter(a => !getFollowUpStore()[a.id]); // unworked in platform
+          const pastDue = arForRole.filter(a => !workedIdSet.has(a.id)); // unworked in platform
           const tiers = [
             { label: "$10K+",    key: "followup_high", accs: pastDue.filter(a => a.amount >= 10000), color: "#b91c1c" },
             { label: "$1K–$10K", key: "followup_mid",  accs: pastDue.filter(a => a.amount >= 1000 && a.amount < 10000), color: "#c2410c" },
