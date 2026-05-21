@@ -176,23 +176,22 @@ const ROLE_DEFS = {
 
 const ESCALATION_DATA = {
   escalated: [
-    { accountId: "AR-005",  patient: "Metro Behavioral Health",   payer: "Cigna",    amount: 37000,  expectedValue: 4440,   escalatedBy: "T.Jones",   escalatedAt: "Today 8:42 AM",    note: "CO-50 denial — payer refusing retro auth after two attempts. Need clinical review and appeal strategy.", severity: "URGENT" },
-    { accountId: "DNFB-002",patient: "Coastal Infusion Center",   payer: "Blue Cross",amount: 128400, expectedValue: 102720, escalatedBy: "J.Smith",   escalatedAt: "Today 9:15 AM",    note: "Infusion drug charge still missing after routing to charge capture twice. Site 7 unresponsive — $128K at risk.", severity: "CRITICAL" },
-    { accountId: "AR-001",  patient: "Metro Behavioral Health",   payer: "Medicaid", amount: 78400,  expectedValue: 9408,   escalatedBy: "R.Garcia",  escalatedAt: "Yesterday 4:30 PM",note: "Medicaid CO-4 — three retro auth attempts exhausted. Payer final on denial. Recommend write-off review.", severity: "URGENT" },
+    { accountId: "AR-005",  patient: "Patricia Nguyen",    payer: "Cigna",     amount: 92500,  expectedValue: 11100,  escalatedBy: "T.Jones",   escalatedAt: "Today 8:42 AM",    note: "CO-50 denial — payer refusing retro auth after two attempts. Need clinical review and appeal strategy.", severity: "URGENT" },
+    { accountId: "DNFB-007",patient: "James Whitfield",    payer: "Blue Cross", amount: 320000, expectedValue: 256000, escalatedBy: "J.Smith",   escalatedAt: "Today 9:15 AM",    note: "Infusion drug charge still missing after routing to charge capture twice. Site 7 unresponsive — $320K at risk.", severity: "CRITICAL" },
+    { accountId: "AR-001",  patient: "Sandra Okonkwo",     payer: "Medicaid",   amount: 196000, expectedValue: 23520,  escalatedBy: "R.Garcia",  escalatedAt: "Yesterday 4:30 PM",note: "Medicaid CO-4 — three retro auth attempts exhausted. Payer final on denial. Recommend write-off review.", severity: "URGENT" },
   ],
   slaBreach: [
-    { accountId: "AR-020",  patient: "Alliance Infusion Services", payer: "Worker Comp",assignedTo: "M.Williams", scheduledDate: "May 13", daysOverdue: 3, amount: 169000 },
-    { accountId: "AR-035",  patient: "Regional Orthopedic Group",  payer: "Blue Cross", assignedTo: "J.Smith",    scheduledDate: "May 12", daysOverdue: 4, amount: 124000 },
-    { accountId: "DNFB-007",patient: "Coastal Infusion Center",    payer: "Blue Shield",assignedTo: "T.Jones",    scheduledDate: "May 14", daysOverdue: 2, amount: 89700 },
-    { accountId: "AR-012",  patient: "Genesis Home Health",         payer: "Worker Comp",assignedTo: "R.Garcia",   scheduledDate: "May 13", daysOverdue: 3, amount: 162000 },
+    { accountId: "AR-020",  patient: "Carol Thompson",     payer: "Worker Comp", assignedTo: "M.Williams", scheduledDate: "May 13", daysOverdue: 3, amount: 422500 },
+    { accountId: "AR-035",  patient: "George Taylor",      payer: "Medicare",    assignedTo: "J.Smith",    scheduledDate: "May 12", daysOverdue: 4, amount: 55000 },
+    { accountId: "DNFB-004",patient: "Patricia Nguyen",    payer: "Blue Cross",  assignedTo: "T.Jones",    scheduledDate: "May 14", daysOverdue: 2, amount: 255000 },
   ],
   writeOffPending: [
-    { accountId: "AR-009",  patient: "Harbor Home Health",         payer: "Medicaid", amount: 47200, recommendedBy: "J.Smith",  recommendedAt: "Today 10:20 AM",    rationale: "15% collection probability after 203 days. Timely filing window closed with Medicaid." },
-    { accountId: "AR-005",  patient: "Metro Behavioral Health",    payer: "Cigna",    amount: 37000, recommendedBy: "R.Garcia", recommendedAt: "Yesterday 2:15 PM", rationale: "12% probability. CO-50 medical necessity denial — all appeal paths exhausted after 206 days." },
+    { accountId: "AR-009",  patient: "William Jackson",    payer: "Medicaid",  amount: 67500,  recommendedBy: "J.Smith",  recommendedAt: "Today 10:20 AM",    rationale: "15% collection probability after 203 days. Timely filing window closed with Medicaid. All recovery paths exhausted." },
+    { accountId: "AR-005",  patient: "Patricia Nguyen",    payer: "Cigna",     amount: 92500,  recommendedBy: "R.Garcia", recommendedAt: "Yesterday 2:15 PM", rationale: "12% probability after 206 days. CO-50 medical necessity denial — all three appeal levels exhausted." },
   ],
   overrideReview: [
-    { accountId: "AR-003",  patient: "Harbor Home Health",  payer: "Medicaid",    collectorName: "J.Smith",  aiRecommended: "Appeal submission", collectorChose: "Outbound call",    note: "Payer rep confirmed CO-97 fixable with modifier 59 — faster than full appeal process." },
-    { accountId: "AR-007",  patient: "MedCore Infusion",    payer: "Medicaid",    collectorName: "T.Jones",  aiRecommended: "Outbound call",    collectorChose: "Appeal submission", note: "COB not resolvable by phone — obtained primary EOB and filed formal appeal directly." },
+    { accountId: "AR-003",  patient: "Linda Kowalski",   payer: "Medicaid",  collectorName: "J.Smith", aiRecommended: "Appeal submission", collectorChose: "Outbound call",    note: "Payer rep confirmed CO-97 fixable with modifier 59 — faster than full appeal process. Good call." },
+    { accountId: "AR-007",  patient: "Charles Abramson", payer: "Medicaid",  collectorName: "T.Jones", aiRecommended: "Outbound call",    collectorChose: "Appeal submission", note: "COB not resolvable by phone — obtained primary EOB and filed formal appeal directly. Appropriate override." },
   ],
 };
 
@@ -291,209 +290,209 @@ function getWorklinkSLA(severity, requestType, serviceDateStr) {
 }
 
 const DNFB_DATA = [
-  { id:"DNFB-001", patient:"Coastal Infusion Center", payer:"United Health", amount:62000, daysInDNFB:5, serviceDate:"2026-05-11", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 10", vertical:"Infusion" },
-  { id:"DNFB-002", patient:"Metro Behavioral Health", payer:"Blue Cross", amount:64000, daysInDNFB:17, serviceDate:"2026-04-29", lastContact:"2026-05-09", holdCode:"PHYSICIAN_QUERY", site:"Site 12", vertical:"Behavioral Health" },
-  { id:"DNFB-003", patient:"Genesis Home Health", payer:"United Health", amount:199000, daysInDNFB:26, serviceDate:"2026-04-19", lastContact:"2026-05-05", holdCode:"CODING_UNASSIGNED", site:"Site 5", vertical:"Home Health" },
-  { id:"DNFB-004", patient:"Comfort Home Services", payer:"Blue Cross", amount:102000, daysInDNFB:4, serviceDate:"2026-05-11", lastContact:"2026-05-13", holdCode:"CODING_COMPLEX", site:"Site 5", vertical:"Home Health" },
-  { id:"DNFB-005", patient:"Regional Urology Associates", payer:"Blue Cross", amount:25000, daysInDNFB:18, serviceDate:"2026-04-26", lastContact:"2026-05-04", holdCode:"CREDENTIALING", site:"Site 10", vertical:"Urology" },
-  { id:"DNFB-006", patient:"Coastal Infusion Center", payer:"Aetna", amount:25000, daysInDNFB:28, serviceDate:"2026-04-18", lastContact:"2026-05-03", holdCode:"CHARGE_MISSING", site:"Site 5", vertical:"Infusion" },
-  { id:"DNFB-007", patient:"Comfort Home Services", payer:"Blue Cross", amount:167000, daysInDNFB:6, serviceDate:"2026-05-09", lastContact:"2026-05-14", holdCode:"HIM_DEFICIENCY", site:"Site 8", vertical:"Home Health" },
-  { id:"DNFB-008", patient:"Smile Partners DSO", payer:"Cigna", amount:63000, daysInDNFB:27, serviceDate:"2026-04-19", lastContact:"2026-05-03", holdCode:"CODING_UNASSIGNED", site:"Site 5", vertical:"Dental" },
-  { id:"DNFB-009", patient:"Comfort Home Services", payer:"Aetna", amount:132000, daysInDNFB:13, serviceDate:"2026-04-30", lastContact:"2026-05-13", holdCode:"SCRUBBER_EDIT", site:"Site 5", vertical:"Home Health", scrubberEdit:"Edit 4010 — Missing modifier 59 on unbundled service"  },
-  { id:"DNFB-010", patient:"Comfort Home Services", payer:"Humana", amount:107000, daysInDNFB:12, serviceDate:"2026-05-04", lastContact:"2026-05-07", holdCode:"HIM_DEFICIENCY", site:"Site 8", vertical:"Home Health" },
-  { id:"DNFB-011", patient:"Harborview BH", payer:"Blue Cross", amount:165000, daysInDNFB:6, serviceDate:"2026-05-07", lastContact:"2026-05-11", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 2", vertical:"Behavioral Health" },
-  { id:"DNFB-012", patient:"Heartland Hospice", payer:"Worker Comp", amount:146000, daysInDNFB:28, serviceDate:"2026-04-18", lastContact:"2026-04-24", holdCode:"CHARGE_MISSING", site:"Site 9", vertical:"Hospice" },
-  { id:"DNFB-013", patient:"Peak MSK Partners", payer:"Medicare", amount:133000, daysInDNFB:25, serviceDate:"2026-04-21", lastContact:"2026-04-25", holdCode:"CHARGE_MISSING", site:"Site 5", vertical:"Orthopedics" },
-  { id:"DNFB-014", patient:"Regional Orthopedic Group", payer:"Blue Shield", amount:140000, daysInDNFB:30, serviceDate:"2026-04-16", lastContact:"2026-04-30", holdCode:"AUTH_EXPIRED", site:"Site 1", vertical:"Orthopedics" },
-  { id:"DNFB-015", patient:"Regional Eye Associates", payer:"Aetna", amount:66000, daysInDNFB:29, serviceDate:"2026-04-17", lastContact:"2026-05-13", holdCode:"CODING_UNASSIGNED", site:"Site 12", vertical:"Ophthalmology" },
-  { id:"DNFB-016", patient:"Cardiology Associates", payer:"United Health", amount:160000, daysInDNFB:14, serviceDate:"2026-05-02", lastContact:"2026-05-04", holdCode:"AUTH_EXPIRED", site:"Site 5", vertical:"Cardiology" },
-  { id:"DNFB-017", patient:"Summit Ophthalmology", payer:"Worker Comp", amount:35000, daysInDNFB:8, serviceDate:"2026-05-08", lastContact:"2026-05-13", holdCode:"AUTH_MISSING", site:"Site 1", vertical:"Ophthalmology" },
-  { id:"DNFB-018", patient:"Harbor Home Health", payer:"Blue Cross", amount:20000, daysInDNFB:8, serviceDate:"2026-05-08", lastContact:"2026-05-09", holdCode:"SCRUBBER_EDIT", site:"Site 6", vertical:"Home Health", scrubberEdit:"Edit 4010 — Missing modifier 59 on unbundled service"  },
-  { id:"DNFB-019", patient:"Cardiology Associates", payer:"United Health", amount:129000, daysInDNFB:7, serviceDate:"2026-05-08", lastContact:"2026-05-10", holdCode:"SCRUBBER_EDIT", site:"Site 10", vertical:"Cardiology", scrubberEdit:"Edit 3015 — Place of service mismatch: verify facility vs professional claim type"  },
-  { id:"DNFB-020", patient:"Genesis Home Health", payer:"Humana", amount:29000, daysInDNFB:4, serviceDate:"2026-05-09", lastContact:"2026-05-14", holdCode:"PHYSICIAN_QUERY", site:"Site 7", vertical:"Home Health" },
-  { id:"DNFB-021", patient:"Regional Urology Associates", payer:"Medicare", amount:172000, daysInDNFB:21, serviceDate:"2026-04-25", lastContact:"2026-05-03", holdCode:"SCRUBBER_EDIT", site:"Site 12", vertical:"Urology", scrubberEdit:"Edit 5020 — Unbundling conflict: CPT codes cannot be billed together"  },
-  { id:"DNFB-022", patient:"Peak MSK Partners", payer:"Blue Shield", amount:123000, daysInDNFB:8, serviceDate:"2026-05-08", lastContact:"2026-05-09", holdCode:"CHARGE_MISSING", site:"Site 9", vertical:"Orthopedics" },
-  { id:"DNFB-023", patient:"Northgate Psychiatry", payer:"Worker Comp", amount:28000, daysInDNFB:30, serviceDate:"2026-04-16", lastContact:"2026-05-02", holdCode:"CODING_UNASSIGNED", site:"Site 8", vertical:"Behavioral Health" },
-  { id:"DNFB-024", patient:"Legacy Hospice Group", payer:"Medicaid", amount:113000, daysInDNFB:23, serviceDate:"2026-04-19", lastContact:"2026-04-24", holdCode:"CHARGE_MISSING", site:"Site 12", vertical:"Hospice", subPayer:"Aetna Better Health"  },
-  { id:"DNFB-025", patient:"Heart Partners", payer:"Cigna", amount:17000, daysInDNFB:19, serviceDate:"2026-04-26", lastContact:"2026-05-14", holdCode:"CODING_UNASSIGNED", site:"Site 9", vertical:"Cardiology" },
-  { id:"DNFB-026", patient:"Summit Orthopedics", payer:"Blue Cross", amount:65000, daysInDNFB:13, serviceDate:"2026-05-03", lastContact:"2026-05-06", holdCode:"SCRUBBER_EDIT", site:"Site 10", vertical:"Orthopedics", scrubberEdit:"Edit 5020 — Unbundling conflict: CPT codes cannot be billed together"  },
-  { id:"DNFB-027", patient:"MedCore Infusion", payer:"Worker Comp", amount:71000, daysInDNFB:7, serviceDate:"2026-05-04", lastContact:"2026-05-13", holdCode:"CHARGE_LAG", site:"Site 4", vertical:"Infusion" },
-  { id:"DNFB-028", patient:"Comfort Care Partners", payer:"United Health", amount:85000, daysInDNFB:30, serviceDate:"2026-04-16", lastContact:"2026-05-01", holdCode:"AUTH_MISSING", site:"Site 10", vertical:"Hospice" },
-  { id:"DNFB-029", patient:"Premier Infusion Partners", payer:"Worker Comp", amount:38000, daysInDNFB:30, serviceDate:"2026-04-16", lastContact:"2026-04-17", holdCode:"CHARGE_MISSING", site:"Site 4", vertical:"Infusion" },
-  { id:"DNFB-030", patient:"Northgate Psychiatry", payer:"Worker Comp", amount:174000, daysInDNFB:4, serviceDate:"2026-05-11", lastContact:"2026-05-15", holdCode:"CHARGE_MISSING", site:"Site 2", vertical:"Behavioral Health" },
-  { id:"DNFB-031", patient:"Bright Dental Alliance", payer:"Aetna", amount:57000, daysInDNFB:22, serviceDate:"2026-04-22", lastContact:"2026-04-29", holdCode:"CHARGE_LAG", site:"Site 8", vertical:"Dental" },
-  { id:"DNFB-032", patient:"Summit Mental Health", payer:"Blue Shield", amount:72000, daysInDNFB:6, serviceDate:"2026-05-07", lastContact:"2026-05-11", holdCode:"SCRUBBER_EDIT", site:"Site 12", vertical:"Behavioral Health", scrubberEdit:"Edit 5020 — Unbundling conflict: CPT codes cannot be billed together"  },
-  { id:"DNFB-033", patient:"Heart Partners", payer:"Blue Cross", amount:181000, daysInDNFB:29, serviceDate:"2026-04-17", lastContact:"2026-04-19", holdCode:"CODING_COMPLEX", site:"Site 6", vertical:"Cardiology" },
-  { id:"DNFB-034", patient:"Comfort Care Partners", payer:"Medicare", amount:98000, daysInDNFB:29, serviceDate:"2026-04-17", lastContact:"2026-05-09", holdCode:"CHARGE_MISSING", site:"Site 11", vertical:"Hospice" },
-  { id:"DNFB-035", patient:"Alliance Infusion Services", payer:"Worker Comp", amount:163000, daysInDNFB:24, serviceDate:"2026-04-22", lastContact:"2026-05-10", holdCode:"CREDENTIALING", site:"Site 3", vertical:"Infusion" },
-  { id:"DNFB-036", patient:"Smile Partners DSO", payer:"Blue Cross", amount:14000, daysInDNFB:28, serviceDate:"2026-04-17", lastContact:"2026-05-09", holdCode:"CREDENTIALING", site:"Site 8", vertical:"Dental" },
-  { id:"DNFB-037", patient:"Legacy Hospice Group", payer:"United Health", amount:76000, daysInDNFB:12, serviceDate:"2026-04-30", lastContact:"2026-05-09", holdCode:"CODING_COMPLEX", site:"Site 11", vertical:"Hospice" },
-  { id:"DNFB-038", patient:"Metro Behavioral Health", payer:"United Health", amount:153000, daysInDNFB:9, serviceDate:"2026-05-07", lastContact:"2026-05-09", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 6", vertical:"Behavioral Health" },
-  { id:"DNFB-039", patient:"Serenity Hospice", payer:"Humana", amount:53000, daysInDNFB:9, serviceDate:"2026-05-07", lastContact:"2026-05-15", holdCode:"HIM_DEFICIENCY", site:"Site 9", vertical:"Hospice" },
-  { id:"DNFB-040", patient:"Summit Ophthalmology", payer:"Blue Cross", amount:89000, daysInDNFB:20, serviceDate:"2026-04-24", lastContact:"2026-05-12", holdCode:"SCRUBBER_EDIT", site:"Site 12", vertical:"Ophthalmology", scrubberEdit:"Edit 4010 — Missing modifier 59 on unbundled service"  },
-  { id:"DNFB-041", patient:"Smile Partners DSO", payer:"Aetna", amount:175000, daysInDNFB:13, serviceDate:"2026-04-28", lastContact:"2026-05-13", holdCode:"CREDENTIALING", site:"Site 10", vertical:"Dental" },
-  { id:"DNFB-042", patient:"Serenity Hospice", payer:"United Health", amount:58000, daysInDNFB:14, serviceDate:"2026-04-28", lastContact:"2026-05-05", holdCode:"CHARGE_MISSING", site:"Site 6", vertical:"Hospice" },
-  { id:"DNFB-043", patient:"Metro Urology Group", payer:"Aetna", amount:126000, daysInDNFB:26, serviceDate:"2026-04-19", lastContact:"2026-04-24", holdCode:"AUTH_EXPIRED", site:"Site 2", vertical:"Urology" },
-  { id:"DNFB-044", patient:"Comfort Home Services", payer:"Aetna", amount:42000, daysInDNFB:1, serviceDate:"2026-05-15", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 8", vertical:"Home Health" },
-  { id:"DNFB-045", patient:"Metro Urology Group", payer:"Aetna", amount:131000, daysInDNFB:13, serviceDate:"2026-05-03", lastContact:"2026-05-05", holdCode:"CREDENTIALING", site:"Site 12", vertical:"Urology" },
-  { id:"DNFB-046", patient:"MedCore Infusion", payer:"Aetna", amount:183000, daysInDNFB:17, serviceDate:"2026-04-29", lastContact:"2026-05-08", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 2", vertical:"Infusion" },
-  { id:"DNFB-047", patient:"Peak MSK Partners", payer:"Worker Comp", amount:157000, daysInDNFB:11, serviceDate:"2026-05-02", lastContact:"2026-05-07", holdCode:"AUTH_EXPIRED", site:"Site 8", vertical:"Orthopedics" },
-  { id:"DNFB-048", patient:"Metro Urology Group", payer:"United Health", amount:168000, daysInDNFB:9, serviceDate:"2026-05-04", lastContact:"2026-05-12", holdCode:"PHYSICIAN_QUERY", site:"Site 5", vertical:"Urology" },
-  { id:"DNFB-049", patient:"Alliance Infusion Services", payer:"Aetna", amount:90000, daysInDNFB:11, serviceDate:"2026-05-05", lastContact:"2026-05-13", holdCode:"CHARGE_MISSING", site:"Site 3", vertical:"Infusion" },
-  { id:"DNFB-050", patient:"Comfort Care Partners", payer:"Aetna", amount:111000, daysInDNFB:14, serviceDate:"2026-04-30", lastContact:"2026-05-08", holdCode:"CODING_COMPLEX", site:"Site 7", vertical:"Hospice" },
-  { id:"DNFB-051", patient:"Genesis Home Health", payer:"Humana", amount:183000, daysInDNFB:1, serviceDate:"2026-05-12", lastContact:"2026-05-12", holdCode:"HIM_DEFICIENCY", site:"Site 8", vertical:"Home Health" },
-  { id:"DNFB-052", patient:"Regional Eye Associates", payer:"Humana", amount:142000, daysInDNFB:24, serviceDate:"2026-04-18", lastContact:"2026-04-26", holdCode:"CREDENTIALING", site:"Site 4", vertical:"Ophthalmology" },
-  { id:"DNFB-053", patient:"Summit Ophthalmology", payer:"Blue Shield", amount:37000, daysInDNFB:20, serviceDate:"2026-04-26", lastContact:"2026-05-03", holdCode:"AUTH_MISSING", site:"Site 10", vertical:"Ophthalmology" },
-  { id:"DNFB-054", patient:"MedCore Infusion", payer:"Blue Shield", amount:51000, daysInDNFB:2, serviceDate:"2026-05-13", lastContact:"2026-05-15", holdCode:"AUTH_MISSING", site:"Site 4", vertical:"Infusion" },
-  { id:"DNFB-055", patient:"Regional Eye Associates", payer:"Humana", amount:197000, daysInDNFB:27, serviceDate:"2026-04-17", lastContact:"2026-05-13", holdCode:"CHARGE_MISSING", site:"Site 8", vertical:"Ophthalmology" },
-  { id:"DNFB-056", patient:"Heart Partners", payer:"Cigna", amount:171000, daysInDNFB:3, serviceDate:"2026-05-13", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 4", vertical:"Cardiology" },
-  { id:"DNFB-057", patient:"Lakeside Behavioral", payer:"Blue Shield", amount:37000, daysInDNFB:16, serviceDate:"2026-04-30", lastContact:"2026-05-06", holdCode:"PHYSICIAN_QUERY", site:"Site 4", vertical:"Behavioral Health" },
-  { id:"DNFB-058", patient:"Bright Dental Alliance", payer:"Blue Shield", amount:160000, daysInDNFB:24, serviceDate:"2026-04-22", lastContact:"2026-05-10", holdCode:"HIM_DEFICIENCY", site:"Site 5", vertical:"Dental" },
-  { id:"DNFB-059", patient:"Summit Mental Health", payer:"Humana", amount:188000, daysInDNFB:7, serviceDate:"2026-05-09", lastContact:"2026-05-15", holdCode:"CREDENTIALING", site:"Site 12", vertical:"Behavioral Health" },
-  { id:"DNFB-060", patient:"Coastal Infusion Center", payer:"Cigna", amount:114000, daysInDNFB:22, serviceDate:"2026-04-24", lastContact:"2026-04-29", holdCode:"AUTH_EXPIRED", site:"Site 11", vertical:"Infusion" },
-  { id:"DNFB-061", patient:"Regional Urology Associates", payer:"Blue Shield", amount:50000, daysInDNFB:24, serviceDate:"2026-04-20", lastContact:"2026-04-26", holdCode:"CREDENTIALING", site:"Site 9", vertical:"Urology" },
-  { id:"DNFB-062", patient:"Alliance Infusion Services", payer:"Medicaid", amount:197000, daysInDNFB:15, serviceDate:"2026-04-27", lastContact:"2026-05-05", holdCode:"PHYSICIAN_QUERY", site:"Site 7", vertical:"Infusion", subPayer:"Molina Healthcare"  },
-  { id:"DNFB-063", patient:"Coastal Recovery", payer:"Cigna", amount:129000, daysInDNFB:7, serviceDate:"2026-05-08", lastContact:"2026-05-13", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 5", vertical:"Behavioral Health" },
-  { id:"DNFB-064", patient:"Heart Partners", payer:"Worker Comp", amount:26000, daysInDNFB:8, serviceDate:"2026-05-05", lastContact:"2026-05-12", holdCode:"PHYSICIAN_QUERY", site:"Site 9", vertical:"Cardiology" },
-  { id:"DNFB-065", patient:"Regional Urology Associates", payer:"Medicaid", amount:9000, daysInDNFB:3, serviceDate:"2026-05-13", lastContact:"2026-05-14", holdCode:"AUTH_MISSING", site:"Site 12", vertical:"Urology", subPayer:"AmeriHealth Caritas"  },
-  { id:"DNFB-066", patient:"Bright Dental Alliance", payer:"Medicaid", amount:140000, daysInDNFB:12, serviceDate:"2026-05-02", lastContact:"2026-05-10", holdCode:"AUTH_EXPIRED", site:"Site 12", vertical:"Dental", subPayer:"United Community Plan"  },
-  { id:"DNFB-067", patient:"Bright Dental Alliance", payer:"United Health", amount:35000, daysInDNFB:24, serviceDate:"2026-04-21", lastContact:"2026-05-12", holdCode:"PHYSICIAN_QUERY", site:"Site 12", vertical:"Dental" },
-  { id:"DNFB-068", patient:"VitalCaring Home", payer:"Medicaid", amount:190000, daysInDNFB:19, serviceDate:"2026-04-23", lastContact:"2026-05-06", holdCode:"CHARGE_MISSING", site:"Site 2", vertical:"Home Health", subPayer:"Centene / WellCare"  },
-  { id:"DNFB-069", patient:"Smile Partners DSO", payer:"Cigna", amount:82000, daysInDNFB:1, serviceDate:"2026-05-11", lastContact:"2026-05-11", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 3", vertical:"Dental" },
-  { id:"DNFB-070", patient:"Metro Behavioral Health", payer:"Worker Comp", amount:183000, daysInDNFB:5, serviceDate:"2026-05-08", lastContact:"2026-05-15", holdCode:"CHARGE_MISSING", site:"Site 1", vertical:"Behavioral Health" },
-  { id:"DNFB-071", patient:"Metro Urology Group", payer:"Medicaid", amount:52000, daysInDNFB:2, serviceDate:"2026-05-13", lastContact:"2026-05-15", holdCode:"CHARGE_LAG", site:"Site 2", vertical:"Urology", subPayer:"Buckeye Health Plan"  },
-  { id:"DNFB-072", patient:"Advanced Urology Partners", payer:"Medicare", amount:43000, daysInDNFB:26, serviceDate:"2026-04-18", lastContact:"2026-05-13", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 4", vertical:"Urology" },
-  { id:"DNFB-073", patient:"Metro Heart Institute", payer:"Aetna", amount:102000, daysInDNFB:15, serviceDate:"2026-04-29", lastContact:"2026-05-02", holdCode:"AUTH_EXPIRED", site:"Site 10", vertical:"Cardiology" },
-  { id:"DNFB-074", patient:"Lakeside Dental Group", payer:"Blue Cross", amount:165000, daysInDNFB:7, serviceDate:"2026-05-07", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 3", vertical:"Dental" },
-  { id:"DNFB-075", patient:"Summit Orthopedics", payer:"Blue Shield", amount:109000, daysInDNFB:15, serviceDate:"2026-04-27", lastContact:"2026-05-08", holdCode:"CODING_UNASSIGNED", site:"Site 5", vertical:"Orthopedics" },
-  { id:"DNFB-076", patient:"Comfort Home Services", payer:"United Health", amount:23000, daysInDNFB:22, serviceDate:"2026-04-23", lastContact:"2026-04-25", holdCode:"AUTH_MISSING", site:"Site 10", vertical:"Home Health" },
-  { id:"DNFB-077", patient:"Serenity Hospice", payer:"Worker Comp", amount:170000, daysInDNFB:5, serviceDate:"2026-05-11", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 1", vertical:"Hospice" },
-  { id:"DNFB-078", patient:"Bright Dental Alliance", payer:"Medicaid", amount:124000, daysInDNFB:23, serviceDate:"2026-04-21", lastContact:"2026-05-03", holdCode:"CODING_COMPLEX", site:"Site 5", vertical:"Dental", subPayer:"Aetna Better Health"  },
-  { id:"DNFB-079", patient:"Lakeside Dental Group", payer:"Blue Cross", amount:177000, daysInDNFB:27, serviceDate:"2026-04-15", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 11", vertical:"Dental" },
-  { id:"DNFB-080", patient:"Smile Partners DSO", payer:"Humana", amount:130000, daysInDNFB:3, serviceDate:"2026-05-11", lastContact:"2026-05-14", holdCode:"SCRUBBER_EDIT", site:"Site 6", vertical:"Dental", scrubberEdit:"Edit 6010 — Diagnosis code not covered for this procedure — medical necessity documentation required"  },
-  { id:"DNFB-081", patient:"Premier Infusion Partners", payer:"Cigna", amount:182000, daysInDNFB:16, serviceDate:"2026-04-28", lastContact:"2026-05-09", holdCode:"CREDENTIALING", site:"Site 9", vertical:"Infusion" },
-  { id:"DNFB-082", patient:"Advanced Urology Partners", payer:"Cigna", amount:87000, daysInDNFB:4, serviceDate:"2026-05-12", lastContact:"2026-05-13", holdCode:"CHARGE_MISSING", site:"Site 9", vertical:"Urology" },
-  { id:"DNFB-083", patient:"Serenity Hospice", payer:"Aetna", amount:97000, daysInDNFB:20, serviceDate:"2026-04-23", lastContact:"2026-05-14", holdCode:"AUTH_EXPIRED", site:"Site 4", vertical:"Hospice" },
-  { id:"DNFB-084", patient:"Coastal Infusion Center", payer:"Aetna", amount:84000, daysInDNFB:18, serviceDate:"2026-04-28", lastContact:"2026-05-13", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 4", vertical:"Infusion" },
-  { id:"DNFB-085", patient:"Advanced Urology Partners", payer:"Blue Shield", amount:188000, daysInDNFB:10, serviceDate:"2026-05-04", lastContact:"2026-05-09", holdCode:"AUTH_MISSING", site:"Site 8", vertical:"Urology" },
-  { id:"DNFB-086", patient:"Genesis Home Health", payer:"Worker Comp", amount:103000, daysInDNFB:7, serviceDate:"2026-05-05", lastContact:"2026-05-10", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 3", vertical:"Home Health" },
-  { id:"DNFB-087", patient:"Premier Dental Group", payer:"Cigna", amount:73000, daysInDNFB:27, serviceDate:"2026-04-19", lastContact:"2026-04-22", holdCode:"AUTH_EXPIRED", site:"Site 5", vertical:"Dental" },
-  { id:"DNFB-088", patient:"Metro Heart Institute", payer:"Medicaid", amount:53000, daysInDNFB:23, serviceDate:"2026-04-22", lastContact:"2026-05-08", holdCode:"CHARGE_LAG", site:"Site 7", vertical:"Cardiology", subPayer:"Molina Healthcare"  },
-  { id:"DNFB-089", patient:"Summit Ophthalmology", payer:"Humana", amount:174000, daysInDNFB:26, serviceDate:"2026-04-19", lastContact:"2026-04-30", holdCode:"CREDENTIALING", site:"Site 1", vertical:"Ophthalmology" },
-  { id:"DNFB-090", patient:"Regional Cardiac Group", payer:"Blue Cross", amount:30000, daysInDNFB:17, serviceDate:"2026-04-29", lastContact:"2026-05-11", holdCode:"AUTH_MISSING", site:"Site 7", vertical:"Cardiology" },
-  { id:"DNFB-091", patient:"MedCore Infusion", payer:"United Health", amount:164000, daysInDNFB:23, serviceDate:"2026-04-23", lastContact:"2026-05-05", holdCode:"CHARGE_LAG", site:"Site 11", vertical:"Infusion" },
-  { id:"DNFB-092", patient:"Premier Infusion Partners", payer:"United Health", amount:196000, daysInDNFB:3, serviceDate:"2026-05-13", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 8", vertical:"Infusion" },
-  { id:"DNFB-093", patient:"Lakeside Dental Group", payer:"Medicare", amount:19000, daysInDNFB:10, serviceDate:"2026-05-05", lastContact:"2026-05-09", holdCode:"CHARGE_LAG", site:"Site 3", vertical:"Dental" },
-  { id:"DNFB-094", patient:"Metro Heart Institute", payer:"Blue Shield", amount:49000, daysInDNFB:3, serviceDate:"2026-05-10", lastContact:"2026-05-15", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 8", vertical:"Cardiology" },
-  { id:"DNFB-095", patient:"Genesis Home Health", payer:"United Health", amount:70000, daysInDNFB:22, serviceDate:"2026-04-24", lastContact:"2026-05-06", holdCode:"AUTH_MISSING", site:"Site 11", vertical:"Home Health" },
-  { id:"DNFB-096", patient:"MedCore Infusion", payer:"Cigna", amount:81000, daysInDNFB:21, serviceDate:"2026-04-23", lastContact:"2026-05-01", holdCode:"HIM_DEFICIENCY", site:"Site 5", vertical:"Infusion" },
-  { id:"DNFB-097", patient:"Heartland Hospice", payer:"Blue Cross", amount:102000, daysInDNFB:19, serviceDate:"2026-04-25", lastContact:"2026-05-06", holdCode:"PHYSICIAN_QUERY", site:"Site 12", vertical:"Hospice" },
-  { id:"DNFB-098", patient:"Harborview BH", payer:"Humana", amount:7000, daysInDNFB:19, serviceDate:"2026-04-22", lastContact:"2026-05-14", holdCode:"CHARGE_MISSING", site:"Site 10", vertical:"Behavioral Health" },
-  { id:"DNFB-099", patient:"Smile Partners DSO", payer:"Cigna", amount:167000, daysInDNFB:7, serviceDate:"2026-05-07", lastContact:"2026-05-10", holdCode:"PHYSICIAN_QUERY", site:"Site 12", vertical:"Dental" },
-  { id:"DNFB-100", patient:"Coastal Infusion Center", payer:"United Health", amount:13000, daysInDNFB:19, serviceDate:"2026-04-25", lastContact:"2026-05-11", holdCode:"AUTH_MISSING", site:"Site 2", vertical:"Infusion" }
+  { id:"DNFB-001", patient:"James Whitfield", payer:"United Health", amount:370000, daysInDNFB:5, serviceDate:"2026-05-11", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 10", vertical:"Infusion" },
+  { id:"DNFB-002", patient:"Sandra Okonkwo", payer:"Blue Cross", amount:385000, daysInDNFB:17, serviceDate:"2026-04-29", lastContact:"2026-05-09", holdCode:"PHYSICIAN_QUERY", site:"Site 12", vertical:"Behavioral Health" },
+  { id:"DNFB-003", patient:"Robert Delgado", payer:"United Health", amount:1195000, daysInDNFB:26, serviceDate:"2026-04-19", lastContact:"2026-05-05", holdCode:"CODING_UNASSIGNED", site:"Site 5", vertical:"Home Health" },
+  { id:"DNFB-004", patient:"Patricia Nguyen", payer:"Blue Cross", amount:610000, daysInDNFB:4, serviceDate:"2026-05-11", lastContact:"2026-05-13", holdCode:"CODING_COMPLEX", site:"Site 5", vertical:"Home Health" },
+  { id:"DNFB-005", patient:"Michael Torres", payer:"Blue Cross", amount:150000, daysInDNFB:18, serviceDate:"2026-04-26", lastContact:"2026-05-04", holdCode:"CREDENTIALING", site:"Site 10", vertical:"Urology" },
+  { id:"DNFB-006", patient:"James Whitfield", payer:"Aetna", amount:150000, daysInDNFB:28, serviceDate:"2026-04-18", lastContact:"2026-05-03", holdCode:"CHARGE_MISSING", site:"Site 5", vertical:"Infusion" },
+  { id:"DNFB-007", patient:"Patricia Nguyen", payer:"Blue Cross", amount:1005000, daysInDNFB:6, serviceDate:"2026-05-09", lastContact:"2026-05-14", holdCode:"HIM_DEFICIENCY", site:"Site 8", vertical:"Home Health" },
+  { id:"DNFB-008", patient:"Linda Kowalski", payer:"Cigna", amount:380000, daysInDNFB:27, serviceDate:"2026-04-19", lastContact:"2026-05-03", holdCode:"CODING_UNASSIGNED", site:"Site 5", vertical:"Dental" },
+  { id:"DNFB-009", patient:"Patricia Nguyen", payer:"Aetna", amount:790000, daysInDNFB:13, serviceDate:"2026-04-30", lastContact:"2026-05-13", holdCode:"SCRUBBER_EDIT", site:"Site 5", vertical:"Home Health", scrubberEdit:"Edit 4010 — Missing modifier 59 on unbundled service"  },
+  { id:"DNFB-010", patient:"Patricia Nguyen", payer:"Humana", amount:645000, daysInDNFB:12, serviceDate:"2026-05-04", lastContact:"2026-05-07", holdCode:"HIM_DEFICIENCY", site:"Site 8", vertical:"Home Health" },
+  { id:"DNFB-011", patient:"Charles Abramson", payer:"Blue Cross", amount:990000, daysInDNFB:6, serviceDate:"2026-05-07", lastContact:"2026-05-11", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 2", vertical:"Behavioral Health" },
+  { id:"DNFB-012", patient:"Dorothy Fairbanks", payer:"Worker Comp", amount:875000, daysInDNFB:28, serviceDate:"2026-04-18", lastContact:"2026-04-24", holdCode:"CHARGE_MISSING", site:"Site 9", vertical:"Hospice" },
+  { id:"DNFB-013", patient:"Steven Calloway", payer:"Medicare", amount:795000, daysInDNFB:25, serviceDate:"2026-04-21", lastContact:"2026-04-25", holdCode:"CHARGE_MISSING", site:"Site 5", vertical:"Orthopedics" },
+  { id:"DNFB-014", patient:"Barbara Lindqvist", payer:"Blue Shield", amount:840000, daysInDNFB:30, serviceDate:"2026-04-16", lastContact:"2026-04-30", holdCode:"AUTH_EXPIRED", site:"Site 1", vertical:"Orthopedics" },
+  { id:"DNFB-015", patient:"Thomas Oduya", payer:"Aetna", amount:395000, daysInDNFB:29, serviceDate:"2026-04-17", lastContact:"2026-05-13", holdCode:"CODING_UNASSIGNED", site:"Site 12", vertical:"Ophthalmology" },
+  { id:"DNFB-016", patient:"Nancy Petrov", payer:"United Health", amount:960000, daysInDNFB:14, serviceDate:"2026-05-02", lastContact:"2026-05-04", holdCode:"AUTH_EXPIRED", site:"Site 5", vertical:"Cardiology" },
+  { id:"DNFB-017", patient:"Kenneth Watanabe", payer:"Worker Comp", amount:210000, daysInDNFB:8, serviceDate:"2026-05-08", lastContact:"2026-05-13", holdCode:"AUTH_MISSING", site:"Site 1", vertical:"Ophthalmology" },
+  { id:"DNFB-018", patient:"Betty Ramirez", payer:"Blue Cross", amount:120000, daysInDNFB:8, serviceDate:"2026-05-08", lastContact:"2026-05-09", holdCode:"SCRUBBER_EDIT", site:"Site 6", vertical:"Home Health", scrubberEdit:"Edit 4010 — Missing modifier 59 on unbundled service"  },
+  { id:"DNFB-019", patient:"Nancy Petrov", payer:"United Health", amount:775000, daysInDNFB:7, serviceDate:"2026-05-08", lastContact:"2026-05-10", holdCode:"SCRUBBER_EDIT", site:"Site 10", vertical:"Cardiology", scrubberEdit:"Edit 3015 — Place of service mismatch: verify facility vs professional claim type"  },
+  { id:"DNFB-020", patient:"Robert Delgado", payer:"Humana", amount:175000, daysInDNFB:4, serviceDate:"2026-05-09", lastContact:"2026-05-14", holdCode:"PHYSICIAN_QUERY", site:"Site 7", vertical:"Home Health" },
+  { id:"DNFB-021", patient:"Michael Torres", payer:"Medicare", amount:1030000, daysInDNFB:21, serviceDate:"2026-04-25", lastContact:"2026-05-03", holdCode:"SCRUBBER_EDIT", site:"Site 12", vertical:"Urology", scrubberEdit:"Edit 5020 — Unbundling conflict: CPT codes cannot be billed together"  },
+  { id:"DNFB-022", patient:"Steven Calloway", payer:"Blue Shield", amount:740000, daysInDNFB:8, serviceDate:"2026-05-08", lastContact:"2026-05-09", holdCode:"CHARGE_MISSING", site:"Site 9", vertical:"Orthopedics" },
+  { id:"DNFB-023", patient:"Kevin Holbrook", payer:"Worker Comp", amount:170000, daysInDNFB:30, serviceDate:"2026-04-16", lastContact:"2026-05-02", holdCode:"CODING_UNASSIGNED", site:"Site 8", vertical:"Behavioral Health" },
+  { id:"DNFB-024", patient:"Margaret Szymanski", payer:"Medicaid", amount:675000, daysInDNFB:23, serviceDate:"2026-04-19", lastContact:"2026-04-24", holdCode:"CHARGE_MISSING", site:"Site 12", vertical:"Hospice", subPayer:"Aetna Better Health"  },
+  { id:"DNFB-025", patient:"Frank Nguyen", payer:"Cigna", amount:100000, daysInDNFB:19, serviceDate:"2026-04-26", lastContact:"2026-05-14", holdCode:"CODING_UNASSIGNED", site:"Site 9", vertical:"Cardiology" },
+  { id:"DNFB-026", patient:"Raymond Patel", payer:"Blue Cross", amount:390000, daysInDNFB:13, serviceDate:"2026-05-03", lastContact:"2026-05-06", holdCode:"SCRUBBER_EDIT", site:"Site 10", vertical:"Orthopedics", scrubberEdit:"Edit 5020 — Unbundling conflict: CPT codes cannot be billed together"  },
+  { id:"DNFB-027", patient:"Carol Johansson", payer:"Worker Comp", amount:425000, daysInDNFB:7, serviceDate:"2026-05-04", lastContact:"2026-05-13", holdCode:"CHARGE_LAG", site:"Site 4", vertical:"Infusion" },
+  { id:"DNFB-028", patient:"Helen Moreau", payer:"United Health", amount:510000, daysInDNFB:30, serviceDate:"2026-04-16", lastContact:"2026-05-01", holdCode:"AUTH_MISSING", site:"Site 10", vertical:"Hospice" },
+  { id:"DNFB-029", patient:"Arthur Yamamoto", payer:"Worker Comp", amount:230000, daysInDNFB:30, serviceDate:"2026-04-16", lastContact:"2026-04-17", holdCode:"CHARGE_MISSING", site:"Site 4", vertical:"Infusion" },
+  { id:"DNFB-030", patient:"Kevin Holbrook", payer:"Worker Comp", amount:1045000, daysInDNFB:4, serviceDate:"2026-05-11", lastContact:"2026-05-15", holdCode:"CHARGE_MISSING", site:"Site 2", vertical:"Behavioral Health" },
+  { id:"DNFB-031", patient:"Jean Callahan", payer:"Aetna", amount:340000, daysInDNFB:22, serviceDate:"2026-04-22", lastContact:"2026-04-29", holdCode:"CHARGE_LAG", site:"Site 8", vertical:"Dental" },
+  { id:"DNFB-032", patient:"Walter Osei", payer:"Blue Shield", amount:430000, daysInDNFB:6, serviceDate:"2026-05-07", lastContact:"2026-05-11", holdCode:"SCRUBBER_EDIT", site:"Site 12", vertical:"Behavioral Health", scrubberEdit:"Edit 5020 — Unbundling conflict: CPT codes cannot be billed together"  },
+  { id:"DNFB-033", patient:"Frank Nguyen", payer:"Blue Cross", amount:1085000, daysInDNFB:29, serviceDate:"2026-04-17", lastContact:"2026-04-19", holdCode:"CODING_COMPLEX", site:"Site 6", vertical:"Cardiology" },
+  { id:"DNFB-034", patient:"Helen Moreau", payer:"Medicare", amount:590000, daysInDNFB:29, serviceDate:"2026-04-17", lastContact:"2026-05-09", holdCode:"CHARGE_MISSING", site:"Site 11", vertical:"Hospice" },
+  { id:"DNFB-035", patient:"Gloria Henson", payer:"Worker Comp", amount:980000, daysInDNFB:24, serviceDate:"2026-04-22", lastContact:"2026-05-10", holdCode:"CREDENTIALING", site:"Site 3", vertical:"Infusion" },
+  { id:"DNFB-036", patient:"Linda Kowalski", payer:"Blue Cross", amount:85000, daysInDNFB:28, serviceDate:"2026-04-17", lastContact:"2026-05-09", holdCode:"CREDENTIALING", site:"Site 8", vertical:"Dental" },
+  { id:"DNFB-037", patient:"Margaret Szymanski", payer:"United Health", amount:455000, daysInDNFB:12, serviceDate:"2026-04-30", lastContact:"2026-05-09", holdCode:"CODING_COMPLEX", site:"Site 11", vertical:"Hospice" },
+  { id:"DNFB-038", patient:"Sandra Okonkwo", payer:"United Health", amount:915000, daysInDNFB:9, serviceDate:"2026-05-07", lastContact:"2026-05-09", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 6", vertical:"Behavioral Health" },
+  { id:"DNFB-039", patient:"Victor Nakamura", payer:"Humana", amount:315000, daysInDNFB:9, serviceDate:"2026-05-07", lastContact:"2026-05-15", holdCode:"HIM_DEFICIENCY", site:"Site 9", vertical:"Hospice" },
+  { id:"DNFB-040", patient:"Kenneth Watanabe", payer:"Blue Cross", amount:535000, daysInDNFB:20, serviceDate:"2026-04-24", lastContact:"2026-05-12", holdCode:"SCRUBBER_EDIT", site:"Site 12", vertical:"Ophthalmology", scrubberEdit:"Edit 4010 — Missing modifier 59 on unbundled service"  },
+  { id:"DNFB-041", patient:"Linda Kowalski", payer:"Aetna", amount:1050000, daysInDNFB:13, serviceDate:"2026-04-28", lastContact:"2026-05-13", holdCode:"CREDENTIALING", site:"Site 10", vertical:"Dental" },
+  { id:"DNFB-042", patient:"Evelyn Kowalczyk", payer:"United Health", amount:350000, daysInDNFB:14, serviceDate:"2026-04-28", lastContact:"2026-05-05", holdCode:"CHARGE_MISSING", site:"Site 6", vertical:"Hospice" },
+  { id:"DNFB-043", patient:"Ernest Okonkwo", payer:"Aetna", amount:755000, daysInDNFB:26, serviceDate:"2026-04-19", lastContact:"2026-04-24", holdCode:"AUTH_EXPIRED", site:"Site 2", vertical:"Urology" },
+  { id:"DNFB-044", patient:"Patricia Nguyen", payer:"Aetna", amount:250000, daysInDNFB:1, serviceDate:"2026-05-15", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 8", vertical:"Home Health" },
+  { id:"DNFB-045", patient:"Mildred Ferreira", payer:"Aetna", amount:785000, daysInDNFB:13, serviceDate:"2026-05-03", lastContact:"2026-05-05", holdCode:"CREDENTIALING", site:"Site 12", vertical:"Urology" },
+  { id:"DNFB-046", patient:"Carol Johansson", payer:"Aetna", amount:1100000, daysInDNFB:17, serviceDate:"2026-04-29", lastContact:"2026-05-08", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 2", vertical:"Infusion" },
+  { id:"DNFB-047", patient:"Steven Calloway", payer:"Worker Comp", amount:940000, daysInDNFB:11, serviceDate:"2026-05-02", lastContact:"2026-05-07", holdCode:"AUTH_EXPIRED", site:"Site 8", vertical:"Orthopedics" },
+  { id:"DNFB-048", patient:"Harold Svenson", payer:"United Health", amount:1010000, daysInDNFB:9, serviceDate:"2026-05-04", lastContact:"2026-05-12", holdCode:"PHYSICIAN_QUERY", site:"Site 5", vertical:"Urology" },
+  { id:"DNFB-049", patient:"Gladys Tanaka", payer:"Aetna", amount:540000, daysInDNFB:11, serviceDate:"2026-05-05", lastContact:"2026-05-13", holdCode:"CHARGE_MISSING", site:"Site 3", vertical:"Infusion" },
+  { id:"DNFB-050", patient:"Helen Moreau", payer:"Aetna", amount:665000, daysInDNFB:14, serviceDate:"2026-04-30", lastContact:"2026-05-08", holdCode:"CODING_COMPLEX", site:"Site 7", vertical:"Hospice" },
+  { id:"DNFB-051", patient:"Robert Delgado", payer:"Humana", amount:1100000, daysInDNFB:1, serviceDate:"2026-05-12", lastContact:"2026-05-12", holdCode:"HIM_DEFICIENCY", site:"Site 8", vertical:"Home Health" },
+  { id:"DNFB-052", patient:"Thomas Oduya", payer:"Humana", amount:850000, daysInDNFB:24, serviceDate:"2026-04-18", lastContact:"2026-04-26", holdCode:"CREDENTIALING", site:"Site 4", vertical:"Ophthalmology" },
+  { id:"DNFB-053", patient:"Kenneth Watanabe", payer:"Blue Shield", amount:220000, daysInDNFB:20, serviceDate:"2026-04-26", lastContact:"2026-05-03", holdCode:"AUTH_MISSING", site:"Site 10", vertical:"Ophthalmology" },
+  { id:"DNFB-054", patient:"Carol Johansson", payer:"Blue Shield", amount:305000, daysInDNFB:2, serviceDate:"2026-05-13", lastContact:"2026-05-15", holdCode:"AUTH_MISSING", site:"Site 4", vertical:"Infusion" },
+  { id:"DNFB-055", patient:"Thomas Oduya", payer:"Humana", amount:1180000, daysInDNFB:27, serviceDate:"2026-04-17", lastContact:"2026-05-13", holdCode:"CHARGE_MISSING", site:"Site 8", vertical:"Ophthalmology" },
+  { id:"DNFB-056", patient:"Frank Nguyen", payer:"Cigna", amount:1025000, daysInDNFB:3, serviceDate:"2026-05-13", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 4", vertical:"Cardiology" },
+  { id:"DNFB-057", patient:"Lakeside Behavioral", payer:"Blue Shield", amount:220000, daysInDNFB:16, serviceDate:"2026-04-30", lastContact:"2026-05-06", holdCode:"PHYSICIAN_QUERY", site:"Site 4", vertical:"Behavioral Health" },
+  { id:"DNFB-058", patient:"Jean Callahan", payer:"Blue Shield", amount:960000, daysInDNFB:24, serviceDate:"2026-04-22", lastContact:"2026-05-10", holdCode:"HIM_DEFICIENCY", site:"Site 5", vertical:"Dental" },
+  { id:"DNFB-059", patient:"Walter Osei", payer:"Humana", amount:1130000, daysInDNFB:7, serviceDate:"2026-05-09", lastContact:"2026-05-15", holdCode:"CREDENTIALING", site:"Site 12", vertical:"Behavioral Health" },
+  { id:"DNFB-060", patient:"James Whitfield", payer:"Cigna", amount:685000, daysInDNFB:22, serviceDate:"2026-04-24", lastContact:"2026-04-29", holdCode:"AUTH_EXPIRED", site:"Site 11", vertical:"Infusion" },
+  { id:"DNFB-061", patient:"Michael Torres", payer:"Blue Shield", amount:300000, daysInDNFB:24, serviceDate:"2026-04-20", lastContact:"2026-04-26", holdCode:"CREDENTIALING", site:"Site 9", vertical:"Urology" },
+  { id:"DNFB-062", patient:"Herman Olawale", payer:"Medicaid", amount:1180000, daysInDNFB:15, serviceDate:"2026-04-27", lastContact:"2026-05-05", holdCode:"PHYSICIAN_QUERY", site:"Site 7", vertical:"Infusion", subPayer:"Molina Healthcare"  },
+  { id:"DNFB-063", patient:"Coastal Recovery", payer:"Cigna", amount:775000, daysInDNFB:7, serviceDate:"2026-05-08", lastContact:"2026-05-13", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 5", vertical:"Behavioral Health" },
+  { id:"DNFB-064", patient:"Frank Nguyen", payer:"Worker Comp", amount:155000, daysInDNFB:8, serviceDate:"2026-05-05", lastContact:"2026-05-12", holdCode:"PHYSICIAN_QUERY", site:"Site 9", vertical:"Cardiology" },
+  { id:"DNFB-065", patient:"Michael Torres", payer:"Medicaid", amount:55000, daysInDNFB:3, serviceDate:"2026-05-13", lastContact:"2026-05-14", holdCode:"AUTH_MISSING", site:"Site 12", vertical:"Urology", subPayer:"AmeriHealth Caritas"  },
+  { id:"DNFB-066", patient:"Jean Callahan", payer:"Medicaid", amount:840000, daysInDNFB:12, serviceDate:"2026-05-02", lastContact:"2026-05-10", holdCode:"AUTH_EXPIRED", site:"Site 12", vertical:"Dental", subPayer:"United Community Plan"  },
+  { id:"DNFB-067", patient:"Jean Callahan", payer:"United Health", amount:210000, daysInDNFB:24, serviceDate:"2026-04-21", lastContact:"2026-05-12", holdCode:"PHYSICIAN_QUERY", site:"Site 12", vertical:"Dental" },
+  { id:"DNFB-068", patient:"VitalCaring Home", payer:"Medicaid", amount:1140000, daysInDNFB:19, serviceDate:"2026-04-23", lastContact:"2026-05-06", holdCode:"CHARGE_MISSING", site:"Site 2", vertical:"Home Health", subPayer:"Centene / WellCare"  },
+  { id:"DNFB-069", patient:"Linda Kowalski", payer:"Cigna", amount:490000, daysInDNFB:1, serviceDate:"2026-05-11", lastContact:"2026-05-11", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 3", vertical:"Dental" },
+  { id:"DNFB-070", patient:"Sandra Okonkwo", payer:"Worker Comp", amount:1100000, daysInDNFB:5, serviceDate:"2026-05-08", lastContact:"2026-05-15", holdCode:"CHARGE_MISSING", site:"Site 1", vertical:"Behavioral Health" },
+  { id:"DNFB-071", patient:"Irene Castillo", payer:"Medicaid", amount:310000, daysInDNFB:2, serviceDate:"2026-05-13", lastContact:"2026-05-15", holdCode:"CHARGE_LAG", site:"Site 2", vertical:"Urology", subPayer:"Buckeye Health Plan"  },
+  { id:"DNFB-072", patient:"Chester Bianco", payer:"Medicare", amount:260000, daysInDNFB:26, serviceDate:"2026-04-18", lastContact:"2026-05-13", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 4", vertical:"Urology" },
+  { id:"DNFB-073", patient:"Metro Heart Institute", payer:"Aetna", amount:610000, daysInDNFB:15, serviceDate:"2026-04-29", lastContact:"2026-05-02", holdCode:"AUTH_EXPIRED", site:"Site 10", vertical:"Cardiology" },
+  { id:"DNFB-074", patient:"Phyllis Guerrero", payer:"Blue Cross", amount:990000, daysInDNFB:7, serviceDate:"2026-05-07", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 3", vertical:"Dental" },
+  { id:"DNFB-075", patient:"Raymond Patel", payer:"Blue Shield", amount:655000, daysInDNFB:15, serviceDate:"2026-04-27", lastContact:"2026-05-08", holdCode:"CODING_UNASSIGNED", site:"Site 5", vertical:"Orthopedics" },
+  { id:"DNFB-076", patient:"Patricia Nguyen", payer:"United Health", amount:140000, daysInDNFB:22, serviceDate:"2026-04-23", lastContact:"2026-04-25", holdCode:"AUTH_MISSING", site:"Site 10", vertical:"Home Health" },
+  { id:"DNFB-077", patient:"Lloyd Ashworth", payer:"Worker Comp", amount:1020000, daysInDNFB:5, serviceDate:"2026-05-11", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 1", vertical:"Hospice" },
+  { id:"DNFB-078", patient:"Jean Callahan", payer:"Medicaid", amount:745000, daysInDNFB:23, serviceDate:"2026-04-21", lastContact:"2026-05-03", holdCode:"CODING_COMPLEX", site:"Site 5", vertical:"Dental", subPayer:"Aetna Better Health"  },
+  { id:"DNFB-079", patient:"Norma Johansson", payer:"Blue Cross", amount:1060000, daysInDNFB:27, serviceDate:"2026-04-15", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 11", vertical:"Dental" },
+  { id:"DNFB-080", patient:"Linda Kowalski", payer:"Humana", amount:780000, daysInDNFB:3, serviceDate:"2026-05-11", lastContact:"2026-05-14", holdCode:"SCRUBBER_EDIT", site:"Site 6", vertical:"Dental", scrubberEdit:"Edit 6010 — Diagnosis code not covered for this procedure — medical necessity documentation required"  },
+  { id:"DNFB-081", patient:"Arthur Yamamoto", payer:"Cigna", amount:1090000, daysInDNFB:16, serviceDate:"2026-04-28", lastContact:"2026-05-09", holdCode:"CREDENTIALING", site:"Site 9", vertical:"Infusion" },
+  { id:"DNFB-082", patient:"Clifford Petrov", payer:"Cigna", amount:525000, daysInDNFB:4, serviceDate:"2026-05-12", lastContact:"2026-05-13", holdCode:"CHARGE_MISSING", site:"Site 9", vertical:"Urology" },
+  { id:"DNFB-083", patient:"Edith Yamamoto", payer:"Aetna", amount:580000, daysInDNFB:20, serviceDate:"2026-04-23", lastContact:"2026-05-14", holdCode:"AUTH_EXPIRED", site:"Site 4", vertical:"Hospice" },
+  { id:"DNFB-084", patient:"James Whitfield", payer:"Aetna", amount:505000, daysInDNFB:18, serviceDate:"2026-04-28", lastContact:"2026-05-13", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 4", vertical:"Infusion" },
+  { id:"DNFB-085", patient:"Marshall Osei", payer:"Blue Shield", amount:1130000, daysInDNFB:10, serviceDate:"2026-05-04", lastContact:"2026-05-09", holdCode:"AUTH_MISSING", site:"Site 8", vertical:"Urology" },
+  { id:"DNFB-086", patient:"Robert Delgado", payer:"Worker Comp", amount:620000, daysInDNFB:7, serviceDate:"2026-05-05", lastContact:"2026-05-10", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 3", vertical:"Home Health" },
+  { id:"DNFB-087", patient:"Viola Ramirez", payer:"Cigna", amount:435000, daysInDNFB:27, serviceDate:"2026-04-19", lastContact:"2026-04-22", holdCode:"AUTH_EXPIRED", site:"Site 5", vertical:"Dental" },
+  { id:"DNFB-088", patient:"Metro Heart Institute", payer:"Medicaid", amount:315000, daysInDNFB:23, serviceDate:"2026-04-22", lastContact:"2026-05-08", holdCode:"CHARGE_LAG", site:"Site 7", vertical:"Cardiology", subPayer:"Molina Healthcare"  },
+  { id:"DNFB-089", patient:"Kenneth Watanabe", payer:"Humana", amount:1045000, daysInDNFB:26, serviceDate:"2026-04-19", lastContact:"2026-04-30", holdCode:"CREDENTIALING", site:"Site 1", vertical:"Ophthalmology" },
+  { id:"DNFB-090", patient:"Calvin Lindqvist", payer:"Blue Cross", amount:180000, daysInDNFB:17, serviceDate:"2026-04-29", lastContact:"2026-05-11", holdCode:"AUTH_MISSING", site:"Site 7", vertical:"Cardiology" },
+  { id:"DNFB-091", patient:"Carol Johansson", payer:"United Health", amount:985000, daysInDNFB:23, serviceDate:"2026-04-23", lastContact:"2026-05-05", holdCode:"CHARGE_LAG", site:"Site 11", vertical:"Infusion" },
+  { id:"DNFB-092", patient:"Arthur Yamamoto", payer:"United Health", amount:1175000, daysInDNFB:3, serviceDate:"2026-05-13", lastContact:"2026-05-15", holdCode:"PHYSICIAN_QUERY", site:"Site 8", vertical:"Infusion" },
+  { id:"DNFB-093", patient:"Blanche Watanabe", payer:"Medicare", amount:115000, daysInDNFB:10, serviceDate:"2026-05-05", lastContact:"2026-05-09", holdCode:"CHARGE_LAG", site:"Site 3", vertical:"Dental" },
+  { id:"DNFB-094", patient:"Metro Heart Institute", payer:"Blue Shield", amount:295000, daysInDNFB:3, serviceDate:"2026-05-10", lastContact:"2026-05-15", holdCode:"PHYSICIAN_UNSIGNED", site:"Site 8", vertical:"Cardiology" },
+  { id:"DNFB-095", patient:"Robert Delgado", payer:"United Health", amount:420000, daysInDNFB:22, serviceDate:"2026-04-24", lastContact:"2026-05-06", holdCode:"AUTH_MISSING", site:"Site 11", vertical:"Home Health" },
+  { id:"DNFB-096", patient:"Carol Johansson", payer:"Cigna", amount:485000, daysInDNFB:21, serviceDate:"2026-04-23", lastContact:"2026-05-01", holdCode:"HIM_DEFICIENCY", site:"Site 5", vertical:"Infusion" },
+  { id:"DNFB-097", patient:"Dorothy Fairbanks", payer:"Blue Cross", amount:610000, daysInDNFB:19, serviceDate:"2026-04-25", lastContact:"2026-05-06", holdCode:"PHYSICIAN_QUERY", site:"Site 12", vertical:"Hospice" },
+  { id:"DNFB-098", patient:"Charles Abramson", payer:"Humana", amount:45000, daysInDNFB:19, serviceDate:"2026-04-22", lastContact:"2026-05-14", holdCode:"CHARGE_MISSING", site:"Site 10", vertical:"Behavioral Health" },
+  { id:"DNFB-099", patient:"Linda Kowalski", payer:"Cigna", amount:1005000, daysInDNFB:7, serviceDate:"2026-05-07", lastContact:"2026-05-10", holdCode:"PHYSICIAN_QUERY", site:"Site 12", vertical:"Dental" },
+  { id:"DNFB-100", patient:"James Whitfield", payer:"United Health", amount:75000, daysInDNFB:19, serviceDate:"2026-04-25", lastContact:"2026-05-11", holdCode:"AUTH_MISSING", site:"Site 2", vertical:"Infusion" }
 ];
 
 const AR_DATA = [
-  { id:"AR-001", patient:"Betty Allen", payer:"Aetna", amount:50000, daysOut:9, serviceDate:"2026-05-01", lastContact:"2026-05-11", denialCode:null, site:"Site 12", vertical:"Hospice", claimStatus:"At Payer"  },
-  { id:"AR-002", patient:"Carol Scott", payer:"Aetna", amount:161000, daysOut:56, serviceDate:"2026-03-11", lastContact:"2026-03-24", denialCode:null, site:"Site 7", vertical:"Home Health", claimStatus:"At Payer"  },
-  { id:"AR-003", patient:"Sandra White", payer:"Cigna", amount:140000, daysOut:63, serviceDate:"2026-03-02", lastContact:"2026-04-25", denialCode:"CO-16", site:"Site 7", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-004", patient:"Sandra Adams", payer:"Aetna", amount:123000, daysOut:192, serviceDate:"2025-10-29", lastContact:"2026-05-02", denialCode:null, site:"Site 12", vertical:"Orthopedics", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-005", patient:"Brian Hill", payer:"Medicare", amount:158000, daysOut:95, serviceDate:"2026-01-27", lastContact:"2026-04-19", denialCode:"CO-22", site:"Site 2", vertical:"Infusion", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-006", patient:"Jennifer Clark", payer:"Blue Shield", amount:109000, daysOut:11, serviceDate:"2026-04-22", lastContact:"2026-05-10", denialCode:"CO-22", site:"Site 8", vertical:"Home Health", claimStatus:"At Payer"  },
-  { id:"AR-007", patient:"Patricia Hall", payer:"Blue Shield", amount:133000, daysOut:23, serviceDate:"2026-04-18", lastContact:"2026-05-05", denialCode:"CO-16", site:"Site 4", vertical:"Hospice", claimStatus:"At Payer"  },
-  { id:"AR-008", patient:"Margaret Young", payer:"Humana", amount:99000, daysOut:36, serviceDate:"2026-04-05", lastContact:"2026-04-22", denialCode:null, site:"Site 12", vertical:"Hospice", claimStatus:"At Payer"  },
-  { id:"AR-009", patient:"William Lewis", payer:"Aetna", amount:103000, daysOut:29, serviceDate:"2026-04-11", lastContact:"2026-05-01", denialCode:"CO-50", site:"Site 7", vertical:"Dental", claimStatus:"Rejected by Clearinghouse"  },
-  { id:"AR-010", patient:"Paul Clark", payer:"Cigna", amount:141000, daysOut:13, serviceDate:"2026-04-22", lastContact:"2026-05-11", denialCode:null, site:"Site 7", vertical:"Orthopedics", claimStatus:"At Payer"  },
-  { id:"AR-011", patient:"Anthony Mitchell", payer:"Medicaid", amount:102000, daysOut:11, serviceDate:"2026-04-25", lastContact:"2026-05-15", denialCode:"CO-50", site:"Site 11", vertical:"Ophthalmology", subPayer:"AmeriHealth Caritas" , claimStatus:"At Payer"  },
-  { id:"AR-012", patient:"Joseph Jackson", payer:"United Health", amount:64000, daysOut:58, serviceDate:"2026-03-09", lastContact:"2026-04-03", denialCode:null, site:"Site 7", vertical:"Behavioral Health", claimStatus:"At Payer"  },
-  { id:"AR-013", patient:"Paul Baker", payer:"Aetna", amount:138000, daysOut:26, serviceDate:"2026-04-13", lastContact:"2026-04-29", denialCode:"CO-4", site:"Site 8", vertical:"Home Health", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-014", patient:"Joseph Johnson", payer:"Blue Cross", amount:24000, daysOut:32, serviceDate:"2026-04-03", lastContact:"2026-05-06", denialCode:"CO-97", site:"Site 6", vertical:"Cardiology", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-015", patient:"Charles Lopez", payer:"Cigna", amount:38000, daysOut:176, serviceDate:"2025-11-10", lastContact:"2026-04-19", denialCode:"CO-22", site:"Site 9", vertical:"Orthopedics", claimStatus:"At Payer"  },
-  { id:"AR-016", patient:"Andrew Garcia", payer:"Medicaid", amount:8000, daysOut:30, serviceDate:"2026-04-04", lastContact:"2026-05-13", denialCode:null, site:"Site 6", vertical:"Behavioral Health", subPayer:"United Community Plan" , claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-017", patient:"Richard Anderson", payer:"Medicare", amount:14000, daysOut:21, serviceDate:"2026-04-17", lastContact:"2026-04-28", denialCode:null, site:"Site 5", vertical:"Orthopedics", claimStatus:"Rejected by Clearinghouse"  },
-  { id:"AR-018", patient:"Linda Hernandez", payer:"Aetna", amount:34000, daysOut:39, serviceDate:"2026-03-29", lastContact:"2026-04-22", denialCode:"CO-50", site:"Site 2", vertical:"Cardiology", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-019", patient:"Rebecca Gonzalez", payer:"Blue Shield", amount:172000, daysOut:155, serviceDate:"2025-12-06", lastContact:"2026-03-29", denialCode:null, site:"Site 11", vertical:"Infusion", claimStatus:"Pending Submission"  },
-  { id:"AR-020", patient:"Kenneth Wright", payer:"Blue Cross", amount:47000, daysOut:102, serviceDate:"2026-01-25", lastContact:"2026-04-25", denialCode:"CO-22", site:"Site 10", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-021", patient:"Carol Thompson", payer:"Worker Comp", amount:177000, daysOut:14, serviceDate:"2026-04-21", lastContact:"2026-05-09", denialCode:"CO-22", site:"Site 9", vertical:"Home Health", claimStatus:"At Payer"  },
-  { id:"AR-022", patient:"Kimberly Hernandez", payer:"Medicare", amount:66000, daysOut:66, serviceDate:"2026-02-25", lastContact:"2026-05-09", denialCode:"CO-50", site:"Site 7", vertical:"Behavioral Health", claimStatus:"At Payer"  },
-  { id:"AR-023", patient:"Paul Young", payer:"Medicaid", amount:47000, daysOut:41, serviceDate:"2026-03-25", lastContact:"2026-05-07", denialCode:"CO-16", site:"Site 8", vertical:"Infusion", subPayer:"Centene / WellCare" , claimStatus:"Rejected by Clearinghouse"  },
-  { id:"AR-024", patient:"Dorothy Perez", payer:"Aetna", amount:39000, daysOut:59, serviceDate:"2026-03-10", lastContact:"2026-05-04", denialCode:"CO-22", site:"Site 11", vertical:"Dental", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-025", patient:"Amanda Adams", payer:"Worker Comp", amount:24000, daysOut:21, serviceDate:"2026-04-17", lastContact:"2026-05-02", denialCode:null, site:"Site 7", vertical:"Cardiology", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-026", patient:"Sarah Martinez", payer:"Cigna", amount:90000, daysOut:34, serviceDate:"2026-03-28", lastContact:"2026-05-14", denialCode:null, site:"Site 1", vertical:"Hospice", claimStatus:"At Payer"  },
-  { id:"AR-027", patient:"Daniel Harris", payer:"Medicare", amount:52000, daysOut:26, serviceDate:"2026-04-11", lastContact:"2026-05-15", denialCode:"CO-97", site:"Site 10", vertical:"Cardiology", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-028", patient:"Jennifer Rodriguez", payer:"Worker Comp", amount:55000, daysOut:31, serviceDate:"2026-04-05", lastContact:"2026-05-08", denialCode:"CO-97", site:"Site 3", vertical:"Infusion", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-029", patient:"Andrew Thomas", payer:"Blue Cross", amount:12000, daysOut:12, serviceDate:"2026-04-24", lastContact:"2026-05-06", denialCode:"CO-4", site:"Site 5", vertical:"Infusion", claimStatus:"At Payer"  },
-  { id:"AR-030", patient:"Dorothy Taylor", payer:"Humana", amount:99000, daysOut:48, serviceDate:"2026-03-18", lastContact:"2026-04-10", denialCode:"CO-16", site:"Site 11", vertical:"Dental", claimStatus:"At Payer"  },
-  { id:"AR-031", patient:"Michael Brown", payer:"Aetna", amount:88000, daysOut:69, serviceDate:"2026-02-27", lastContact:"2026-04-06", denialCode:"CO-97", site:"Site 10", vertical:"Home Health", claimStatus:"Rejected by Clearinghouse"  },
-  { id:"AR-032", patient:"Donald Wright", payer:"Worker Comp", amount:159000, daysOut:63, serviceDate:"2026-03-03", lastContact:"2026-05-08", denialCode:"CO-4", site:"Site 12", vertical:"Behavioral Health", claimStatus:"At Payer"  },
-  { id:"AR-033", patient:"Christopher Young", payer:"Aetna", amount:156000, daysOut:150, serviceDate:"2025-12-05", lastContact:"2026-04-24", denialCode:"CO-16", site:"Site 10", vertical:"Infusion", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-034", patient:"Nancy White", payer:"Humana", amount:166000, daysOut:13, serviceDate:"2026-04-20", lastContact:"2026-05-11", denialCode:null, site:"Site 5", vertical:"Orthopedics", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-035", patient:"George Taylor", payer:"Medicare", amount:22000, daysOut:17, serviceDate:"2026-04-22", lastContact:"2026-05-06", denialCode:null, site:"Site 10", vertical:"Urology", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-036", patient:"Rebecca Green", payer:"United Health", amount:69000, daysOut:51, serviceDate:"2026-03-19", lastContact:"2026-04-16", denialCode:null, site:"Site 5", vertical:"Orthopedics", claimStatus:"At Payer"  },
-  { id:"AR-037", patient:"Margaret Green", payer:"Blue Shield", amount:63000, daysOut:80, serviceDate:"2026-02-12", lastContact:"2026-05-11", denialCode:null, site:"Site 4", vertical:"Cardiology", claimStatus:"Pending Submission"  },
-  { id:"AR-038", patient:"Joseph Taylor", payer:"Blue Shield", amount:84000, daysOut:22, serviceDate:"2026-04-09", lastContact:"2026-04-25", denialCode:"CO-97", site:"Site 4", vertical:"Infusion", claimStatus:"At Payer"  },
-  { id:"AR-039", patient:"Daniel Johnson", payer:"Aetna", amount:108000, daysOut:6, serviceDate:"2026-04-28", lastContact:"2026-04-28", denialCode:"CO-97", site:"Site 11", vertical:"Dental", claimStatus:"Rejected by Clearinghouse"  },
-  { id:"AR-040", patient:"Andrew Perez", payer:"Cigna", amount:94000, daysOut:27, serviceDate:"2026-04-09", lastContact:"2026-04-23", denialCode:"CO-50", site:"Site 9", vertical:"Home Health", claimStatus:"At Payer"  },
-  { id:"AR-041", patient:"Ryan Adams", payer:"Humana", amount:46000, daysOut:78, serviceDate:"2026-02-20", lastContact:"2026-03-30", denialCode:null, site:"Site 9", vertical:"Cardiology", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-042", patient:"Melissa Gonzalez", payer:"United Health", amount:49000, daysOut:53, serviceDate:"2026-03-18", lastContact:"2026-03-30", denialCode:null, site:"Site 9", vertical:"Dental", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-043", patient:"Kevin Lee", payer:"Humana", amount:167000, daysOut:10, serviceDate:"2026-04-21", lastContact:"2026-05-14", denialCode:"CO-50", site:"Site 8", vertical:"Hospice", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-044", patient:"Andrew Baker", payer:"Humana", amount:156000, daysOut:90, serviceDate:"2026-02-04", lastContact:"2026-04-29", denialCode:null, site:"Site 2", vertical:"Home Health", claimStatus:"At Payer"  },
-  { id:"AR-045", patient:"Karen Hernandez", payer:"Blue Shield", amount:175000, daysOut:174, serviceDate:"2025-11-16", lastContact:"2026-04-27", denialCode:"CO-22", site:"Site 12", vertical:"Behavioral Health", claimStatus:"At Payer"  },
-  { id:"AR-046", patient:"David Lopez", payer:"Blue Cross", amount:148000, daysOut:162, serviceDate:"2025-11-25", lastContact:"2026-03-27", denialCode:null, site:"Site 12", vertical:"Cardiology", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-047", patient:"Michael Williams", payer:"Aetna", amount:120000, daysOut:21, serviceDate:"2026-04-13", lastContact:"2026-04-30", denialCode:"CO-4", site:"Site 11", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-048", patient:"George Brown", payer:"Aetna", amount:168000, daysOut:59, serviceDate:"2026-03-11", lastContact:"2026-03-21", denialCode:"CO-22", site:"Site 9", vertical:"Urology", claimStatus:"At Payer"  },
-  { id:"AR-049", patient:"Ryan Brown", payer:"Aetna", amount:105000, daysOut:115, serviceDate:"2026-01-09", lastContact:"2026-03-28", denialCode:null, site:"Site 3", vertical:"Dental", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-050", patient:"Thomas White", payer:"Medicare", amount:140000, daysOut:100, serviceDate:"2026-01-27", lastContact:"2026-04-25", denialCode:"CO-22", site:"Site 7", vertical:"Ophthalmology", claimStatus:"At Payer"  },
-  { id:"AR-051", patient:"Emily Carter", payer:"Blue Shield", amount:59000, daysOut:56, serviceDate:"2026-03-10", lastContact:"2026-04-24", denialCode:null, site:"Site 7", vertical:"Cardiology", claimStatus:"Rejected by Clearinghouse"  },
-  { id:"AR-052", patient:"Ryan Garcia", payer:"Humana", amount:67000, daysOut:68, serviceDate:"2026-02-27", lastContact:"2026-05-10", denialCode:"CO-22", site:"Site 3", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-053", patient:"Amanda Gonzalez", payer:"Humana", amount:169000, daysOut:39, serviceDate:"2026-03-31", lastContact:"2026-05-06", denialCode:null, site:"Site 8", vertical:"Ophthalmology", claimStatus:"Pending Submission"  },
-  { id:"AR-054", patient:"Steven Wright", payer:"Medicaid", amount:121000, daysOut:76, serviceDate:"2026-02-15", lastContact:"2026-04-07", denialCode:"CO-22", site:"Site 5", vertical:"Cardiology", subPayer:"Buckeye Health Plan" , claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-055", patient:"Emily King", payer:"Worker Comp", amount:33000, daysOut:28, serviceDate:"2026-04-10", lastContact:"2026-05-11", denialCode:"CO-4", site:"Site 4", vertical:"Dental", claimStatus:"At Payer"  },
-  { id:"AR-056", patient:"Matthew Davis", payer:"Medicare", amount:14000, daysOut:24, serviceDate:"2026-04-14", lastContact:"2026-05-09", denialCode:"CO-50", site:"Site 9", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-057", patient:"Sandra Martinez", payer:"Medicaid", amount:98000, daysOut:15, serviceDate:"2026-04-23", lastContact:"2026-05-11", denialCode:null, site:"Site 1", vertical:"Urology", subPayer:"Aetna Better Health" , claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-058", patient:"Richard Carter", payer:"Medicare", amount:107000, daysOut:139, serviceDate:"2025-12-18", lastContact:"2026-04-24", denialCode:"CO-50", site:"Site 3", vertical:"Urology", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-059", patient:"William Johnson", payer:"Humana", amount:5000, daysOut:16, serviceDate:"2026-04-20", lastContact:"2026-05-06", denialCode:null, site:"Site 6", vertical:"Dental", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-060", patient:"Stephanie Martinez", payer:"Humana", amount:159000, daysOut:112, serviceDate:"2026-01-15", lastContact:"2026-03-23", denialCode:"CO-22", site:"Site 9", vertical:"Infusion", claimStatus:"At Payer"  },
-  { id:"AR-061", patient:"Kevin Hill", payer:"Blue Cross", amount:179000, daysOut:16, serviceDate:"2026-04-19", lastContact:"2026-05-02", denialCode:"CO-16", site:"Site 6", vertical:"Home Health", claimStatus:"At Payer"  },
-  { id:"AR-062", patient:"Linda Anderson", payer:"Worker Comp", amount:148000, daysOut:57, serviceDate:"2026-03-05", lastContact:"2026-05-15", denialCode:"CO-97", site:"Site 6", vertical:"Ophthalmology", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-063", patient:"Anthony Robinson", payer:"Medicaid", amount:48000, daysOut:158, serviceDate:"2025-11-24", lastContact:"2026-05-14", denialCode:"CO-22", site:"Site 11", vertical:"Behavioral Health", subPayer:"Molina Healthcare" , claimStatus:"At Payer"  },
-  { id:"AR-064", patient:"Linda Anderson", payer:"United Health", amount:153000, daysOut:15, serviceDate:"2026-04-23", lastContact:"2026-05-15", denialCode:null, site:"Site 4", vertical:"Dental", claimStatus:"Pending Submission"  },
-  { id:"AR-065", patient:"Patricia Mitchell", payer:"Blue Cross", amount:50000, daysOut:23, serviceDate:"2026-04-08", lastContact:"2026-05-09", denialCode:null, site:"Site 6", vertical:"Urology", claimStatus:"Rejected by Clearinghouse"  },
-  { id:"AR-066", patient:"Lisa Anderson", payer:"Aetna", amount:114000, daysOut:105, serviceDate:"2026-01-22", lastContact:"2026-04-19", denialCode:"CO-50", site:"Site 4", vertical:"Urology", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-067", patient:"Sandra Martin", payer:"Blue Cross", amount:14000, daysOut:11, serviceDate:"2026-04-26", lastContact:"2026-05-09", denialCode:null, site:"Site 1", vertical:"Infusion", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-068", patient:"Richard Johnson", payer:"Aetna", amount:36000, daysOut:7, serviceDate:"2026-05-04", lastContact:"2026-05-04", denialCode:"CO-16", site:"Site 12", vertical:"Dental", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-069", patient:"Rebecca Hall", payer:"Blue Shield", amount:103000, daysOut:44, serviceDate:"2026-03-26", lastContact:"2026-04-15", denialCode:null, site:"Site 4", vertical:"Cardiology", claimStatus:"At Payer"  },
-  { id:"AR-070", patient:"Joshua Brown", payer:"Aetna", amount:16000, daysOut:41, serviceDate:"2026-03-21", lastContact:"2026-04-30", denialCode:"CO-50", site:"Site 10", vertical:"Urology", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-071", patient:"Karen Gonzalez", payer:"Humana", amount:36000, daysOut:20, serviceDate:"2026-04-20", lastContact:"2026-05-10", denialCode:"CO-50", site:"Site 4", vertical:"Orthopedics", claimStatus:"At Payer"  },
-  { id:"AR-072", patient:"Ryan King", payer:"Blue Cross", amount:72000, daysOut:12, serviceDate:"2026-04-26", lastContact:"2026-05-07", denialCode:null, site:"Site 9", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-073", patient:"Melissa Mitchell", payer:"Medicaid", amount:74000, daysOut:69, serviceDate:"2026-02-23", lastContact:"2026-04-17", denialCode:null, site:"Site 3", vertical:"Cardiology", subPayer:"AmeriHealth Caritas" , claimStatus:"Rejected by Clearinghouse"  },
-  { id:"AR-074", patient:"Kimberly Carter", payer:"Humana", amount:9000, daysOut:10, serviceDate:"2026-04-21", lastContact:"2026-05-10", denialCode:"CO-97", site:"Site 10", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-075", patient:"Joshua Harris", payer:"Worker Comp", amount:97000, daysOut:9, serviceDate:"2026-04-22", lastContact:"2026-05-08", denialCode:"CO-97", site:"Site 6", vertical:"Urology", claimStatus:"At Payer"  },
-  { id:"AR-076", patient:"Margaret Hall", payer:"Aetna", amount:176000, daysOut:12, serviceDate:"2026-04-20", lastContact:"2026-05-07", denialCode:"CO-50", site:"Site 10", vertical:"Infusion", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-077", patient:"Brian Nelson", payer:"Blue Shield", amount:76000, daysOut:75, serviceDate:"2026-02-23", lastContact:"2026-05-02", denialCode:null, site:"Site 10", vertical:"Dental", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-078", patient:"Kimberly Lopez", payer:"United Health", amount:98000, daysOut:17, serviceDate:"2026-04-22", lastContact:"2026-05-07", denialCode:"CO-4", site:"Site 9", vertical:"Infusion", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-079", patient:"Anthony Green", payer:"Blue Shield", amount:100000, daysOut:5, serviceDate:"2026-04-28", lastContact:"2026-04-28", denialCode:null, site:"Site 2", vertical:"Urology", claimStatus:"Pending Submission"  },
-  { id:"AR-080", patient:"Joshua King", payer:"United Health", amount:107000, daysOut:119, serviceDate:"2026-01-04", lastContact:"2026-03-29", denialCode:null, site:"Site 8", vertical:"Behavioral Health", claimStatus:"Rejected by Clearinghouse"  },
-  { id:"AR-081", patient:"Jessica Allen", payer:"Medicaid", amount:19000, daysOut:23, serviceDate:"2026-04-17", lastContact:"2026-05-13", denialCode:"CO-97", site:"Site 7", vertical:"Orthopedics", subPayer:"United Community Plan" , claimStatus:"Pending Submission"  },
-  { id:"AR-082", patient:"Brian Perez", payer:"Blue Shield", amount:150000, daysOut:40, serviceDate:"2026-03-31", lastContact:"2026-05-10", denialCode:"CO-50", site:"Site 2", vertical:"Ophthalmology", claimStatus:"At Payer"  },
-  { id:"AR-083", patient:"Betty Garcia", payer:"Worker Comp", amount:126000, daysOut:22, serviceDate:"2026-04-14", lastContact:"2026-04-27", denialCode:"CO-97", site:"Site 7", vertical:"Ophthalmology", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-084", patient:"Donald Anderson", payer:"Aetna", amount:109000, daysOut:39, serviceDate:"2026-03-28", lastContact:"2026-04-21", denialCode:"CO-22", site:"Site 6", vertical:"Infusion", claimStatus:"At Payer"  },
-  { id:"AR-085", patient:"Jessica Scott", payer:"Worker Comp", amount:10000, daysOut:59, serviceDate:"2026-03-07", lastContact:"2026-04-11", denialCode:null, site:"Site 1", vertical:"Home Health", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-086", patient:"Donald Carter", payer:"Humana", amount:9000, daysOut:7, serviceDate:"2026-05-01", lastContact:"2026-05-01", denialCode:null, site:"Site 9", vertical:"Hospice", claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-087", patient:"David Thompson", payer:"Cigna", amount:171000, daysOut:114, serviceDate:"2026-01-07", lastContact:"2026-04-23", denialCode:null, site:"Site 12", vertical:"Infusion", claimStatus:"Rejected by Clearinghouse"  },
-  { id:"AR-088", patient:"Melissa Jackson", payer:"Medicare", amount:154000, daysOut:47, serviceDate:"2026-03-20", lastContact:"2026-04-13", denialCode:"CO-16", site:"Site 5", vertical:"Urology", claimStatus:"Rejected by Clearinghouse"  },
-  { id:"AR-089", patient:"Stephanie Brown", payer:"Medicaid", amount:45000, daysOut:120, serviceDate:"2026-01-01", lastContact:"2026-04-21", denialCode:"CO-22", site:"Site 6", vertical:"Behavioral Health", subPayer:"Centene / WellCare" , claimStatus:"Adjudicated — Denied"  },
-  { id:"AR-090", patient:"Robert Harris", payer:"Blue Cross", amount:140000, daysOut:10, serviceDate:"2026-04-24", lastContact:"2026-05-10", denialCode:null, site:"Site 2", vertical:"Urology", claimStatus:"Submitted to Clearinghouse"  },
-  { id:"AR-091", patient:"Donald Mitchell", payer:"Blue Shield", amount:140000, daysOut:12, serviceDate:"2026-04-26", lastContact:"2026-05-11", denialCode:"CO-4", site:"Site 12", vertical:"Orthopedics", claimStatus:"At Payer"  },
-  { id:"AR-092", patient:"Maria Martinez", payer:"United Health", amount:125000, daysOut:103, serviceDate:"2026-01-21", lastContact:"2026-04-09", denialCode:null, site:"Site 5", vertical:"Infusion", claimStatus:"Pending Submission"  },
-  { id:"AR-093", patient:"Timothy Moore", payer:"Medicare", amount:95000, daysOut:41, serviceDate:"2026-03-27", lastContact:"2026-04-29", denialCode:null, site:"Site 3", vertical:"Infusion", claimStatus:"At Payer"  },
-  { id:"AR-094", patient:"Kevin Davis", payer:"United Health", amount:141000, daysOut:18, serviceDate:"2026-04-15", lastContact:"2026-05-12", denialCode:"CO-16", site:"Site 5", vertical:"Cardiology", claimStatus:"At Payer"  },
-  { id:"AR-095", patient:"Sandra Thompson", payer:"Blue Shield", amount:97000, daysOut:71, serviceDate:"2026-02-21", lastContact:"2026-04-29", denialCode:"CO-22", site:"Site 7", vertical:"Infusion", claimStatus:"At Payer"  },
-  { id:"AR-096", patient:"Donna Scott", payer:"Blue Shield", amount:169000, daysOut:79, serviceDate:"2026-02-17", lastContact:"2026-03-20", denialCode:null, site:"Site 8", vertical:"Infusion", claimStatus:"At Payer"  },
-  { id:"AR-097", patient:"Richard Mitchell", payer:"Medicare", amount:63000, daysOut:19, serviceDate:"2026-04-14", lastContact:"2026-05-09", denialCode:"CO-16", site:"Site 10", vertical:"Hospice", claimStatus:"At Payer"  },
-  { id:"AR-098", patient:"Susan Harris", payer:"Medicaid", amount:91000, daysOut:30, serviceDate:"2026-04-04", lastContact:"2026-04-18", denialCode:null, site:"Site 2", vertical:"Behavioral Health", subPayer:"Buckeye Health Plan" , claimStatus:"Rejected by Clearinghouse"  },
-  { id:"AR-099", patient:"Margaret Young", payer:"United Health", amount:81000, daysOut:7, serviceDate:"2026-05-02", lastContact:"2026-05-02", denialCode:"CO-50", site:"Site 10", vertical:"Behavioral Health", claimStatus:"At Payer"  },
-  { id:"AR-100", patient:"Daniel Nelson", payer:"Cigna", amount:54000, daysOut:27, serviceDate:"2026-04-08", lastContact:"2026-05-10", denialCode:null, site:"Site 4", vertical:"Behavioral Health", claimStatus:"Rejected by Clearinghouse"  }
+  { id:"AR-001", patient:"Betty Allen", payer:"Aetna", amount:300000, daysOut:9, serviceDate:"2026-05-01", lastContact:"2026-05-11", denialCode:null, site:"Site 12", vertical:"Hospice", claimStatus:"At Payer"  },
+  { id:"AR-002", patient:"Carol Scott", payer:"Aetna", amount:965000, daysOut:56, serviceDate:"2026-03-11", lastContact:"2026-03-24", denialCode:null, site:"Site 7", vertical:"Home Health", claimStatus:"At Payer"  },
+  { id:"AR-003", patient:"Sandra White", payer:"Cigna", amount:840000, daysOut:63, serviceDate:"2026-03-02", lastContact:"2026-04-25", denialCode:"CO-16", site:"Site 7", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-004", patient:"Sandra Adams", payer:"Aetna", amount:740000, daysOut:192, serviceDate:"2025-10-29", lastContact:"2026-05-02", denialCode:null, site:"Site 12", vertical:"Orthopedics", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-005", patient:"Brian Hill", payer:"Medicare", amount:950000, daysOut:95, serviceDate:"2026-01-27", lastContact:"2026-04-19", denialCode:"CO-22", site:"Site 2", vertical:"Infusion", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-006", patient:"Jennifer Clark", payer:"Blue Shield", amount:655000, daysOut:11, serviceDate:"2026-04-22", lastContact:"2026-05-10", denialCode:"CO-22", site:"Site 8", vertical:"Home Health", claimStatus:"At Payer"  },
+  { id:"AR-007", patient:"Patricia Hall", payer:"Blue Shield", amount:795000, daysOut:23, serviceDate:"2026-04-18", lastContact:"2026-05-05", denialCode:"CO-16", site:"Site 4", vertical:"Hospice", claimStatus:"At Payer"  },
+  { id:"AR-008", patient:"Margaret Young", payer:"Humana", amount:595000, daysOut:36, serviceDate:"2026-04-05", lastContact:"2026-04-22", denialCode:null, site:"Site 12", vertical:"Hospice", claimStatus:"At Payer"  },
+  { id:"AR-009", patient:"William Lewis", payer:"Aetna", amount:620000, daysOut:29, serviceDate:"2026-04-11", lastContact:"2026-05-01", denialCode:"CO-50", site:"Site 7", vertical:"Dental", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-010", patient:"Paul Clark", payer:"Cigna", amount:845000, daysOut:13, serviceDate:"2026-04-22", lastContact:"2026-05-11", denialCode:null, site:"Site 7", vertical:"Orthopedics", claimStatus:"At Payer"  },
+  { id:"AR-011", patient:"Anthony Mitchell", payer:"Medicaid", amount:610000, daysOut:11, serviceDate:"2026-04-25", lastContact:"2026-05-15", denialCode:"CO-50", site:"Site 11", vertical:"Ophthalmology", subPayer:"AmeriHealth Caritas" , claimStatus:"At Payer"  },
+  { id:"AR-012", patient:"Joseph Jackson", payer:"United Health", amount:385000, daysOut:58, serviceDate:"2026-03-09", lastContact:"2026-04-03", denialCode:null, site:"Site 7", vertical:"Behavioral Health", claimStatus:"At Payer"  },
+  { id:"AR-013", patient:"Paul Baker", payer:"Aetna", amount:830000, daysOut:26, serviceDate:"2026-04-13", lastContact:"2026-04-29", denialCode:"CO-4", site:"Site 8", vertical:"Home Health", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-014", patient:"Joseph Johnson", payer:"Blue Cross", amount:145000, daysOut:32, serviceDate:"2026-04-03", lastContact:"2026-05-06", denialCode:"CO-97", site:"Site 6", vertical:"Cardiology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-015", patient:"Charles Lopez", payer:"Cigna", amount:230000, daysOut:176, serviceDate:"2025-11-10", lastContact:"2026-04-19", denialCode:"CO-22", site:"Site 9", vertical:"Orthopedics", claimStatus:"At Payer"  },
+  { id:"AR-016", patient:"Andrew Garcia", payer:"Medicaid", amount:50000, daysOut:30, serviceDate:"2026-04-04", lastContact:"2026-05-13", denialCode:null, site:"Site 6", vertical:"Behavioral Health", subPayer:"United Community Plan" , claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-017", patient:"Richard Anderson", payer:"Medicare", amount:85000, daysOut:21, serviceDate:"2026-04-17", lastContact:"2026-04-28", denialCode:null, site:"Site 5", vertical:"Orthopedics", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-018", patient:"Linda Hernandez", payer:"Aetna", amount:205000, daysOut:39, serviceDate:"2026-03-29", lastContact:"2026-04-22", denialCode:"CO-50", site:"Site 2", vertical:"Cardiology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-019", patient:"Rebecca Gonzalez", payer:"Blue Shield", amount:1030000, daysOut:155, serviceDate:"2025-12-06", lastContact:"2026-03-29", denialCode:null, site:"Site 11", vertical:"Infusion", claimStatus:"Pending Submission"  },
+  { id:"AR-020", patient:"Kenneth Wright", payer:"Blue Cross", amount:285000, daysOut:102, serviceDate:"2026-01-25", lastContact:"2026-04-25", denialCode:"CO-22", site:"Site 10", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-021", patient:"Carol Thompson", payer:"Worker Comp", amount:1060000, daysOut:14, serviceDate:"2026-04-21", lastContact:"2026-05-09", denialCode:"CO-22", site:"Site 9", vertical:"Home Health", claimStatus:"At Payer"  },
+  { id:"AR-022", patient:"Kimberly Hernandez", payer:"Medicare", amount:395000, daysOut:66, serviceDate:"2026-02-25", lastContact:"2026-05-09", denialCode:"CO-50", site:"Site 7", vertical:"Behavioral Health", claimStatus:"At Payer"  },
+  { id:"AR-023", patient:"Paul Young", payer:"Medicaid", amount:285000, daysOut:41, serviceDate:"2026-03-25", lastContact:"2026-05-07", denialCode:"CO-16", site:"Site 8", vertical:"Infusion", subPayer:"Centene / WellCare" , claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-024", patient:"Dorothy Perez", payer:"Aetna", amount:235000, daysOut:59, serviceDate:"2026-03-10", lastContact:"2026-05-04", denialCode:"CO-22", site:"Site 11", vertical:"Dental", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-025", patient:"Amanda Adams", payer:"Worker Comp", amount:145000, daysOut:21, serviceDate:"2026-04-17", lastContact:"2026-05-02", denialCode:null, site:"Site 7", vertical:"Cardiology", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-026", patient:"Sarah Martinez", payer:"Cigna", amount:540000, daysOut:34, serviceDate:"2026-03-28", lastContact:"2026-05-14", denialCode:null, site:"Site 1", vertical:"Hospice", claimStatus:"At Payer"  },
+  { id:"AR-027", patient:"Daniel Harris", payer:"Medicare", amount:310000, daysOut:26, serviceDate:"2026-04-11", lastContact:"2026-05-15", denialCode:"CO-97", site:"Site 10", vertical:"Cardiology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-028", patient:"Jennifer Rodriguez", payer:"Worker Comp", amount:330000, daysOut:31, serviceDate:"2026-04-05", lastContact:"2026-05-08", denialCode:"CO-97", site:"Site 3", vertical:"Infusion", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-029", patient:"Andrew Thomas", payer:"Blue Cross", amount:70000, daysOut:12, serviceDate:"2026-04-24", lastContact:"2026-05-06", denialCode:"CO-4", site:"Site 5", vertical:"Infusion", claimStatus:"At Payer"  },
+  { id:"AR-030", patient:"Dorothy Taylor", payer:"Humana", amount:595000, daysOut:48, serviceDate:"2026-03-18", lastContact:"2026-04-10", denialCode:"CO-16", site:"Site 11", vertical:"Dental", claimStatus:"At Payer"  },
+  { id:"AR-031", patient:"Michael Brown", payer:"Aetna", amount:530000, daysOut:69, serviceDate:"2026-02-27", lastContact:"2026-04-06", denialCode:"CO-97", site:"Site 10", vertical:"Home Health", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-032", patient:"Donald Wright", payer:"Worker Comp", amount:955000, daysOut:63, serviceDate:"2026-03-03", lastContact:"2026-05-08", denialCode:"CO-4", site:"Site 12", vertical:"Behavioral Health", claimStatus:"At Payer"  },
+  { id:"AR-033", patient:"Christopher Young", payer:"Aetna", amount:935000, daysOut:150, serviceDate:"2025-12-05", lastContact:"2026-04-24", denialCode:"CO-16", site:"Site 10", vertical:"Infusion", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-034", patient:"Nancy White", payer:"Humana", amount:995000, daysOut:13, serviceDate:"2026-04-20", lastContact:"2026-05-11", denialCode:null, site:"Site 5", vertical:"Orthopedics", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-035", patient:"George Taylor", payer:"Medicare", amount:130000, daysOut:17, serviceDate:"2026-04-22", lastContact:"2026-05-06", denialCode:null, site:"Site 10", vertical:"Urology", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-036", patient:"Rebecca Green", payer:"United Health", amount:415000, daysOut:51, serviceDate:"2026-03-19", lastContact:"2026-04-16", denialCode:null, site:"Site 5", vertical:"Orthopedics", claimStatus:"At Payer"  },
+  { id:"AR-037", patient:"Margaret Green", payer:"Blue Shield", amount:380000, daysOut:80, serviceDate:"2026-02-12", lastContact:"2026-05-11", denialCode:null, site:"Site 4", vertical:"Cardiology", claimStatus:"Pending Submission"  },
+  { id:"AR-038", patient:"Joseph Taylor", payer:"Blue Shield", amount:505000, daysOut:22, serviceDate:"2026-04-09", lastContact:"2026-04-25", denialCode:"CO-97", site:"Site 4", vertical:"Infusion", claimStatus:"At Payer"  },
+  { id:"AR-039", patient:"Daniel Johnson", payer:"Aetna", amount:650000, daysOut:6, serviceDate:"2026-04-28", lastContact:"2026-04-28", denialCode:"CO-97", site:"Site 11", vertical:"Dental", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-040", patient:"Andrew Perez", payer:"Cigna", amount:565000, daysOut:27, serviceDate:"2026-04-09", lastContact:"2026-04-23", denialCode:"CO-50", site:"Site 9", vertical:"Home Health", claimStatus:"At Payer"  },
+  { id:"AR-041", patient:"Ryan Adams", payer:"Humana", amount:275000, daysOut:78, serviceDate:"2026-02-20", lastContact:"2026-03-30", denialCode:null, site:"Site 9", vertical:"Cardiology", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-042", patient:"Melissa Gonzalez", payer:"United Health", amount:295000, daysOut:53, serviceDate:"2026-03-18", lastContact:"2026-03-30", denialCode:null, site:"Site 9", vertical:"Dental", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-043", patient:"Kevin Lee", payer:"Humana", amount:1005000, daysOut:10, serviceDate:"2026-04-21", lastContact:"2026-05-14", denialCode:"CO-50", site:"Site 8", vertical:"Hospice", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-044", patient:"Andrew Baker", payer:"Humana", amount:935000, daysOut:90, serviceDate:"2026-02-04", lastContact:"2026-04-29", denialCode:null, site:"Site 2", vertical:"Home Health", claimStatus:"At Payer"  },
+  { id:"AR-045", patient:"Karen Hernandez", payer:"Blue Shield", amount:1050000, daysOut:174, serviceDate:"2025-11-16", lastContact:"2026-04-27", denialCode:"CO-22", site:"Site 12", vertical:"Behavioral Health", claimStatus:"At Payer"  },
+  { id:"AR-046", patient:"David Lopez", payer:"Blue Cross", amount:890000, daysOut:162, serviceDate:"2025-11-25", lastContact:"2026-03-27", denialCode:null, site:"Site 12", vertical:"Cardiology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-047", patient:"Michael Williams", payer:"Aetna", amount:720000, daysOut:21, serviceDate:"2026-04-13", lastContact:"2026-04-30", denialCode:"CO-4", site:"Site 11", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-048", patient:"George Brown", payer:"Aetna", amount:1010000, daysOut:59, serviceDate:"2026-03-11", lastContact:"2026-03-21", denialCode:"CO-22", site:"Site 9", vertical:"Urology", claimStatus:"At Payer"  },
+  { id:"AR-049", patient:"Ryan Brown", payer:"Aetna", amount:630000, daysOut:115, serviceDate:"2026-01-09", lastContact:"2026-03-28", denialCode:null, site:"Site 3", vertical:"Dental", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-050", patient:"Thomas White", payer:"Medicare", amount:840000, daysOut:100, serviceDate:"2026-01-27", lastContact:"2026-04-25", denialCode:"CO-22", site:"Site 7", vertical:"Ophthalmology", claimStatus:"At Payer"  },
+  { id:"AR-051", patient:"Emily Carter", payer:"Blue Shield", amount:355000, daysOut:56, serviceDate:"2026-03-10", lastContact:"2026-04-24", denialCode:null, site:"Site 7", vertical:"Cardiology", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-052", patient:"Ryan Garcia", payer:"Humana", amount:405000, daysOut:68, serviceDate:"2026-02-27", lastContact:"2026-05-10", denialCode:"CO-22", site:"Site 3", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-053", patient:"Amanda Gonzalez", payer:"Humana", amount:1015000, daysOut:39, serviceDate:"2026-03-31", lastContact:"2026-05-06", denialCode:null, site:"Site 8", vertical:"Ophthalmology", claimStatus:"Pending Submission"  },
+  { id:"AR-054", patient:"Steven Wright", payer:"Medicaid", amount:725000, daysOut:76, serviceDate:"2026-02-15", lastContact:"2026-04-07", denialCode:"CO-22", site:"Site 5", vertical:"Cardiology", subPayer:"Buckeye Health Plan" , claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-055", patient:"Emily King", payer:"Worker Comp", amount:195000, daysOut:28, serviceDate:"2026-04-10", lastContact:"2026-05-11", denialCode:"CO-4", site:"Site 4", vertical:"Dental", claimStatus:"At Payer"  },
+  { id:"AR-056", patient:"Matthew Davis", payer:"Medicare", amount:85000, daysOut:24, serviceDate:"2026-04-14", lastContact:"2026-05-09", denialCode:"CO-50", site:"Site 9", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-057", patient:"Sandra Martinez", payer:"Medicaid", amount:590000, daysOut:15, serviceDate:"2026-04-23", lastContact:"2026-05-11", denialCode:null, site:"Site 1", vertical:"Urology", subPayer:"Aetna Better Health" , claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-058", patient:"Richard Carter", payer:"Medicare", amount:645000, daysOut:139, serviceDate:"2025-12-18", lastContact:"2026-04-24", denialCode:"CO-50", site:"Site 3", vertical:"Urology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-059", patient:"William Johnson", payer:"Humana", amount:30000, daysOut:16, serviceDate:"2026-04-20", lastContact:"2026-05-06", denialCode:null, site:"Site 6", vertical:"Dental", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-060", patient:"Stephanie Martinez", payer:"Humana", amount:955000, daysOut:112, serviceDate:"2026-01-15", lastContact:"2026-03-23", denialCode:"CO-22", site:"Site 9", vertical:"Infusion", claimStatus:"At Payer"  },
+  { id:"AR-061", patient:"Kevin Hill", payer:"Blue Cross", amount:1075000, daysOut:16, serviceDate:"2026-04-19", lastContact:"2026-05-02", denialCode:"CO-16", site:"Site 6", vertical:"Home Health", claimStatus:"At Payer"  },
+  { id:"AR-062", patient:"Linda Anderson", payer:"Worker Comp", amount:890000, daysOut:57, serviceDate:"2026-03-05", lastContact:"2026-05-15", denialCode:"CO-97", site:"Site 6", vertical:"Ophthalmology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-063", patient:"Anthony Robinson", payer:"Medicaid", amount:290000, daysOut:158, serviceDate:"2025-11-24", lastContact:"2026-05-14", denialCode:"CO-22", site:"Site 11", vertical:"Behavioral Health", subPayer:"Molina Healthcare" , claimStatus:"At Payer"  },
+  { id:"AR-064", patient:"Linda Anderson", payer:"United Health", amount:915000, daysOut:15, serviceDate:"2026-04-23", lastContact:"2026-05-15", denialCode:null, site:"Site 4", vertical:"Dental", claimStatus:"Pending Submission"  },
+  { id:"AR-065", patient:"Patricia Mitchell", payer:"Blue Cross", amount:300000, daysOut:23, serviceDate:"2026-04-08", lastContact:"2026-05-09", denialCode:null, site:"Site 6", vertical:"Urology", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-066", patient:"Lisa Anderson", payer:"Aetna", amount:685000, daysOut:105, serviceDate:"2026-01-22", lastContact:"2026-04-19", denialCode:"CO-50", site:"Site 4", vertical:"Urology", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-067", patient:"Sandra Martin", payer:"Blue Cross", amount:85000, daysOut:11, serviceDate:"2026-04-26", lastContact:"2026-05-09", denialCode:null, site:"Site 1", vertical:"Infusion", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-068", patient:"Richard Johnson", payer:"Aetna", amount:215000, daysOut:7, serviceDate:"2026-05-04", lastContact:"2026-05-04", denialCode:"CO-16", site:"Site 12", vertical:"Dental", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-069", patient:"Rebecca Hall", payer:"Blue Shield", amount:620000, daysOut:44, serviceDate:"2026-03-26", lastContact:"2026-04-15", denialCode:null, site:"Site 4", vertical:"Cardiology", claimStatus:"At Payer"  },
+  { id:"AR-070", patient:"Joshua Brown", payer:"Aetna", amount:95000, daysOut:41, serviceDate:"2026-03-21", lastContact:"2026-04-30", denialCode:"CO-50", site:"Site 10", vertical:"Urology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-071", patient:"Karen Gonzalez", payer:"Humana", amount:215000, daysOut:20, serviceDate:"2026-04-20", lastContact:"2026-05-10", denialCode:"CO-50", site:"Site 4", vertical:"Orthopedics", claimStatus:"At Payer"  },
+  { id:"AR-072", patient:"Ryan King", payer:"Blue Cross", amount:430000, daysOut:12, serviceDate:"2026-04-26", lastContact:"2026-05-07", denialCode:null, site:"Site 9", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-073", patient:"Melissa Mitchell", payer:"Medicaid", amount:445000, daysOut:69, serviceDate:"2026-02-23", lastContact:"2026-04-17", denialCode:null, site:"Site 3", vertical:"Cardiology", subPayer:"AmeriHealth Caritas" , claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-074", patient:"Kimberly Carter", payer:"Humana", amount:55000, daysOut:10, serviceDate:"2026-04-21", lastContact:"2026-05-10", denialCode:"CO-97", site:"Site 10", vertical:"Behavioral Health", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-075", patient:"Joshua Harris", payer:"Worker Comp", amount:580000, daysOut:9, serviceDate:"2026-04-22", lastContact:"2026-05-08", denialCode:"CO-97", site:"Site 6", vertical:"Urology", claimStatus:"At Payer"  },
+  { id:"AR-076", patient:"Margaret Hall", payer:"Aetna", amount:1055000, daysOut:12, serviceDate:"2026-04-20", lastContact:"2026-05-07", denialCode:"CO-50", site:"Site 10", vertical:"Infusion", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-077", patient:"Brian Nelson", payer:"Blue Shield", amount:455000, daysOut:75, serviceDate:"2026-02-23", lastContact:"2026-05-02", denialCode:null, site:"Site 10", vertical:"Dental", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-078", patient:"Kimberly Lopez", payer:"United Health", amount:590000, daysOut:17, serviceDate:"2026-04-22", lastContact:"2026-05-07", denialCode:"CO-4", site:"Site 9", vertical:"Infusion", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-079", patient:"Anthony Green", payer:"Blue Shield", amount:600000, daysOut:5, serviceDate:"2026-04-28", lastContact:"2026-04-28", denialCode:null, site:"Site 2", vertical:"Urology", claimStatus:"Pending Submission"  },
+  { id:"AR-080", patient:"Joshua King", payer:"United Health", amount:645000, daysOut:119, serviceDate:"2026-01-04", lastContact:"2026-03-29", denialCode:null, site:"Site 8", vertical:"Behavioral Health", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-081", patient:"Jessica Allen", payer:"Medicaid", amount:115000, daysOut:23, serviceDate:"2026-04-17", lastContact:"2026-05-13", denialCode:"CO-97", site:"Site 7", vertical:"Orthopedics", subPayer:"United Community Plan" , claimStatus:"Pending Submission"  },
+  { id:"AR-082", patient:"Brian Perez", payer:"Blue Shield", amount:900000, daysOut:40, serviceDate:"2026-03-31", lastContact:"2026-05-10", denialCode:"CO-50", site:"Site 2", vertical:"Ophthalmology", claimStatus:"At Payer"  },
+  { id:"AR-083", patient:"Betty Garcia", payer:"Worker Comp", amount:755000, daysOut:22, serviceDate:"2026-04-14", lastContact:"2026-04-27", denialCode:"CO-97", site:"Site 7", vertical:"Ophthalmology", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-084", patient:"Donald Anderson", payer:"Aetna", amount:655000, daysOut:39, serviceDate:"2026-03-28", lastContact:"2026-04-21", denialCode:"CO-22", site:"Site 6", vertical:"Infusion", claimStatus:"At Payer"  },
+  { id:"AR-085", patient:"Jessica Scott", payer:"Worker Comp", amount:60000, daysOut:59, serviceDate:"2026-03-07", lastContact:"2026-04-11", denialCode:null, site:"Site 1", vertical:"Home Health", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-086", patient:"Donald Carter", payer:"Humana", amount:55000, daysOut:7, serviceDate:"2026-05-01", lastContact:"2026-05-01", denialCode:null, site:"Site 9", vertical:"Hospice", claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-087", patient:"David Thompson", payer:"Cigna", amount:1025000, daysOut:114, serviceDate:"2026-01-07", lastContact:"2026-04-23", denialCode:null, site:"Site 12", vertical:"Infusion", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-088", patient:"Melissa Jackson", payer:"Medicare", amount:925000, daysOut:47, serviceDate:"2026-03-20", lastContact:"2026-04-13", denialCode:"CO-16", site:"Site 5", vertical:"Urology", claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-089", patient:"Stephanie Brown", payer:"Medicaid", amount:270000, daysOut:120, serviceDate:"2026-01-01", lastContact:"2026-04-21", denialCode:"CO-22", site:"Site 6", vertical:"Behavioral Health", subPayer:"Centene / WellCare" , claimStatus:"Adjudicated — Denied"  },
+  { id:"AR-090", patient:"Robert Harris", payer:"Blue Cross", amount:840000, daysOut:10, serviceDate:"2026-04-24", lastContact:"2026-05-10", denialCode:null, site:"Site 2", vertical:"Urology", claimStatus:"Submitted to Clearinghouse"  },
+  { id:"AR-091", patient:"Donald Mitchell", payer:"Blue Shield", amount:840000, daysOut:12, serviceDate:"2026-04-26", lastContact:"2026-05-11", denialCode:"CO-4", site:"Site 12", vertical:"Orthopedics", claimStatus:"At Payer"  },
+  { id:"AR-092", patient:"Maria Martinez", payer:"United Health", amount:750000, daysOut:103, serviceDate:"2026-01-21", lastContact:"2026-04-09", denialCode:null, site:"Site 5", vertical:"Infusion", claimStatus:"Pending Submission"  },
+  { id:"AR-093", patient:"Timothy Moore", payer:"Medicare", amount:570000, daysOut:41, serviceDate:"2026-03-27", lastContact:"2026-04-29", denialCode:null, site:"Site 3", vertical:"Infusion", claimStatus:"At Payer"  },
+  { id:"AR-094", patient:"Kevin Davis", payer:"United Health", amount:845000, daysOut:18, serviceDate:"2026-04-15", lastContact:"2026-05-12", denialCode:"CO-16", site:"Site 5", vertical:"Cardiology", claimStatus:"At Payer"  },
+  { id:"AR-095", patient:"Sandra Thompson", payer:"Blue Shield", amount:580000, daysOut:71, serviceDate:"2026-02-21", lastContact:"2026-04-29", denialCode:"CO-22", site:"Site 7", vertical:"Infusion", claimStatus:"At Payer"  },
+  { id:"AR-096", patient:"Donna Scott", payer:"Blue Shield", amount:1015000, daysOut:79, serviceDate:"2026-02-17", lastContact:"2026-03-20", denialCode:null, site:"Site 8", vertical:"Infusion", claimStatus:"At Payer"  },
+  { id:"AR-097", patient:"Richard Mitchell", payer:"Medicare", amount:380000, daysOut:19, serviceDate:"2026-04-14", lastContact:"2026-05-09", denialCode:"CO-16", site:"Site 10", vertical:"Hospice", claimStatus:"At Payer"  },
+  { id:"AR-098", patient:"Susan Harris", payer:"Medicaid", amount:545000, daysOut:30, serviceDate:"2026-04-04", lastContact:"2026-04-18", denialCode:null, site:"Site 2", vertical:"Behavioral Health", subPayer:"Buckeye Health Plan" , claimStatus:"Rejected by Clearinghouse"  },
+  { id:"AR-099", patient:"Margaret Young", payer:"United Health", amount:485000, daysOut:7, serviceDate:"2026-05-02", lastContact:"2026-05-02", denialCode:"CO-50", site:"Site 10", vertical:"Behavioral Health", claimStatus:"At Payer"  },
+  { id:"AR-100", patient:"Daniel Nelson", payer:"Cigna", amount:325000, daysOut:27, serviceDate:"2026-04-08", lastContact:"2026-05-10", denialCode:null, site:"Site 4", vertical:"Behavioral Health", claimStatus:"Rejected by Clearinghouse"  }
 ];
 
 const fmt = n => "$" + n.toLocaleString();
@@ -1168,12 +1167,13 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
       <div style={{ padding: "10px 18px" }}>
         {resolving === w.id ? (
           <>
-            <textarea value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} placeholder="What action did you take?" rows={2}
+            <textarea value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} placeholder="What action did you take? (required)" rows={2}
               style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", fontSize: 13, border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff", color: "#0f172a", fontFamily: "inherit", resize: "none", outline: "none", marginBottom: 8 }} />
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => { onResolve(w.id, resolutionNote); setResolving(null); setResolutionNote(""); }}
-                style={{ flex: 1, padding: "8px", background: "#16a34a", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>✓ Mark resolved</button>
-              <button onClick={() => setResolving(null)} style={{ padding: "8px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Cancel</button>
+              <button onClick={() => { if (resolutionNote.trim()) { onResolve(w.id, resolutionNote); setResolving(null); setResolutionNote(""); } }}
+                disabled={!resolutionNote.trim()}
+                style={{ flex: 1, padding: "8px", background: resolutionNote.trim() ? "#16a34a" : "#f1f5f9", border: "none", borderRadius: 8, color: resolutionNote.trim() ? "#fff" : "#94a3b8", cursor: resolutionNote.trim() ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>✓ Mark resolved</button>
+              <button onClick={() => { setResolving(null); setResolutionNote(""); }} style={{ padding: "8px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Cancel</button>
             </div>
           </>
         ) : resolving === `return-${w.id}` ? (
@@ -2490,7 +2490,14 @@ function AreaChart({ accounts, onFilter, activeFilter }) {
 
 function EscalationQueue({ arScored, dnfbScored }) {
   const [section, setSection] = useState("escalated");
-  const [dismissed, setDismissed] = useState({});
+  const [actionState, setActionState] = useState({}); // tracks action taken per item
+  const [noteInput, setNoteInput] = useState({}); // note input per item
+  const [showNote, setShowNote] = useState({}); // show note field per item
+
+  const setItemAction = (id, action) => setActionState(p => ({...p, [id]: action}));
+  const getNote = (id) => noteInput[id] || "";
+  const setNote = (id, val) => setNoteInput(p => ({...p, [id]: val}));
+  const toggleNote = (id) => setShowNote(p => ({...p, [id]: !p[id]}));
 
   const sectionBtn = (key, label, count, accent) => (
     <button onClick={() => setSection(key)} style={{
@@ -2506,95 +2513,179 @@ function EscalationQueue({ arScored, dnfbScored }) {
     </button>
   );
 
-  const escCard = (e) => (
-    <div key={e.accountId} style={{ background: "#fff", border: "1px solid #fee2e2", borderLeft: "3px solid #dc2626", borderRadius: 8, padding: "14px 18px", marginBottom: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 10, fontWeight: 600, background: "#fee2e2", color: "#b91c1c", border: "1px solid #fca5a5", padding: "1px 7px", borderRadius: 4 }}>{e.severity}</span>
-            <span style={{ fontSize: 10, color: "#94a3b8", fontFamily: "monospace" }}>{e.accountId}</span>
-          </div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "#0f172a", marginBottom: 2 }}>{e.patient}</div>
-          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>{e.payer} · {fmt(e.amount)} balance · {fmt(e.expectedValue)} EV</div>
-          <div style={{ fontSize: 12, color: "#334155", background: "#fafafa", border: "1px solid #f1f5f9", borderRadius: 6, padding: "8px 12px", lineHeight: 1.6 }}>
-            <span style={{ fontSize: 10, color: "#94a3b8", marginRight: 6 }}>Escalated by {e.escalatedBy} · {e.escalatedAt}</span><br/>
-            {e.note}
-          </div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
-          <button onClick={() => setDismissed(p => ({...p, [e.accountId+"_resolve"]: true}))} style={{ padding: "7px 14px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 6, color: "#16a34a", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>
-            {dismissed[e.accountId+"_resolve"] ? "✓ Resolved" : "Resolve"}
-          </button>
-          <button style={{ padding: "7px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 6, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Reassign</button>
-        </div>
+  const NoteField = ({ id, placeholder }) => (
+    showNote[id] ? (
+      <div style={{ marginTop: 8 }}>
+        <textarea value={getNote(id)} onChange={e => setNote(id, e.target.value)}
+          placeholder={placeholder}
+          rows={2}
+          style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, fontFamily: "inherit", resize: "none", outline: "none", color: "#334155" }} />
       </div>
-    </div>
+    ) : null
   );
 
-  const slaCard = (s) => (
-    <div key={s.accountId} style={{ background: "#fff", border: "1px solid #fed7aa", borderLeft: "3px solid #f97316", borderRadius: 8, padding: "14px 18px", marginBottom: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "#0f172a", marginBottom: 3 }}>{s.patient}</div>
-          <div style={{ fontSize: 11, color: "#64748b" }}>{s.accountId} · {s.payer} · {fmt(s.amount)}</div>
-          <div style={{ fontSize: 11, color: "#c2410c", marginTop: 4 }}>Scheduled {s.scheduledDate} — <strong>{s.daysOverdue} days overdue</strong> · Assigned to {s.assignedTo}</div>
-        </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={() => setDismissed(p => ({...p, [s.accountId+"_ack"]: true}))} style={{ padding: "7px 14px", background: dismissed[s.accountId+"_ack"] ? "#f0fdf4" : "#fff7ed", border: `1px solid ${dismissed[s.accountId+"_ack"] ? "#86efac" : "#fed7aa"}`, borderRadius: 6, color: dismissed[s.accountId+"_ack"] ? "#16a34a" : "#c2410c", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>
-            {dismissed[s.accountId+"_ack"] ? "✓ Acknowledged" : "Acknowledge"}
-          </button>
-          <button style={{ padding: "7px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 6, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Reassign</button>
-        </div>
-      </div>
-    </div>
-  );
-
-  const writeOffCard = (w) => (
-    <div key={w.accountId} style={{ background: "#fff", border: "1px solid #e2e8f0", borderLeft: "3px solid #64748b", borderRadius: 8, padding: "14px 18px", marginBottom: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "#0f172a", marginBottom: 2 }}>{w.patient}</div>
-          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 6 }}>{w.accountId} · {w.payer} · {fmt(w.amount)}</div>
-          <div style={{ fontSize: 11, color: "#475569", background: "#f8fafc", border: "1px solid #f1f5f9", borderRadius: 6, padding: "7px 10px" }}>{w.rationale}</div>
-          <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>Recommended by {w.recommendedBy} · {w.recommendedAt}</div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
-          <button onClick={() => setDismissed(p => ({...p, [w.accountId+"_approve"]: true}))} style={{ padding: "7px 14px", background: dismissed[w.accountId+"_approve"] ? "#f1f5f9" : "#eff6ff", border: `1px solid ${dismissed[w.accountId+"_approve"] ? "#e2e8f0" : "#bfdbfe"}`, borderRadius: 6, color: dismissed[w.accountId+"_approve"] ? "#94a3b8" : "#2563eb", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>
-            {dismissed[w.accountId+"_approve"] ? "↗ Sent to CFO" : "Approve to CFO"}
-          </button>
-          <button style={{ padding: "7px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 6, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Return to biller</button>
-        </div>
-      </div>
-    </div>
-  );
-
-  const overrideCard = (o) => (
-    <div key={o.accountId} style={{ background: "#fff", border: "1px solid #ede9fe", borderLeft: "3px solid #7c3aed", borderRadius: 8, padding: "14px 18px", marginBottom: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "#0f172a", marginBottom: 2 }}>{o.patient}</div>
-          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>{o.accountId} · {o.payer} · overridden by {o.collectorName}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, padding: "7px 10px" }}>
-              <div style={{ fontSize: 9, color: "#94a3b8", marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.08em" }}>AI recommended</div>
-              <div style={{ fontSize: 12, color: "#64748b" }}>{o.aiRecommended}</div>
+  const escCard = (e) => {
+    const resolved = actionState[e.accountId] === "resolved";
+    const reassigned = actionState[e.accountId] === "reassigned";
+    return (
+      <div key={e.accountId} style={{ background: "#fff", border: "1px solid #fee2e2", borderLeft: "3px solid #dc2626", borderRadius: 8, padding: "14px 18px", marginBottom: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 10, fontWeight: 600, background: "#fee2e2", color: "#b91c1c", border: "1px solid #fca5a5", padding: "1px 7px", borderRadius: 4 }}>{e.severity}</span>
+              <span style={{ fontSize: 10, color: "#94a3b8", fontFamily: "monospace" }}>{e.accountId}</span>
             </div>
-            <div style={{ background: "#faf5ff", border: "1px solid #ede9fe", borderRadius: 6, padding: "7px 10px" }}>
-              <div style={{ fontSize: 9, color: "#7c3aed", marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.08em" }}>Collector chose</div>
-              <div style={{ fontSize: 12, color: "#6d28d9", fontWeight: 500 }}>{o.collectorChose}</div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "#0f172a", marginBottom: 2 }}>{e.patient}</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>{e.payer} · {fmt(e.amount)} balance · {fmt(e.expectedValue)} EV</div>
+            <div style={{ fontSize: 12, color: "#334155", background: "#fafafa", border: "1px solid #f1f5f9", borderRadius: 6, padding: "8px 12px", lineHeight: 1.6 }}>
+              <span style={{ fontSize: 10, color: "#94a3b8", marginRight: 6 }}>Escalated by {e.escalatedBy} · {e.escalatedAt}</span><br/>
+              {e.note}
             </div>
+            <NoteField id={e.accountId} placeholder="Add resolution note..." />
           </div>
-          <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic" }}>"{o.note}"</div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
-          <button onClick={() => setDismissed(p => ({...p, [o.accountId+"_ack"]: true}))} style={{ padding: "7px 14px", background: dismissed[o.accountId+"_ack"] ? "#f0fdf4" : "#fff", border: `1px solid ${dismissed[o.accountId+"_ack"] ? "#86efac" : "#e2e8f0"}`, borderRadius: 6, color: dismissed[o.accountId+"_ack"] ? "#16a34a" : "#64748b", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>
-            {dismissed[o.accountId+"_ack"] ? "✓ Acknowledged" : "Acknowledge"}
-          </button>
-          <button style={{ padding: "7px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 6, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Flag for coaching</button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+            {resolved ? (
+              <div style={{ padding: "7px 14px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 6, color: "#16a34a", fontSize: 11, fontWeight: 600, textAlign: "center" }}>✓ Resolved</div>
+            ) : (
+              <>
+                <button onClick={() => { toggleNote(e.accountId); }} style={{ padding: "7px 14px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, color: "#475569", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>
+                  {showNote[e.accountId] ? "Hide note" : "Add note"}
+                </button>
+                <button onClick={() => setItemAction(e.accountId, "resolved")} style={{ padding: "7px 14px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 6, color: "#16a34a", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>
+                  Resolve
+                </button>
+                <button onClick={() => setItemAction(e.accountId, "reassigned")} style={{ padding: "7px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 6, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Reassign</button>
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  const slaCard = (s) => {
+    const acked = actionState[s.accountId] === "acked";
+    return (
+      <div key={s.accountId} style={{ background: "#fff", border: "1px solid #fed7aa", borderLeft: "3px solid #f97316", borderRadius: 8, padding: "14px 18px", marginBottom: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "#0f172a", marginBottom: 3 }}>{s.patient}</div>
+            <div style={{ fontSize: 11, color: "#64748b" }}>{s.accountId} · {s.payer} · {fmt(s.amount)}</div>
+            <div style={{ fontSize: 11, color: "#c2410c", marginTop: 4 }}>Scheduled {s.scheduledDate} — <strong>{s.daysOverdue} days overdue</strong> · Assigned to {s.assignedTo}</div>
+            <NoteField id={s.accountId + "_sla"} placeholder="Add follow-up note..." />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+            {acked ? (
+              <div style={{ padding: "7px 14px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 6, color: "#16a34a", fontSize: 11, fontWeight: 600 }}>✓ Acknowledged</div>
+            ) : (
+              <>
+                <button onClick={() => toggleNote(s.accountId + "_sla")} style={{ padding: "7px 14px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, color: "#475569", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>
+                  Add note
+                </button>
+                <button onClick={() => setItemAction(s.accountId, "acked")} style={{ padding: "7px 14px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, color: "#c2410c", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>
+                  Acknowledge
+                </button>
+                <button style={{ padding: "7px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 6, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Reassign</button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const writeOffCard = (w) => {
+    const approved = actionState[w.accountId] === "approved";
+    const returned = actionState[w.accountId] === "returned";
+    return (
+      <div key={w.accountId} style={{ background: "#fff", border: "1px solid #e2e8f0", borderLeft: "3px solid #64748b", borderRadius: 8, padding: "14px 18px", marginBottom: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "#0f172a", marginBottom: 2 }}>{w.patient}</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 6 }}>{w.accountId} · {w.payer} · {fmt(w.amount)}</div>
+            <div style={{ fontSize: 11, color: "#475569", background: "#f8fafc", border: "1px solid #f1f5f9", borderRadius: 6, padding: "7px 10px" }}>{w.rationale}</div>
+            <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>Recommended by {w.recommendedBy} · {w.recommendedAt}</div>
+            {(showNote[w.accountId] || showNote[w.accountId + "_ret"]) && (
+              <div style={{ marginTop: 8 }}>
+                <textarea
+                  value={getNote(w.accountId)}
+                  onChange={e => setNote(w.accountId, e.target.value)}
+                  placeholder={showNote[w.accountId + "_ret"] ? "Reason for returning to biller..." : "Approval note (optional)..."}
+                  rows={2}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, fontFamily: "inherit", resize: "none", outline: "none", color: "#334155" }} />
+              </div>
+            )}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+            {approved && <div style={{ padding: "7px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, color: "#2563eb", fontSize: 11, fontWeight: 600, textAlign: "center" }}>↗ Sent to CFO</div>}
+            {returned && <div style={{ padding: "7px 14px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, color: "#64748b", fontSize: 11, fontWeight: 600, textAlign: "center" }}>↩ Returned</div>}
+            {!approved && !returned && (
+              <>
+                <button onClick={() => { setShowNote(p => ({...p, [w.accountId]: true, [w.accountId + "_ret"]: false})); }} style={{ padding: "7px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, color: "#2563eb", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>
+                  Approve to CFO
+                </button>
+                {showNote[w.accountId] && !showNote[w.accountId + "_ret"] && (
+                  <button onClick={() => setItemAction(w.accountId, "approved")} style={{ padding: "7px 14px", background: "#2563eb", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>
+                    Confirm Approval →
+                  </button>
+                )}
+                <button onClick={() => { setShowNote(p => ({...p, [w.accountId]: false, [w.accountId + "_ret"]: true})); }} style={{ padding: "7px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 6, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>
+                  Return to biller
+                </button>
+                {showNote[w.accountId + "_ret"] && (
+                  <button onClick={() => setItemAction(w.accountId, "returned")} style={{ padding: "7px 14px", background: "#64748b", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>
+                    Confirm Return →
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const overrideCard = (o) => {
+    const acked = actionState[o.accountId] === "acked";
+    const flagged = actionState[o.accountId] === "flagged";
+    return (
+      <div key={o.accountId} style={{ background: "#fff", border: "1px solid #ede9fe", borderLeft: "3px solid #7c3aed", borderRadius: 8, padding: "14px 18px", marginBottom: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "#0f172a", marginBottom: 2 }}>{o.patient}</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>{o.accountId} · {o.payer} · overridden by {o.collectorName}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, padding: "7px 10px" }}>
+                <div style={{ fontSize: 9, color: "#94a3b8", marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.08em" }}>AI recommended</div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>{o.aiRecommended}</div>
+              </div>
+              <div style={{ background: "#faf5ff", border: "1px solid #ede9fe", borderRadius: 6, padding: "7px 10px" }}>
+                <div style={{ fontSize: 9, color: "#7c3aed", marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.08em" }}>Collector chose</div>
+                <div style={{ fontSize: 12, color: "#6d28d9", fontWeight: 500 }}>{o.collectorChose}</div>
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic" }}>"{o.note}"</div>
+            <NoteField id={o.accountId + "_ov"} placeholder="Coaching note (optional)..." />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+            {acked && <div style={{ padding: "7px 14px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 6, color: "#16a34a", fontSize: 11, fontWeight: 600 }}>✓ Acknowledged</div>}
+            {flagged && <div style={{ padding: "7px 14px", background: "#faf5ff", border: "1px solid #ede9fe", borderRadius: 6, color: "#7c3aed", fontSize: 11, fontWeight: 600 }}>⚑ Flagged</div>}
+            {!acked && !flagged && (
+              <>
+                <button onClick={() => { toggleNote(o.accountId + "_ov"); }} style={{ padding: "7px 14px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, color: "#475569", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>
+                  Add coaching note
+                </button>
+                <button onClick={() => setItemAction(o.accountId, "acked")} style={{ padding: "7px 14px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 6, color: "#16a34a", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>
+                  Acknowledge
+                </button>
+                <button onClick={() => setItemAction(o.accountId, "flagged")} style={{ padding: "7px 14px", background: "#faf5ff", border: "1px solid #ede9fe", borderRadius: 6, color: "#7c3aed", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Flag for coaching</button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const totalWriteOff = ESCALATION_DATA.writeOffPending.reduce((s,w) => s + w.amount, 0);
 
@@ -3162,6 +3253,7 @@ export default function WIPPlatform() {
   const [donutExpanded, setDonutExpanded] = useState(false);
   const [worklinks, setWorklinks] = useState([]);
   const [siteFilter, setSiteFilter] = useState(null);
+  const [activeTier, setActiveTier] = useState(null);
 
   const handleSendWorklink = (req) => setWorklinks(prev => [...prev, req]);
   const handleResolveWorklink = (id, note) => setWorklinks(prev => prev.map(w => w.id === id ? {...w, status: "resolved", resolvedAt: new Date(), resolutionNote: note} : w));
@@ -3337,7 +3429,7 @@ Return JSON with:
     if (wo.length > 0) items.push({ id: "writeoffs", type: "writeoff", urgency: "high", title: `${wo.length} write-off${wo.length > 1 ? "s" : ""} pending CFO approval`, body: `${fmt(wo.reduce((s,w)=>s+w.amount,0))} pending review`, tab: "escalation", role: "supervisor" });
     // Open WorkLink
     const openWL = worklinks.filter(w => w.status === "open");
-    if (openWL.length > 0) items.push({ id: "worklinks", type: "worklink", urgency: "medium", title: `${openWL.length} open WorkLink request${openWL.length > 1 ? "s" : ""}`, body: `${fmt(openWL.reduce((s,w)=>s+w.expectedValue,0))} EV pending cross-area action`, tab: "worklink", role: "supervisor" });
+    if (openWL.length > 0) items.push({ id: "worklinks", type: "worklink", urgency: "medium", title: `${openWL.length} open WorkLink request${openWL.length > 1 ? "s" : ""}`, body: `${fmt(openWL.reduce((s,w)=>s+w.expectedValue,0))} EV pending cross-area action · check WorkLink tab`, tab: "worklink", role: null });
     return items;
   }, [worklinks, arForRole]);
 
@@ -3379,47 +3471,93 @@ Return JSON with:
   if (isCollectorMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif" }}>
-        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "10px 16px" : "14px 32px", display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", flexWrap: "wrap", gap: isMobile ? 10 : 0 }}>
+        {/* Unified header — same as CFO/Supervisor */}
+        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "10px 16px" : "14px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <div>
             <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 2 }}>D4 Consulting Group</div>
             <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 600, color: "#0f172a" }}>WIP Intelligence Platform <span style={{ fontSize: 11, color: "#2563eb", marginLeft: 6 }}>v2.1</span></div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: isMobile ? "flex-start" : "flex-end" }}>
-            <div style={{ display: "flex", gap: isMobile ? 4 : 8, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Collectors &amp; Billers</div>
-                <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
-                  {seg("Biller", "biller")}
-                  {seg("Commercial", "commercial_collector")}
-                  {!isMobile && seg("Medicare Part B", "medicare_bc")}
-                  {isMobile && seg("Medicare", "medicare_bc")}
-                  {seg("Medicaid", "medicaid")}
-                  {seg("Self-Pay", "self_pay")}
-                  {seg("WC", "wc")}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* Notification bell */}
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setShowNotifications(s => !s)}
+                style={{ background: showNotifications ? "#f1f5f9" : "none", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
+                <span style={{ fontSize: 16 }}>🔔</span>
+                {notifications.length > 0 && (
+                  <span style={{ background: notifications.some(n=>n.urgency==="critical") ? "#dc2626" : "#d97706", color: "#fff", borderRadius: 10, padding: "0 6px", fontSize: 10, fontWeight: 700 }}>{notifications.length}</span>
+                )}
+              </button>
+              {showNotifications && (
+                <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 320, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 200, overflow: "hidden" }}>
+                  <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Notifications</span>
+                    <button onClick={() => setShowNotifications(false)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 12 }}>✕</button>
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 12, color: "#94a3b8" }}>No active notifications</div>
+                  ) : notifications.map(n => (
+                    <div key={n.id} onClick={() => { if (n.role) setRoleAndPersist(n.role); setTab(n.tab || "metrics"); setShowNotifications(false); }}
+                      style={{ padding: "12px 16px", borderBottom: "1px solid #f8fafc", cursor: "pointer", background: urgencyBg[n.urgency] + "40", display: "flex", gap: 10 }}
+                      onMouseEnter={e => e.currentTarget.style.background = urgencyBg[n.urgency]}
+                      onMouseLeave={e => e.currentTarget.style.background = urgencyBg[n.urgency] + "40"}>
+                      <span style={{ fontSize: 14, flexShrink: 0 }}>{urgencyIcon[n.urgency]}</span>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: urgencyColor[n.urgency], marginBottom: 2 }}>{n.title}</div>
+                        <div style={{ fontSize: 11, color: "#64748b" }}>{n.body}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Area Worklists</div>
-                <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
-                  {seg("Auth", "authorization")}
-                  {seg("Charge", "charge_capture")}
-                  {seg("Coder", "coder")}
-                  {seg("HIM", "him")}
-                  {seg("Billing", "billing_scrubber")}
-                  {seg("Cred", "credentialing")}
-                </div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Management</div>
-                <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2 }}>
-                  {seg("Supervisor", "supervisor")}
-                  {seg("CFO", "cfo")}
-                </div>
-              </div>
+              )}
             </div>
-            {roleConfig.paneLabel && !isMobile && (
-              <div style={{ fontSize: 10, color: "#94a3b8" }}>
-                <span style={{ color: "#2563eb", fontWeight: 500 }}>{roleConfig.label}</span> — {roleConfig.paneLabel}
+            {/* Role switcher */}
+            {!showRoleSwitcher ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 2 }}>Current role</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{roleConfig.label}</div>
+                </div>
+                <button onClick={() => setShowRoleSwitcher(true)}
+                  style={{ padding: "7px 14px", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 8, color: "#475569", cursor: "pointer", fontSize: 12, fontWeight: 500, fontFamily: "inherit" }}>
+                  Switch role ↓
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+                <div style={{ display: "flex", gap: isMobile ? 4 : 8, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Collectors &amp; Billers</div>
+                    <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: "wrap" }}>
+                      {seg("Commercial", "commercial_collector")}
+                      {seg("Medicare Part B", "medicare_bc")}
+                      {seg("Medicaid", "medicaid")}
+                      {seg("Self-Pay", "self_pay")}
+                      {seg("WC", "wc")}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Area Worklists</div>
+                    <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: "wrap" }}>
+                      {seg("Auth", "authorization")}
+                      {seg("Charge", "charge_capture")}
+                      {seg("Coder", "coder")}
+                      {seg("HIM", "him")}
+                      {seg("Billing", "billing_scrubber")}
+                      {seg("Cred", "credentialing")}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Management</div>
+                    <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2 }}>
+                      {seg("Supervisor", "supervisor")}
+                      {seg("CFO", "cfo")}
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setShowRoleSwitcher(false)}
+                  style={{ fontSize: 11, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textDecoration: "underline", padding: 0 }}>
+                  ↑ collapse
+                </button>
               </div>
             )}
           </div>
@@ -3436,35 +3574,95 @@ Return JSON with:
   if (isAreaMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif" }}>
-        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "10px 16px" : "14px 32px", display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", flexWrap: "wrap", gap: isMobile ? 10 : 0 }}>
+        {/* Unified header */}
+        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "10px 16px" : "14px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <div>
             <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 2 }}>D4 Consulting Group</div>
             <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 600, color: "#0f172a" }}>WIP Intelligence Platform <span style={{ fontSize: 11, color: "#2563eb", marginLeft: 6 }}>v2.1</span></div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: isMobile ? "flex-start" : "flex-end" }}>
-            <div style={{ display: "flex", gap: isMobile ? 4 : 8, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Area Worklists</div>
-                <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
-                  {seg("Auth", "authorization")}
-                  {seg("Charge", "charge_capture")}
-                  {seg("Coder", "coder")}
-                  {seg("HIM", "him")}
-                  {seg("Billing", "billing_scrubber")}
-                  {seg("Cred", "credentialing")}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* Notification bell */}
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setShowNotifications(s => !s)}
+                style={{ background: showNotifications ? "#f1f5f9" : "none", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
+                <span style={{ fontSize: 16 }}>🔔</span>
+                {notifications.length > 0 && (
+                  <span style={{ background: notifications.some(n=>n.urgency==="critical") ? "#dc2626" : "#d97706", color: "#fff", borderRadius: 10, padding: "0 6px", fontSize: 10, fontWeight: 700 }}>{notifications.length}</span>
+                )}
+              </button>
+              {showNotifications && (
+                <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 320, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 200, overflow: "hidden" }}>
+                  <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Notifications</span>
+                    <button onClick={() => setShowNotifications(false)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 12 }}>✕</button>
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 12, color: "#94a3b8" }}>No active notifications</div>
+                  ) : notifications.map(n => (
+                    <div key={n.id} onClick={() => { if (n.role) setRoleAndPersist(n.role); setTab(n.tab || "metrics"); setShowNotifications(false); }}
+                      style={{ padding: "12px 16px", borderBottom: "1px solid #f8fafc", cursor: "pointer", background: urgencyBg[n.urgency] + "40", display: "flex", gap: 10 }}
+                      onMouseEnter={e => e.currentTarget.style.background = urgencyBg[n.urgency]}
+                      onMouseLeave={e => e.currentTarget.style.background = urgencyBg[n.urgency] + "40"}>
+                      <span style={{ fontSize: 14, flexShrink: 0 }}>{urgencyIcon[n.urgency]}</span>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: urgencyColor[n.urgency], marginBottom: 2 }}>{n.title}</div>
+                        <div style={{ fontSize: 11, color: "#64748b" }}>{n.body}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Other roles</div>
-                <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: isMobile ? "wrap" : "nowrap" }}>
-                  {seg("Biller", "biller")}
-                  {seg("Commercial", "commercial_collector")}
-                  {seg("Supervisor", "supervisor")}
-                  {seg("CFO", "cfo")}
-                </div>
-              </div>
+              )}
             </div>
-            {!isMobile && <div style={{ fontSize: 10, color: "#94a3b8" }}><span style={{ color: "#2563eb", fontWeight: 500 }}>{roleConfig.label}</span> — {roleConfig.paneLabel}</div>}
+            {/* Role switcher */}
+            {!showRoleSwitcher ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 2 }}>Current role</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{roleConfig.label}</div>
+                </div>
+                <button onClick={() => setShowRoleSwitcher(true)}
+                  style={{ padding: "7px 14px", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 8, color: "#475569", cursor: "pointer", fontSize: 12, fontWeight: 500, fontFamily: "inherit" }}>
+                  Switch role ↓
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Collectors</div>
+                    <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: "wrap" }}>
+                      {seg("Commercial", "commercial_collector")}
+                      {seg("Medicare", "medicare_bc")}
+                      {seg("Medicaid", "medicaid")}
+                      {seg("Self-Pay", "self_pay")}
+                      {seg("WC", "wc")}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Area Worklists</div>
+                    <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2, flexWrap: "wrap" }}>
+                      {seg("Auth", "authorization")}
+                      {seg("Charge", "charge_capture")}
+                      {seg("Coder", "coder")}
+                      {seg("HIM", "him")}
+                      {seg("Billing", "billing_scrubber")}
+                      {seg("Cred", "credentialing")}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <div style={{ fontSize: 9, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>Management</div>
+                    <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 3, display: "flex", gap: 2 }}>
+                      {seg("Supervisor", "supervisor")}
+                      {seg("CFO", "cfo")}
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setShowRoleSwitcher(false)}
+                  style={{ fontSize: 11, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textDecoration: "underline", padding: 0 }}>
+                  ↑ collapse
+                </button>
+              </div>
+            )}
           </div>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "8px 16px" : "10px 32px", display: "flex", alignItems: "center", gap: 10 }}>
@@ -4152,8 +4350,9 @@ Return JSON with:
           <AreaWorklist area="Billing/Scrubber" dnfbScored={dnfbForRole} worklinks={worklinks} onResolve={handleResolveWorklink} onReturn={handleReturnWorklink} onWorkLink={handleSendWorklink} />
         )}
         {(role === "supervisor") && <AreaChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />}
+  const [activeTier, setActiveTier] = useState(null);
+
         {role === "cfo" && tab === "dnfb" && (() => {
-          const [activeTier, setActiveTier] = React.useState(null);
           const tiers = [
             { key: "normal", label: "Normal (1–3 days)", accs: dnfbForRole.filter(a => a.daysInDNFB <= 3), color: "#16a34a" },
             { key: "watch",  label: "Watch (3–5 days)",  accs: dnfbForRole.filter(a => a.daysInDNFB > 3 && a.daysInDNFB < 6), color: "#d97706" },
