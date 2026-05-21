@@ -201,7 +201,25 @@ const AREAS = ["Coding","Physician/Doc","Charge Capture","Credentialing","Author
 // Revenue cycle order: Authorization → Charge Capture → Coding → HIM → Billing/Scrubber
 const RC_AREA_ORDER = ["Authorization","Charge Capture","Coding","Clinical/HIM","Billing/Scrubber","Credentialing","Physician/Doc"];
 
-// Recommended action → WorkLink auto-draft mapping
+// ─── Denial Prediction — Hold code → denial risk mapping ────────────────────
+const DENIAL_RISK_MAP = {
+  AUTH_MISSING:   { risk: "high",   carc: "CO-15", label: "Missing auth number", action: "Chase authorization before billing" },
+  AUTH_EXPIRED:   { risk: "high",   carc: "CO-15", label: "Auth expired",         action: "Renew authorization immediately" },
+  CODING_UNASSIGNED: { risk: "medium", carc: "CO-4",  label: "Coding incomplete",  action: "Assign coder — uncode claims denied" },
+  CODING_COMPLEX: { risk: "medium", carc: "CO-97",  label: "Bundling risk",        action: "Review for modifier requirements" },
+  HIM_DEFICIENCY: { risk: "medium", carc: "CO-50",  label: "Documentation gap",   action: "Resolve HIM deficiency before billing" },
+  CREDENTIALING:  { risk: "high",   carc: "CO-29",  label: "Provider not credentialed", action: "Hold — do not submit until credentialing complete" },
+  CHARGE_MISSING: { risk: "high",   carc: "CO-16",  label: "Incomplete charge",   action: "Submit missing charge or claim will be returned" },
+};
+
+// ─── Cash Flow Forecasting — Payer timing weights (days to payment) ──────────
+const PAYER_TIMING = {
+  medicare:     { p30: 0.60, p60: 0.85, p90: 0.95 }, // MAC pays fast
+  commercial:   { p30: 0.35, p60: 0.65, p90: 0.85 }, // commercial varies
+  medicaid:     { p30: 0.20, p60: 0.50, p90: 0.75 }, // Medicaid slowest
+  workers_comp: { p30: 0.10, p60: 0.35, p90: 0.60 }, // WC longest tail
+  self_pay:     { p30: 0.15, p60: 0.30, p90: 0.45 }, // self-pay lowest
+};
 const WORKLINK_ACTION_MAP = {
   "chase_auth":     { requestType: "chase_auth",     requestLabel: "Chase authorization", requestIcon: "🔐", targetArea: "Authorization" },
   "recode":         { requestType: "recode",          requestLabel: "Recode account",      requestIcon: "💻", targetArea: "Coding" },
@@ -972,9 +990,13 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
   const [showSettings, setShowSettings] = useState(false);
   const [goals, setGoals] = useState({ ...DEFAULT_GOALS });
   const [wlAccount, setWlAccount] = useState(null);
+  const [areaSiteFilter, setAreaSiteFilter] = useState(null);
 
   // Account buckets
-  const allNative = dnfbScored.filter(a => a.area === area && !worked.has(a.id));
+  const openWorklinkAccountIds = new Set(
+    worklinks.filter(w => w.status === "open" && w.targetArea === area).map(w => w.accountId)
+  );
+  const allNative = dnfbScored.filter(a => a.area === area && !worked.has(a.id) && !openWorklinkAccountIds.has(a.id) && (!areaSiteFilter || a.site === areaSiteFilter));
   const monitor   = allNative.filter(a => a.daysInDNFB <= 3).sort((a,b) => b.expectedValue - a.expectedValue);
   const workAsap  = allNative.filter(a => a.daysInDNFB > 3).sort((a,b) => b.daysInDNFB - a.daysInDNFB || b.expectedValue - a.expectedValue);
   const wlOpen    = worklinks.filter(w => w.targetArea === area && w.status === "open").sort((a,b) => new Date(a.slaDue) - new Date(b.slaDue));
@@ -1022,6 +1044,14 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
           <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
             <span style={{ fontSize: 10, fontWeight: 600, background: a.daysInDNFB > 3 ? "#fee2e2" : "#f1f5f9", color: a.daysInDNFB > 3 ? "#dc2626" : "#475569", border: `1px solid ${a.daysInDNFB > 3 ? "#fca5a5" : "#e2e8f0"}`, padding: "2px 8px", borderRadius: 4 }}>{a.holdCode}</span>
             <span style={{ fontSize: 10, fontWeight: 600, color: a.daysInDNFB > 3 ? "#dc2626" : "#64748b", background: a.daysInDNFB > 3 ? "#fee2e2" : "#f8fafc", padding: "2px 8px", borderRadius: 4, border: "1px solid transparent" }}>{a.daysInDNFB}d in DNFB</span>
+            {DENIAL_RISK_MAP[a.holdCode] && (
+              <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4,
+                background: DENIAL_RISK_MAP[a.holdCode].risk === "high" ? "#fee2e2" : "#fff7ed",
+                color: DENIAL_RISK_MAP[a.holdCode].risk === "high" ? "#b91c1c" : "#c2410c",
+                border: `1px solid ${DENIAL_RISK_MAP[a.holdCode].risk === "high" ? "#fca5a5" : "#fed7aa"}` }}>
+                ⚠ {DENIAL_RISK_MAP[a.holdCode].risk === "high" ? "High" : "Medium"} denial risk · {DENIAL_RISK_MAP[a.holdCode].carc}
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 2 }}>{a.patient}</div>
           <div style={{ fontSize: 11, color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}>
@@ -1148,6 +1178,28 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
 
   return (
     <div style={{ padding: isMobile ? "16px 12px 80px" : "24px 32px" }}>
+
+      {/* Site filter — area specialist assignment */}
+      {(() => {
+        const sites = [...new Set(dnfbScored.filter(a => a.area === area).map(a => a.site))].sort((a,b) => parseInt(a.replace(/\D/g,"")) - parseInt(b.replace(/\D/g,"")));
+        if (sites.length <= 1) return null;
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px" }}>
+            <span style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0 }}>My sites:</span>
+            <button onClick={() => setAreaSiteFilter(null)}
+              style={{ padding: "3px 10px", fontSize: 11, fontWeight: !areaSiteFilter ? 600 : 400, border: `1px solid ${!areaSiteFilter ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: !areaSiteFilter ? "#2563eb" : "#fff", color: !areaSiteFilter ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
+              All
+            </button>
+            {sites.map(s => (
+              <button key={s} onClick={() => setAreaSiteFilter(areaSiteFilter === s ? null : s)}
+                style={{ padding: "3px 10px", fontSize: 11, fontWeight: areaSiteFilter === s ? 600 : 400, border: `1px solid ${areaSiteFilter === s ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: areaSiteFilter === s ? "#2563eb" : "#fff", color: areaSiteFilter === s ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
+                {s}
+              </button>
+            ))}
+            {areaSiteFilter && <span style={{ fontSize: 10, color: "#2563eb", marginLeft: 4 }}>— your assigned accounts</span>}
+          </div>
+        );
+      })()}
 
       {/* Settings panel */}
       {showSettings && (
@@ -2046,8 +2098,11 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
 
   const hasFiling = arScored.some(a => (120 - (a.daysOut || 0)) < 14);
 
+  const [collectorSiteFilter, setCollectorSiteFilter] = useState(null);
+
   const sortedQueue = arScored
     .filter(a => !workedIds.has(a.id) && !openWorklinkIds.has(a.id))
+    .filter(a => !collectorSiteFilter || a.site === collectorSiteFilter)
     .sort((a, b) => {
       if (sortMode === "triage") return (b.expectedValue * urgencyFactor(b)) - (a.expectedValue * urgencyFactor(a));
       return b.expectedValue - a.expectedValue;
@@ -2099,6 +2154,29 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
           </div>
         ))}
       </div>
+
+      {/* Site filter — collector assignment */}
+      {(() => {
+        const sites = [...new Set(arScored.map(a => a.site))].sort((a,b) => parseInt(a.replace(/\D/g,"")) - parseInt(b.replace(/\D/g,"")));
+        if (sites.length <= 1) return null;
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px" }}>
+            <span style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0 }}>My sites:</span>
+            <button onClick={() => setCollectorSiteFilter(null)}
+              style={{ padding: "3px 10px", fontSize: 11, fontWeight: !collectorSiteFilter ? 600 : 400, border: `1px solid ${!collectorSiteFilter ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: !collectorSiteFilter ? "#2563eb" : "#fff", color: !collectorSiteFilter ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
+              All
+            </button>
+            {sites.map(s => (
+              <button key={s} onClick={() => setCollectorSiteFilter(collectorSiteFilter === s ? null : s)}
+                style={{ padding: "3px 10px", fontSize: 11, fontWeight: collectorSiteFilter === s ? 600 : 400, border: `1px solid ${collectorSiteFilter === s ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: collectorSiteFilter === s ? "#2563eb" : "#fff", color: collectorSiteFilter === s ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
+                {s}
+              </button>
+            ))}
+            {collectorSiteFilter && <span style={{ fontSize: 10, color: "#2563eb", marginLeft: 4 }}>— showing your assigned accounts</span>}
+            {!collectorSiteFilter && <span style={{ fontSize: 10, color: "#94a3b8", marginLeft: 4 }}>— select your assigned sites to filter your queue</span>}
+          </div>
+        );
+      })()}
 
       {/* Sort + View mode controls */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap", justifyContent: "space-between" }}>
@@ -2737,7 +2815,7 @@ function SelfPayView() {
 }
 
 
-function DonutChart({ accounts, onFilter, activeFilter }) {
+function DonutChart({ accounts, onFilter, activeFilter, title }) {
   const byArea = {};
   accounts.forEach(a => { byArea[a.area] = (byArea[a.area] || 0) + a.amount; });
   const total = Object.values(byArea).reduce((s,v) => s+v, 0) || 1;
@@ -3812,6 +3890,166 @@ Return JSON with:
                 </div>
               );
             })()}
+
+            {/* AR Aging KPIs — Over 90 and 120 Days */}
+            {(() => {
+              const ar90 = arFiltered.filter(a => a.daysOut > 90);
+              const ar120 = arFiltered.filter(a => a.daysOut > 120);
+              const totalAR = arFiltered.reduce((s,a) => s+a.amount, 0);
+              const ar90Bal = ar90.reduce((s,a) => s+a.amount, 0);
+              const ar120Bal = ar120.reduce((s,a) => s+a.amount, 0);
+              const ar90Pct = totalAR > 0 ? Math.round(ar90Bal / totalAR * 100) : 0;
+              const ar120Pct = totalAR > 0 ? Math.round(ar120Bal / totalAR * 100) : 0;
+              const ar90Color = ar90Pct <= 10 ? "#16a34a" : ar90Pct <= 15 ? "#d97706" : "#dc2626";
+              const ar120Color = ar120Pct <= 5 ? "#16a34a" : ar120Pct <= 10 ? "#d97706" : "#dc2626";
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>AR Over 90 Days</div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
+                      <div style={{ fontSize: 28, fontWeight: 700, color: ar90Color, letterSpacing: "-0.02em" }}>{ar90Pct}%</div>
+                      <div style={{ fontSize: 12, color: ar90Color, fontWeight: 600 }}>{fmt(ar90Bal)}</div>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>{ar90.length} accounts · {fmt(ar90Bal)} of {fmt(totalAR)} total AR</div>
+                    <div style={{ position: "relative", height: 5, background: "#f1f5f9", borderRadius: 3, marginBottom: 5 }}>
+                      <div style={{ width: Math.min(ar90Pct * 4, 100) + "%", height: "100%", background: ar90Color, borderRadius: 3 }} />
+                      <div style={{ position: "absolute", left: "40%", top: -3, width: 2, height: 11, background: "#0f172a", borderRadius: 1 }} />
+                      <div style={{ position: "absolute", left: "60%", top: -1, width: 1, height: 7, background: "#94a3b8", borderRadius: 1 }} />
+                    </div>
+                    <div style={{ fontSize: 9, color: "#94a3b8" }}>Benchmark: &lt;10% PE target · &lt;15% acceptable · &gt;90 days outstanding</div>
+                  </div>
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>AR Over 120 Days</div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
+                      <div style={{ fontSize: 28, fontWeight: 700, color: ar120Color, letterSpacing: "-0.02em" }}>{ar120Pct}%</div>
+                      <div style={{ fontSize: 12, color: ar120Color, fontWeight: 600 }}>{fmt(ar120Bal)}</div>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>{ar120.length} accounts · {fmt(ar120Bal)} of {fmt(totalAR)} total AR</div>
+                    <div style={{ position: "relative", height: 5, background: "#f1f5f9", borderRadius: 3, marginBottom: 5 }}>
+                      <div style={{ width: Math.min(ar120Pct * 8, 100) + "%", height: "100%", background: ar120Color, borderRadius: 3 }} />
+                      <div style={{ position: "absolute", left: "40%", top: -3, width: 2, height: 11, background: "#0f172a", borderRadius: 1 }} />
+                      <div style={{ position: "absolute", left: "80%", top: -1, width: 1, height: 7, background: "#94a3b8", borderRadius: 1 }} />
+                    </div>
+                    <div style={{ fontSize: 9, color: "#94a3b8" }}>Benchmark: &lt;5% well-managed · &lt;10% acceptable · &gt;120 days outstanding</div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Self-Pay EV + Collection Rate */}
+            {(() => {
+              const spScored = SP_DATA.map(a => ({ ...a, ev: Math.round(a.prob / 100 * a.balance) }));
+              const spTotalBal = spScored.reduce((s,a) => s+a.balance, 0);
+              const spTotalEV = spScored.reduce((s,a) => s+a.ev, 0);
+              const spCollected = spScored.filter(a => a.daysOut > 90).reduce((s,a) => s + Math.round(a.balance * 0.28), 0); // synthetic 28% collection
+              const spCollRate = spTotalBal > 0 ? Math.round(spCollected / spTotalBal * 100) : 0;
+              const spRateColor = spCollRate >= 35 ? "#16a34a" : spCollRate >= 20 ? "#d97706" : "#dc2626";
+              const spEvColor = "#2563eb";
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Self-Pay — Expected Recovery</div>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: spEvColor, letterSpacing: "-0.02em", marginBottom: 4 }}>{fmt(spTotalEV)}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>{spScored.length} accounts · {fmt(spTotalBal)} total balance</div>
+                    <div style={{ fontSize: 9, color: "#94a3b8" }}>Probability-weighted forward-looking · does not blend with insurance EV</div>
+                  </div>
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Self-Pay Collection Rate</div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
+                      <div style={{ fontSize: 28, fontWeight: 700, color: spRateColor, letterSpacing: "-0.02em" }}>{spCollRate}%</div>
+                      <div style={{ fontSize: 12, color: spRateColor, fontWeight: 600 }}>{spCollRate >= 35 ? "Top performer" : spCollRate >= 20 ? "Industry average" : "Below average"}</div>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>{fmt(spCollected)} collected of {fmt(spTotalBal)} billed</div>
+                    <div style={{ position: "relative", height: 5, background: "#f1f5f9", borderRadius: 3, marginBottom: 5 }}>
+                      <div style={{ width: Math.min(spCollRate * 2, 100) + "%", height: "100%", background: spRateColor, borderRadius: 3 }} />
+                      <div style={{ position: "absolute", left: "40%", top: -3, width: 2, height: 11, background: "#0f172a", borderRadius: 1 }} />
+                      <div style={{ position: "absolute", left: "70%", top: -1, width: 1, height: 7, background: "#94a3b8", borderRadius: 1 }} />
+                    </div>
+                    <div style={{ fontSize: 9, color: "#94a3b8" }}>Benchmark: 20–30% industry avg · 35–40% top performer</div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Cash Flow Forecast — 30/60/90 day */}
+            {(() => {
+              const horizons = [
+                { label: "30-Day Forecast", days: 30, color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0" },
+                { label: "60-Day Forecast", days: 60, color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
+                { label: "90-Day Forecast", days: 90, color: "#7c3aed", bg: "#faf5ff", border: "#e9d5ff" },
+              ];
+              const computeForecast = (days) => {
+                let total = 0;
+                arFiltered.forEach(a => {
+                  const cat = PAYER_CATEGORY[a.payer] || "commercial";
+                  const timing = PAYER_TIMING[cat] || PAYER_TIMING.commercial;
+                  const weight = days <= 30 ? timing.p30 : days <= 60 ? timing.p60 : timing.p90;
+                  total += a.expectedValue * weight;
+                });
+                dnfbFiltered.forEach(a => {
+                  const cat = PAYER_CATEGORY[a.payer] || "commercial";
+                  const timing = PAYER_TIMING[cat] || PAYER_TIMING.commercial;
+                  const holdDelay = a.daysInDNFB > 14 ? 0.3 : 0.6;
+                  const weight = (days <= 30 ? timing.p30 : days <= 60 ? timing.p60 : timing.p90) * holdDelay;
+                  total += a.expectedValue * weight;
+                });
+                return Math.round(total);
+              };
+              return (
+                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 18px", marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>Cash Flow Forecast</div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12 }}>Probability-weighted cash timing · hardcoded payer timing weights Phase 1</div>
+                  <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr", "1fr 1fr 1fr", "1fr"), gap: 10 }}>
+                    {horizons.map(h => {
+                      const forecast = computeForecast(h.days);
+                      return (
+                        <div key={h.days} style={{ background: h.bg, border: `1px solid ${h.border}`, borderRadius: 8, padding: "12px 14px" }}>
+                          <div style={{ fontSize: 10, color: h.color, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>{h.label}</div>
+                          <div style={{ fontSize: 22, fontWeight: 700, color: h.color, letterSpacing: "-0.02em" }}>{fmt(forecast)}</div>
+                          <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>Expected cash receipts · {h.days}d horizon</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 10 }}>
+                    Medicare timing: 60% in 30d · Commercial: 35% in 30d · Medicaid: 20% in 30d · WC: 10% in 30d · DNFB applies hold clearance probability. Phase 2: ERA-calibrated weights.
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Denial Prediction Risk Summary */}
+            {(() => {
+              const highRisk = dnfbFiltered.filter(a => DENIAL_RISK_MAP[a.holdCode]?.risk === "high");
+              const medRisk = dnfbFiltered.filter(a => DENIAL_RISK_MAP[a.holdCode]?.risk === "medium");
+              const highEV = highRisk.reduce((s,a) => s+a.expectedValue, 0);
+              const medEV = medRisk.reduce((s,a) => s+a.expectedValue, 0);
+              const reworkCost = Math.round((highRisk.length * 118) + (medRisk.length * 65));
+              if (highRisk.length === 0 && medRisk.length === 0) return null;
+              return (
+                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 18px", marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>Pre-Submission Denial Risk</div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12 }}>Rule-based prediction · accounts at risk before submission · Phase 1</div>
+                  <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr", "1fr 1fr 1fr", "1fr"), gap: 10 }}>
+                    <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "12px 14px" }}>
+                      <div style={{ fontSize: 10, color: "#b91c1c", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>High Risk</div>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: "#dc2626" }}>{highRisk.length}</div>
+                      <div style={{ fontSize: 11, color: "#dc2626", marginTop: 2, fontWeight: 600 }}>{fmt(highEV)} EV at risk</div>
+                    </div>
+                    <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, padding: "12px 14px" }}>
+                      <div style={{ fontSize: 10, color: "#c2410c", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Medium Risk</div>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: "#d97706" }}>{medRisk.length}</div>
+                      <div style={{ fontSize: 11, color: "#d97706", marginTop: 2, fontWeight: 600 }}>{fmt(medEV)} EV at risk</div>
+                    </div>
+                    <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "12px 14px" }}>
+                      <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Projected Rework Cost</div>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: "#0f172a" }}>{fmt(reworkCost)}</div>
+                      <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>If denied · $65–118/claim to rework</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: cols("repeat(3, 1fr)", "repeat(3, 1fr)", "1fr"), gap: 12, marginBottom: 24 }}>
@@ -3828,23 +4066,27 @@ Return JSON with:
         )}
         {(role === "supervisor") && <AreaChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />}
         {role === "cfo" && tab === "dnfb" && (() => {
+          const [activeTier, setActiveTier] = React.useState(null);
           const tiers = [
-            { label: "Normal (1–3 days)", accs: dnfbForRole.filter(a => a.daysInDNFB <= 3), color: "#16a34a" },
-            { label: "Watch (3–5 days)",  accs: dnfbForRole.filter(a => a.daysInDNFB > 3 && a.daysInDNFB < 6), color: "#d97706" },
-            { label: "Flag (6+ days)",    accs: dnfbForRole.filter(a => a.daysInDNFB >= 6), color: "#dc2626" },
+            { key: "normal", label: "Normal (1–3 days)", accs: dnfbForRole.filter(a => a.daysInDNFB <= 3), color: "#16a34a" },
+            { key: "watch",  label: "Watch (3–5 days)",  accs: dnfbForRole.filter(a => a.daysInDNFB > 3 && a.daysInDNFB < 6), color: "#d97706" },
+            { key: "flag",   label: "Flag (6+ days)",    accs: dnfbForRole.filter(a => a.daysInDNFB >= 6), color: "#dc2626" },
           ];
+          const activeTierData = tiers.find(t => t.key === activeTier);
+          const donutAccounts = activeTierData ? activeTierData.accs : dnfbForRole;
           return (
             <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 16 }}>
               <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
-                <div style={{ fontSize: 10, color: "#1d4ed8", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 12 }}>Billing WIP — DNFB</div>
-                {tiers.map((t, i) => {
-                  const isActive = areaFilter === t.label;
+                <div style={{ fontSize: 10, color: "#1d4ed8", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>Billing WIP — DNFB</div>
+                <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 10 }}>Click a tier to filter the area breakdown →</div>
+                {tiers.map((t) => {
+                  const isActive = activeTier === t.key;
                   return (
-                    <div key={t.label} onClick={() => setAreaFilter(isActive ? null : t.label)}
-                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, cursor: "pointer", opacity: areaFilter && !isActive ? 0.4 : 1, padding: "6px 8px", borderRadius: 6, background: isActive ? t.color + "12" : "transparent" }}>
+                    <div key={t.key} onClick={() => setActiveTier(isActive ? null : t.key)}
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, cursor: "pointer", opacity: activeTier && !isActive ? 0.4 : 1, padding: "6px 8px", borderRadius: 6, background: isActive ? t.color + "18" : "transparent", border: isActive ? `1px solid ${t.color}40` : "1px solid transparent" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <div style={{ width: 9, height: 9, borderRadius: "50%", background: t.color, flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, color: isActive ? t.color : "#475569", fontWeight: isActive ? 600 : 500 }}>{t.label}</span>
+                        <span style={{ fontSize: 12, color: isActive ? t.color : "#475569", fontWeight: isActive ? 700 : 500 }}>{t.label}</span>
                       </div>
                       <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
                         <span style={{ fontSize: 11, color: "#94a3b8" }}>{t.accs.length} accts</span>
@@ -3854,11 +4096,14 @@ Return JSON with:
                   );
                 })}
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: "1px solid #f1f5f9" }}>
-                  <span style={{ fontSize: 9, color: "#94a3b8" }}>Total unbilled: {fmt(dnfbForRole.reduce((s,a) => s+a.amount, 0))} · {dnfbForRole.length} accounts</span>
-                  {areaFilter && <button onClick={() => setAreaFilter(null)} style={{ fontSize: 9, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Clear ×</button>}
+                  <span style={{ fontSize: 9, color: "#94a3b8" }}>
+                    {activeTierData ? `${activeTierData.label}: ${fmt(activeTierData.accs.reduce((s,a)=>s+a.amount,0))} · ${activeTierData.accs.length} accounts` : `Total: ${fmt(dnfbForRole.reduce((s,a)=>s+a.amount,0))} · ${dnfbForRole.length} accounts`}
+                  </span>
+                  {activeTier && <button onClick={() => setActiveTier(null)} style={{ fontSize: 9, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Show all ×</button>}
                 </div>
               </div>
-              <DonutChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />
+              <DonutChart accounts={donutAccounts} onFilter={setAreaFilter} activeFilter={areaFilter}
+                title={activeTierData ? `${activeTierData.label} — by area` : "All DNFB — by area"} />
             </div>
           );
         })()}
