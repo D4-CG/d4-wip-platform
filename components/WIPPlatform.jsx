@@ -267,12 +267,27 @@ const DEFAULT_GOALS = {
   worklinkAvgResolutionHrs: 24,
 };
 
-function getWorklinkSLA(severity, requestType) {
+function getWorklinkSLA(severity, requestType, serviceDateStr) {
   const severityHrs = WORKLINK_SLA_HRS[severity] || 48;
   const requestHrs = WORKLINK_REQUEST_SLA_HRS[requestType] || 48;
-  const hrs = Math.max(severityHrs, requestHrs);
+  let hrs = Math.max(severityHrs, requestHrs);
+  let isServiceDateSLA = false;
+
+  if (serviceDateStr) {
+    const sd = new Date(serviceDateStr);
+    const leadTimeHrs = WORKLINK_REQUEST_SLA_HRS[requestType] || 48;
+    const sdDeadline = new Date(sd.getTime() - leadTimeHrs * 3600000);
+    const now = new Date();
+    const hoursUntilDeadline = (sdDeadline - now) / 3600000;
+    if (hoursUntilDeadline < hrs) {
+      hrs = Math.max(0, Math.round(hoursUntilDeadline));
+      isServiceDateSLA = true;
+    }
+  }
+
   const due = new Date(Date.now() + hrs * 3600000);
-  return { hrs, due, label: hrs < 24 ? `${hrs}hr` : hrs < 48 ? `${hrs/24}d` : `${Math.round(hrs/24)}d` };
+  const label = hrs === 0 ? "OVERDUE" : hrs < 24 ? `${hrs}hr` : `${Math.round(hrs/24)}d`;
+  return { hrs, due, label, isServiceDateSLA };
 }
 
 const DNFB_DATA = [
@@ -999,7 +1014,14 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
   const allNative = dnfbScored.filter(a => a.area === area && !worked.has(a.id) && !openWorklinkAccountIds.has(a.id) && (!areaSiteFilter || a.site === areaSiteFilter));
   const monitor   = allNative.filter(a => a.daysInDNFB <= 3).sort((a,b) => b.expectedValue - a.expectedValue);
   const workAsap  = allNative.filter(a => a.daysInDNFB > 3).sort((a,b) => b.daysInDNFB - a.daysInDNFB || b.expectedValue - a.expectedValue);
-  const wlOpen    = worklinks.filter(w => w.targetArea === area && w.status === "open").sort((a,b) => new Date(a.slaDue) - new Date(b.slaDue));
+  const wlOpen    = worklinks.filter(w => w.targetArea === area && w.status === "open")
+    .sort((a,b) => {
+      // Service-date urgent items first, then by SLA deadline
+      const aUrgent = a.isServiceDateSLA && a.slaHrs < 4 ? 0 : 1;
+      const bUrgent = b.isServiceDateSLA && b.slaHrs < 4 ? 0 : 1;
+      if (aUrgent !== bUrgent) return aUrgent - bUrgent;
+      return new Date(a.slaDue) - new Date(b.slaDue);
+    });
 
   // Variance calculations
   const asapEV = workAsap.reduce((s,a) => s+a.expectedValue, 0);
@@ -1119,13 +1141,19 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
   );
 
   const WorkLinkCard = ({ w }) => (
-    <div style={{ background: "#f0f9ff", border: `1px solid ${new Date() > w.slaDue ? "#fca5a5" : "#bae6fd"}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
+    <div style={{ background: w.isServiceDateSLA && w.slaHrs < 4 ? "#fff1f2" : "#f0f9ff", border: `1px solid ${w.isServiceDateSLA && w.slaHrs < 4 ? "#fca5a5" : new Date() > w.slaDue ? "#fca5a5" : "#bae6fd"}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
+      {w.isServiceDateSLA && w.slaHrs < 4 && (
+        <div style={{ background: "#dc2626", color: "#fff", padding: "5px 18px", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em" }}>
+          🚨 SERVICE DATE URGENT — Patient service {w.serviceDate} · Deadline in {w.slaHrs === 0 ? "&lt;1hr" : `${w.slaHrs}hr`}
+        </div>
+      )}
       <div style={{ padding: "12px 18px", borderBottom: "1px solid #e0f2fe", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontSize: 10, fontWeight: 700, background: "#0369a1", color: "#fff", padding: "2px 8px", borderRadius: 4 }}>⇄ WORKLINK</span>
             <span style={{ fontSize: 12, fontWeight: 600, color: "#0369a1" }}>{w.requestIcon} {w.requestLabel}</span>
-            <span style={{ fontSize: 10, fontWeight: 600, color: slaColor(w), background: slaColor(w) + "14", padding: "2px 8px", borderRadius: 4 }}>⏱ {slaRemaining(w)}</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: slaColor(w), background: slaColor(w) + "14", padding: "2px 8px", borderRadius: 4 }}>⏱ {slaRemaining(w)}{w.isServiceDateSLA ? " (service date)" : ""}</span>
+            {w.serviceDate && !w.isServiceDateSLA && <span style={{ fontSize: 10, color: "#64748b" }}>Service: {w.serviceDate}</span>}
           </div>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 2 }}>{w.patient}</div>
           <div style={{ fontSize: 11, color: "#64748b" }}>{w.accountId} · {w.payer} · {w.vertical}</div>
@@ -1467,7 +1495,8 @@ function WorkLinkForm({ acc, onSubmit, onCancel, defaultRequestType, defaultTarg
   const [scratch, setScratch] = useState("");
   const [noteReady, setNoteReady] = useState(null);
   const [generating, setGenerating] = useState(false);
-  const [step, setStep] = useState("form"); // form | review | done
+  const [step, setStep] = useState("form");
+  const [serviceDate, setServiceDate] = useState(""); // optional service date for SLA override // form | review | done
 
   const selectedType = WORKLINK_REQUEST_TYPES.find(r => r.value === requestType);
 
@@ -1506,7 +1535,7 @@ function WorkLinkForm({ acc, onSubmit, onCancel, defaultRequestType, defaultTarg
   };
 
   const handleSubmit = () => {
-    const sla = getWorklinkSLA(acc.cfg?.severity || "MODERATE", requestType);
+    const sla = getWorklinkSLA(acc.cfg?.severity || "MODERATE", requestType, serviceDate || null);
     onSubmit({
       id: `WL-${Date.now()}`,
       accountId: acc.id,
@@ -1524,6 +1553,8 @@ function WorkLinkForm({ acc, onSubmit, onCancel, defaultRequestType, defaultTarg
       targetArea,
       scratch,
       note: noteReady,
+      serviceDate: serviceDate || null,
+      isServiceDateSLA: sla.isServiceDateSLA,
       sentAt: new Date(),
       slaHrs: sla.hrs,
       slaDue: sla.due,
@@ -1534,16 +1565,29 @@ function WorkLinkForm({ acc, onSubmit, onCancel, defaultRequestType, defaultTarg
     });
   };
 
-  if (step === "review") return (
+  if (step === "review") {
+    const sla = getWorklinkSLA(acc.cfg?.severity || "MODERATE", requestType, serviceDate || null);
+    const isUrgent = sla.isServiceDateSLA && sla.hrs < 4;
+    return (
     <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 10, padding: "16px 18px", marginTop: 12 }}>
       <div style={{ fontSize: 10, color: "#0369a1", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>Review WorkLink request before sending</div>
+      {isUrgent && (
+        <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 12, fontWeight: 700, color: "#b91c1c" }}>
+          🚨 SERVICE DATE URGENT — SLA deadline in {sla.hrs === 0 ? "less than 1 hour" : `${sla.hrs} hours`}. This request will be promoted to top of {targetArea} queue.
+        </div>
+      )}
+      {sla.isServiceDateSLA && !isUrgent && (
+        <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 11, color: "#c2410c" }}>
+          ⏰ Service date SLA active — deadline {sla.label} based on patient service date, not request type.
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
         {[
           { label: "Request type", value: `${selectedType?.icon} ${selectedType?.label}` },
           { label: "Target area", value: targetArea },
           { label: "Account", value: acc.id },
           { label: "EV", value: fmt(acc.expectedValue) },
-          { label: "SLA", value: getWorklinkSLA(acc.cfg?.severity || "MODERATE", requestType).label },
+          { label: "SLA", value: `${sla.label}${sla.isServiceDateSLA ? " (service date)" : ""}` },
           { label: "Priority", value: acc.cfg?.severity || "MODERATE" },
         ].map(f => (
           <div key={f.label} style={{ background: "#fff", borderRadius: 6, padding: "8px 10px", border: "1px solid #e0f2fe" }}>
@@ -1552,13 +1596,20 @@ function WorkLinkForm({ acc, onSubmit, onCancel, defaultRequestType, defaultTarg
           </div>
         ))}
       </div>
+      {/* Optional service date for SLA override */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Patient service date (optional) — tightens SLA if sooner than default</div>
+        <input type="date" value={serviceDate} onChange={e => setServiceDate(e.target.value)}
+          style={{ padding: "6px 10px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, fontFamily: "inherit", color: "#334155", outline: "none" }} />
+        {serviceDate && <span style={{ fontSize: 11, color: "#c2410c", marginLeft: 8 }}>SLA: {getWorklinkSLA(acc.cfg?.severity || "MODERATE", requestType, serviceDate).label}</span>}
+      </div>
       <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
         <div style={{ fontSize: 9, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 6 }}>✦ AI-generated note — review before sending</div>
         <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.6 }}>{noteReady}</div>
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={handleSubmit} style={{ flex: 1, padding: "10px", background: "#0369a1", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
-          Send to {targetArea} →
+        <button onClick={handleSubmit} style={{ flex: 1, padding: "10px", background: isUrgent ? "#dc2626" : "#0369a1", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
+          {isUrgent ? "🚨 Send URGENT to " : "Send to "}{targetArea} →
         </button>
         <button onClick={() => setStep("form")} style={{ padding: "10px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
           Edit
@@ -1568,7 +1619,8 @@ function WorkLinkForm({ acc, onSubmit, onCancel, defaultRequestType, defaultTarg
         </button>
       </div>
     </div>
-  );
+    );
+  }
 
   return (
     <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 10, padding: "16px 18px", marginTop: 12 }}>
@@ -3891,7 +3943,42 @@ Return JSON with:
               );
             })()}
 
-            {/* AR Aging KPIs — Over 90 and 120 Days */}
+            {/* Bad Debt Rate */}
+            {(() => {
+              const writeOffs = ESCALATION_DATA.writeOffPending;
+              const approvedWO = writeOffs.filter(w => w.approved);
+              const woTotal = writeOffs.reduce((s,w) => s+w.amount, 0);
+              const approvedTotal = approvedWO.reduce((s,w) => s+w.amount, 0);
+              const totalARBal = arFiltered.reduce((s,a) => s+a.amount, 0);
+              const grossCharges = totalARBal / 0.45; // synthetic gross charges estimate
+              const badDebtRate = grossCharges > 0 ? Math.round(woTotal / grossCharges * 100 * 10) / 10 : 0;
+              const bdColor = badDebtRate <= 2 ? "#16a34a" : badDebtRate <= 5 ? "#d97706" : "#dc2626";
+              const bdLabel = badDebtRate <= 2 ? "Well-managed" : badDebtRate <= 5 ? "Acceptable" : "Needs attention";
+              return (
+                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 18px", marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>Bad Debt Rate</div>
+                  <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr", "1fr 1fr 1fr", "1fr"), gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 28, fontWeight: 700, color: bdColor, letterSpacing: "-0.02em", marginBottom: 4 }}>{badDebtRate}%</div>
+                      <div style={{ fontSize: 12, color: bdColor, fontWeight: 600, marginBottom: 4 }}>{bdLabel}</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8" }}>Write-offs ÷ Gross Charges (est.)</div>
+                      <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 4 }}>Benchmark: &lt;2% commercial · &lt;5% overall</div>
+                    </div>
+                    <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px" }}>
+                      <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Write-Offs Pending</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: "#0f172a" }}>{writeOffs.length}</div>
+                      <div style={{ fontSize: 11, color: "#d97706", fontWeight: 600 }}>{fmt(woTotal)} pending CFO approval</div>
+                    </div>
+                    <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "10px 14px" }}>
+                      <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Approved This Session</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: "#16a34a" }}>{approvedWO.length}</div>
+                      <div style={{ fontSize: 11, color: "#16a34a", fontWeight: 600 }}>{fmt(approvedTotal)} approved</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 8 }}>Gross charges estimated from AR balance ÷ 0.45 average net ratio. Phase 2: actual gross charges from billing system.</div>
+                </div>
+              );
+            })()}
             {(() => {
               const ar90 = arFiltered.filter(a => a.daysOut > 90);
               const ar120 = arFiltered.filter(a => a.daysOut > 120);
