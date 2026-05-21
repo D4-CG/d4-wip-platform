@@ -4046,6 +4046,18 @@ export default function WIPPlatform() {
 
   const filtered = useMemo(() => {
     let list = areaFilter ? current.filter(a => a.area === areaFilter) : current;
+    // DNFB tier filter — set when clicking a tier on Metrics tab, navigates to dnfb tab
+    if (severityFilter && tab === "dnfb") {
+      if (severityFilter === "normal") list = list.filter(a => (a.daysInDNFB||0) <= 3);
+      else if (severityFilter === "watch") list = list.filter(a => (a.daysInDNFB||0) > 3 && (a.daysInDNFB||0) < 6);
+      else if (severityFilter === "flag") list = list.filter(a => (a.daysInDNFB||0) >= 6);
+    }
+    // Collections follow-up tier filter — set when clicking a tier on Metrics tab, navigates to ar tab
+    if (severityFilter && tab === "ar") {
+      if (severityFilter === "followup_high") list = list.filter(a => a.amount >= 10000 && daysSince(a.lastContact) >= 21);
+      else if (severityFilter === "followup_mid") list = list.filter(a => a.amount >= 1000 && a.amount < 10000 && daysSince(a.lastContact) >= 21);
+      else if (severityFilter === "followup_low") list = list.filter(a => a.amount < 1000 && daysSince(a.lastContact) >= 21);
+    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       list = list.filter(a =>
@@ -4056,7 +4068,7 @@ export default function WIPPlatform() {
       );
     }
     return list;
-  }, [current, areaFilter, searchQuery]);
+  }, [current, areaFilter, severityFilter, searchQuery, tab]);
 
   const exportToExcel = () => {
     let rows, filename;
@@ -4822,21 +4834,32 @@ Return JSON with:
                 <div style={{ fontSize: 10, color: "#1d4ed8", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>Billing WIP — DNFB</div>
                 {(() => {
                   const tiers = [
-                    { label: "Normal (1–3 days)", accs: dnfbFiltered.filter(a => a.daysInDNFB <= 3), color: "#16a34a" },
-                    { label: "Watch (3–5 days)",  accs: dnfbFiltered.filter(a => a.daysInDNFB > 3 && a.daysInDNFB < 6), color: "#d97706" },
-                    { label: "Flag (6+ days)",    accs: dnfbFiltered.filter(a => a.daysInDNFB >= 6), color: "#dc2626" },
+                    { label: "Normal (1–3 days)", key: "normal", accs: dnfbFiltered.filter(a => a.daysInDNFB <= 3), color: "#16a34a" },
+                    { label: "Watch (3–5 days)",  key: "watch",  accs: dnfbFiltered.filter(a => a.daysInDNFB > 3 && a.daysInDNFB < 6), color: "#d97706" },
+                    { label: "Flag (6+ days)",    key: "flag",   accs: dnfbFiltered.filter(a => a.daysInDNFB >= 6), color: "#dc2626" },
                   ];
-                  return tiers.map((t, i) => (
-                    <div key={t.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 7, marginBottom: 7, borderBottom: i < 2 ? "1px solid #f1f5f9" : "none" }}>
-                      <div style={{ fontSize: 12, color: "#475569", fontWeight: 500 }}>{t.label}</div>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        <span style={{ fontSize: 11, color: "#94a3b8" }}>{t.accs.length} accts</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: t.color }}>{fmt(t.accs.reduce((s,a) => s+a.amount, 0))}</span>
+                  return tiers.map((t, i) => {
+                    const isActive = severityFilter === t.key;
+                    return (
+                      <div key={t.label} onClick={() => { if (isActive) { setSeverityFilter(null); } else { setSeverityFilter(t.key); setTab("dnfb"); setSearchQuery(""); setAreaFilter(null); } }}
+                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 7, marginBottom: 7, borderBottom: i < 2 ? "1px solid #f1f5f9" : "none", cursor: "pointer", borderRadius: 6, padding: "6px 8px", background: isActive ? t.color + "12" : "transparent", opacity: severityFilter && !isActive ? 0.45 : 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: t.color, flexShrink: 0 }} />
+                          <div style={{ fontSize: 12, color: isActive ? t.color : "#475569", fontWeight: isActive ? 700 : 500 }}>{t.label}</div>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <span style={{ fontSize: 11, color: "#94a3b8" }}>{t.accs.length} accts</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: t.color }}>{fmt(t.accs.reduce((s,a) => s+a.amount, 0))}</span>
+                        </div>
                       </div>
-                    </div>
-                  ));
+                    );
+                  });
                 })()}
-                <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 4 }}>Total unbilled: {fmt(dnfbFiltered.reduce((s,a) => s+a.amount, 0))} · {dnfbFiltered.length} accounts{siteFilter ? " — " + siteFilter : ""}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                  <div style={{ fontSize: 9, color: "#94a3b8" }}>Total unbilled: {fmt(dnfbFiltered.reduce((s,a) => s+a.amount, 0))} · {dnfbFiltered.length} accounts{siteFilter ? " — " + siteFilter : ""}</div>
+                  {severityFilter && <button onClick={() => setSeverityFilter(null)} style={{ fontSize: 9, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Clear ×</button>}
+                </div>
+                {severityFilter && <div style={{ fontSize: 9, color: "#2563eb", marginTop: 4 }}>↓ Filtered below — scroll down to see accounts</div>}
               </div>
               <DonutChartPanel accounts={dnfbFiltered} title="Billing WIP by responsible area" onFilter={setAreaFilter} activeFilter={areaFilter} />
               <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 16px" }}>
@@ -4844,21 +4867,32 @@ Return JSON with:
                 {(() => {
                   const pastDue = arFiltered.filter(a => daysSince(a.lastContact) >= 21);
                   const tiers = [
-                    { label: "$10K+",    accs: pastDue.filter(a => a.amount >= 10000), color: "#b91c1c" },
-                    { label: "$1K–$10K", accs: pastDue.filter(a => a.amount >= 1000 && a.amount < 10000), color: "#c2410c" },
-                    { label: "<$1K",     accs: pastDue.filter(a => a.amount < 1000), color: "#64748b" },
+                    { label: "$10K+",    key: "followup_high", accs: pastDue.filter(a => a.amount >= 10000), color: "#b91c1c" },
+                    { label: "$1K–$10K", key: "followup_mid",  accs: pastDue.filter(a => a.amount >= 1000 && a.amount < 10000), color: "#c2410c" },
+                    { label: "<$1K",     key: "followup_low",  accs: pastDue.filter(a => a.amount < 1000), color: "#64748b" },
                   ];
-                  return tiers.map((t, i) => (
-                    <div key={t.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 7, marginBottom: 7, borderBottom: i < 2 ? "1px solid #f1f5f9" : "none" }}>
-                      <div style={{ fontSize: 12, color: "#475569", fontWeight: 500 }}>{t.label}</div>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        <span style={{ fontSize: 11, color: "#94a3b8" }}>{t.accs.length} accts</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: t.color }}>{fmt(t.accs.reduce((s,a) => s+a.amount, 0))}</span>
+                  return tiers.map((t, i) => {
+                    const isActive = severityFilter === t.key;
+                    return (
+                      <div key={t.label} onClick={() => { if (isActive) { setSeverityFilter(null); } else { setSeverityFilter(t.key); setTab("ar"); setSearchQuery(""); setAreaFilter(null); } }}
+                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 7, marginBottom: 7, borderBottom: i < 2 ? "1px solid #f1f5f9" : "none", cursor: "pointer", borderRadius: 6, padding: "6px 8px", background: isActive ? t.color + "12" : "transparent", opacity: severityFilter && !isActive ? 0.45 : 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: t.color, flexShrink: 0 }} />
+                          <div style={{ fontSize: 12, color: isActive ? t.color : "#475569", fontWeight: isActive ? 700 : 500 }}>{t.label}</div>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <span style={{ fontSize: 11, color: "#94a3b8" }}>{t.accs.length} accts</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: t.color }}>{fmt(t.accs.reduce((s,a) => s+a.amount, 0))}</span>
+                        </div>
                       </div>
-                    </div>
-                  ));
+                    );
+                  });
                 })()}
-                <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 4 }}>Accounts &gt;21 days without contact · {arFiltered.filter(a => daysSince(a.lastContact) >= 21).length} total past due</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                  <div style={{ fontSize: 9, color: "#94a3b8" }}>Accounts &gt;21 days without contact · {arFiltered.filter(a => daysSince(a.lastContact) >= 21).length} total past due</div>
+                  {severityFilter && severityFilter.startsWith("followup") && <button onClick={() => setSeverityFilter(null)} style={{ fontSize: 9, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Clear ×</button>}
+                </div>
+                {severityFilter && severityFilter.startsWith("followup") && <div style={{ fontSize: 9, color: "#2563eb", marginTop: 4 }}>↓ Filtered below — scroll down to see accounts</div>}
               </div>
               <DonutChartPanel accounts={arFiltered} title="Collections WIP by responsible area" onFilter={setAreaFilter} activeFilter={areaFilter} />
             </div>
@@ -5253,6 +5287,14 @@ Return JSON with:
         })()}
         {role === "cfo" && tab === "metrics" && false && <DonutChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />}
 
+        {severityFilter && (tab === "dnfb" || tab === "ar") && (
+          <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "8px 14px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: "#2563eb", fontWeight: 600 }}>
+              Filtered from Dashboard: {severityFilter === "normal" ? "Normal (1–3 days)" : severityFilter === "watch" ? "Watch (3–5 days)" : severityFilter === "flag" ? "Flag (6+ days)" : severityFilter === "followup_high" ? "$10K+ past due" : severityFilter === "followup_mid" ? "$1K–$10K past due" : "< $1K past due"} · {filtered.length} accounts
+            </span>
+            <button onClick={() => setSeverityFilter(null)} style={{ fontSize: 11, color: "#64748b", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>← Back to full list</button>
+          </div>
+        )}
         <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Search by account ID, patient, payer, or site..." />
 
         {(role === "biller" || role === "medicaid" || role === "wc") && (
