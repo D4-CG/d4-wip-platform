@@ -4029,7 +4029,7 @@ Return JSON with:
                     </div>
                   ));
                 })()}
-                <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 6, paddingTop: 6, borderTop: "1px solid #f1f5f9" }}>Accounts &gt;21 days without contact · {arFiltered.filter(a => !workedIdSet.has(a.id)).length} unworked in platform</div>
+                <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 6, paddingTop: 6, borderTop: "1px solid #f1f5f9" }}>{arFiltered.filter(a => !workedIdSet.has(a.id)).length.toLocaleString()} accounts unworked in platform</div>
               </div>
               <DonutChartPanel accounts={arFiltered.filter(a => !workedIdSet.has(a.id))} title="Collections WIP — past due by area" onFilter={(area) => { setTab("ar"); setAreaFilter(area); setSeverityFilter(null); setSearchQuery(""); window.scrollTo(0,0); }} activeFilter={null} />
             </div>
@@ -4327,7 +4327,7 @@ Return JSON with:
                 })}
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: "1px solid #f1f5f9" }}>
                   <span style={{ fontSize: 9, color: "#94a3b8" }}>
-                    {severityFilter ? `${tiers.find(t=>t.key===severityFilter)?.label}: ${fmt((tiers.find(t=>t.key===severityFilter)?.accs||[]).reduce((s,a)=>s+a.amount,0))} · ${(tiers.find(t=>t.key===severityFilter)?.accs||[]).length} accounts` : `Accounts >21 days without contact · ${pastDue.length} past due`}
+                    {severityFilter ? `${tiers.find(t=>t.key===severityFilter)?.label}: ${fmt((tiers.find(t=>t.key===severityFilter)?.accs||[]).reduce((s,a)=>s+a.amount,0))} · ${(tiers.find(t=>t.key===severityFilter)?.accs||[]).length} accounts` : `${pastDue.length.toLocaleString()} accounts unworked in platform`}
                   </span>
                   {severityFilter && <button onClick={() => setSeverityFilter(null)} style={{ fontSize: 9, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Show all ×</button>}
                 </div>
