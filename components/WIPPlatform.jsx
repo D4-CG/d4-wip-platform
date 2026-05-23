@@ -1394,6 +1394,109 @@ function LightRecipientView({ area, worklinks, onResolve, roleLabel }) {
 // ─── CFO Dashboard V2 — refined, layered, cash-health-first ───────────────────
 // Built behind the existing dashboard as a fresh design language (Apple-like:
 // type-led, calm, color-as-signal, progressive disclosure). Old dashboard intact.
+
+// ─── Ranked Risk Engine ───────────────────────────────────────────────────────
+// Pure function: computes ALL candidate findings, scores each by threat-to-business,
+// returns ranked desc. The briefing renders top N. As metrics move, ranking shifts,
+// so the most important risk to Marcus is always on top. Every finding answers
+// WHY (what's driving it) and SO WHAT (cash consequence + the path).
+//   severity: 0..100 (drives rank + color band)
+//   tone: "risk" | "good" (good news shown calmly, never as a threat)
+// fmtUSD passed in to keep currency formatting consistent with the app.
+function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
+  const findings = [];
+  const annualNPR = siteFilter ? (siteNpr[siteFilter] || 0) : Object.values(siteNpr).reduce((s, v) => s + v, 0);
+  const dailyNPR = annualNPR / 365;
+  const totalAR = ar.reduce((s, a) => s + a.amount, 0);
+  const round10k = (n) => Math.round(n / 10000) * 10000;
+
+  // ---- Finding 1: Portfolio AR aging trend (deterioration over the month) ----
+  const curDays = totalAR > 0 ? Math.round(ar.reduce((s, a) => s + a.amount * a.daysOut, 0) / totalAR) : 0;
+  const priorDays = siteFilter
+    ? (baseline.sites[siteFilter]?.prior.arDays ?? curDays)
+    : baseline.portfolio.prior.arDays;
+  const deltaDays = curDays - priorDays;
+  const cashDrift = round10k(Math.abs(deltaDays) * dailyNPR);
+  const deterioratingSites = Object.entries(baseline.sites)
+    .filter(([, s]) => s.trend === "deteriorating")
+    .sort((a, b) => b[1].delta.arDays - a[1].delta.arDays);
+  if (deltaDays > 0) {
+    findings.push({
+      id: "aging_trend", tone: "risk",
+      // severity scales with magnitude of slip; +3 days portfolio ≈ ~60
+      severity: Math.min(100, 40 + deltaDays * 7),
+      headline: { pre: "AR slowed ", em: `${priorDays} → ${curDays} days`, mid: " this month, delaying roughly ", em2: fmtUSD(cashDrift), post: " of cash collection." },
+      why: `Driven by ${deterioratingSites.length} sites aging faster — denials and follow-up gaps compounding.`,
+      soWhat: `Recoverable if worked before accounts cross the 90-day collectability cliff.`,
+      drivers: deterioratingSites.slice(0, 3).map(([name, s]) => ({
+        name, detail: `${s.prior.arDays} → ${s.current.arDays} days · denial +${s.delta.denialRate}pts · +${s.delta.over90Pct}pts over 90`,
+        magnitude: `+${s.delta.arDays}d`,
+      })),
+    });
+  } else if (deltaDays < 0) {
+    findings.push({
+      id: "aging_trend", tone: "good",
+      severity: 20,
+      headline: { pre: "AR improved ", em: `${priorDays} → ${curDays} days`, mid: " this month, pulling roughly ", em2: fmtUSD(cashDrift), post: " of cash closer to collection." },
+      why: `Recovery is broad-based across sites.`,
+      soWhat: `Hold the gains by keeping the weakest sites worked.`,
+      drivers: [],
+    });
+  }
+
+  // ---- Finding 2: Money aging past the recoverability cliff (>90 / >120) ----
+  const over90 = ar.filter(a => a.daysOut > 90).reduce((s, a) => s + a.amount, 0);
+  const over120 = ar.filter(a => a.daysOut > 120).reduce((s, a) => s + a.amount, 0);
+  const over90Pct = totalAR > 0 ? Math.round(over90 / totalAR * 100) : 0;
+  if (over90Pct > 10) {
+    findings.push({
+      id: "aging_cliff", tone: "risk",
+      // PE target is <10%; severity scales above that
+      severity: Math.min(100, 45 + (over90Pct - 10) * 3),
+      headline: { pre: "", em: fmtUSD(round10k(over90)), mid: " has aged past 90 days — ", em2: `${over90Pct}% of AR`, post: ", above the 10% PE target." },
+      why: `Collectability falls sharply after 90 days; ${fmtUSD(round10k(over120))} is already past 120.`,
+      soWhat: `Prioritize the over-90 cohort now to keep it from reaching write-off.`,
+      drivers: [],
+    });
+  }
+
+  // ---- Finding 3: Concentration risk (single site = outsized exposure) ----
+  const bySite = {};
+  ar.forEach(a => { bySite[a.site] = (bySite[a.site] || 0) + a.amount; });
+  const siteEntries = Object.entries(bySite).sort((a, b) => b[1] - a[1]);
+  if (!siteFilter && siteEntries.length > 0) {
+    const [topSite, topAR] = siteEntries[0];
+    const topPct = Math.round(topAR / totalAR * 100);
+    if (topPct >= 15) {
+      findings.push({
+        id: "concentration", tone: "risk",
+        severity: Math.min(85, 30 + topPct * 1.5),
+        headline: { pre: "", em: `${topPct}% of AR`, mid: " sits in a single site — ", em2: topSite, post: ` holds ${fmtUSD(round10k(topAR))}.` },
+        why: `Concentrated exposure means one site's performance swings the whole portfolio.`,
+        soWhat: `Watch ${topSite} closely; its trajectory is the portfolio's trajectory.`,
+        drivers: [],
+      });
+    }
+  }
+
+  // ---- Finding 4: Denial bleed (first-pass denials as recurring leakage) ----
+  const deniedAccts = ar.filter(a => a.denialCode);
+  const denialRate = ar.length > 0 ? Math.round(deniedAccts.length / ar.length * 100) : 0;
+  const deniedBalance = deniedAccts.reduce((s, a) => s + a.amount, 0);
+  if (denialRate >= 10) {
+    findings.push({
+      id: "denial_bleed", tone: "risk",
+      severity: Math.min(80, 25 + denialRate * 2.2),
+      headline: { pre: "First-pass denials at ", em: `${denialRate}%`, mid: " — ", em2: fmtUSD(round10k(deniedBalance)), post: " in denied balance, above the 10% acceptable line." },
+      why: `Recurring denials signal upstream issues (coding, auth, eligibility) feeding back as rework.`,
+      soWhat: `Each point of denial reduction is recurring margin, not a one-time recovery.`,
+      drivers: [],
+    });
+  }
+
+  return findings.sort((a, b) => b.severity - a.severity);
+}
+
 function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isCollectorActionable, worklinks }) {
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
@@ -1402,81 +1505,67 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
   const INK = "#0f172a", MUTE = "#64748b", FAINT = "#94a3b8", LINE = "#e2e8f0";
   const RED = "#dc2626", AMBER = "#d97706", GREEN = "#16a34a", BLUE = "#2563eb";
 
-  // ---- Current portfolio metrics ----
-  const totalAR = arFiltered.reduce((s, a) => s + a.amount, 0);
-  const curDays = totalAR > 0 ? Math.round(arFiltered.reduce((s, a) => s + a.amount * a.daysOut, 0) / totalAR) : 0;
-
-  // ---- Prior-period comparison (the FINDING: what changed) ----
-  // Use locked baseline for portfolio trend. Only meaningful for all-sites view.
-  const priorDays = siteFilter
-    ? (SITE_BASELINE.sites[siteFilter]?.prior.arDays ?? curDays)
-    : SITE_BASELINE.portfolio.prior.arDays;
-  const deltaDays = curDays - priorDays;
-  const deteriorating = deltaDays > 0;
-
-  // Cash consequence of the drift: days slower × daily net revenue rate.
-  // dailyNPR = annual NPR / 365. Each extra AR day ≈ one day of revenue sitting uncollected longer.
-  const annualNPR = siteFilter ? (SITE_NPR[siteFilter] || 0) : Object.values(SITE_NPR).reduce((s, v) => s + v, 0);
-  const dailyNPR = annualNPR / 365;
-  const cashDrift = Math.round(Math.abs(deltaDays) * dailyNPR);
-
-  // ---- Deteriorating sites (where the drift concentrates) ----
-  const deterioratingSites = Object.entries(SITE_BASELINE.sites)
-    .filter(([, s]) => s.trend === "deteriorating")
-    .sort((a, b) => b[1].delta.arDays - a[1].delta.arDays);
-  const deterioratingCount = deterioratingSites.length;
+  // Run the ranked risk engine — findings reorder as the metrics move.
+  const findings = computeRiskFindings({
+    ar: arFiltered, baseline: SITE_BASELINE, siteNpr: SITE_NPR, siteFilter, fmtUSD: fmt,
+  });
 
   const label = { fontSize: 11, fontWeight: 600, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase" };
-  const signalColor = deteriorating ? RED : GREEN;
+  // severity → signal color band. Good-news findings stay calm (no red).
+  const bandColor = (f) => f.tone === "good" ? GREEN : f.severity >= 60 ? RED : f.severity >= 40 ? AMBER : FAINT;
+  const emColor = (f) => f.tone === "good" ? GREEN : f.severity >= 60 ? RED : f.severity >= 40 ? AMBER : INK;
+
+  const lead = findings[0];
+  const supporting = findings.slice(1, 4);
 
   return (
     <div style={{ fontFamily: "inherit", color: INK, background: "#fff", maxWidth: 940, margin: "0 auto", padding: isMobile ? "8px 4px 40px" : "24px 16px 60px" }}>
 
-      {/* ── LEAD FINDING — what changed, what it costs, where ── */}
-      <div style={{ padding: isMobile ? "20px 16px" : "32px 28px", border: `1px solid ${LINE}`, borderRadius: 14, borderLeft: `3px solid ${signalColor}` }}>
-        <div style={{ ...label, marginBottom: 14 }}>Risk briefing{siteFilter ? ` · ${siteFilter}` : " · portfolio"}</div>
+      <div style={{ ...label, marginBottom: 14, paddingLeft: 4 }}>Risk briefing{siteFilter ? ` · ${siteFilter}` : " · portfolio"} · this month</div>
 
-        {/* The finding, stated as a sentence a CFO would repeat to the board */}
-        <div style={{ fontSize: isMobile ? 21 : 27, fontWeight: 600, lineHeight: 1.32, letterSpacing: "-0.01em" }}>
-          {deteriorating ? (
-            <>AR aged <span style={{ color: RED }}>{priorDays} → {curDays} days</span> this month, pushing about{" "}
-            <span style={{ color: RED }}>{fmt(cashDrift)}</span> of cash further from collection.</>
-          ) : (
-            <>AR improved <span style={{ color: GREEN }}>{priorDays} → {curDays} days</span> this month, pulling about{" "}
-            <span style={{ color: GREEN }}>{fmt(cashDrift)}</span> of cash closer to collection.</>
-          )}
+      {!lead ? (
+        <div style={{ padding: "32px 28px", border: `1px solid ${LINE}`, borderRadius: 14, borderLeft: `3px solid ${GREEN}` }}>
+          <div style={{ fontSize: isMobile ? 19 : 23, fontWeight: 600 }}>No material risks this period.</div>
+          <div style={{ fontSize: 14, color: MUTE, marginTop: 10 }}>AR aging, denial, and concentration are all within benchmark. Keep working the queue to hold position.</div>
         </div>
-
-        {/* Supporting context — quiet */}
-        <div style={{ fontSize: 14, color: MUTE, marginTop: 14, lineHeight: 1.5 }}>
-          {deteriorating ? (
-            <>The decline concentrates in <strong style={{ color: INK, fontWeight: 600 }}>{deterioratingCount} sites</strong>.{" "}
-            {deterioratingSites.slice(0, 3).map(([n]) => n).join(", ")} are aging fastest — recoverable if worked before they cross the 90-day collectability cliff.</>
-          ) : (
-            <>Recovery is broad-based across sites. Hold the gains by keeping the weakest sites worked.</>
-          )}
-        </div>
-
-        {/* The three drivers, inline — magnitude per site */}
-        {deteriorating && (
-          <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 0 }}>
-            {deterioratingSites.slice(0, 3).map(([name, s], i) => (
-              <div key={name} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr auto" : "160px 1fr auto", alignItems: "center", gap: 14, padding: "12px 0", borderTop: i === 0 ? `1px solid ${LINE}` : `1px solid ${LINE}` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: RED }} />
-                  <span style={{ fontSize: 15, fontWeight: 600 }}>{name}</span>
-                </div>
-                {!isMobile && (
-                  <div style={{ fontSize: 13, color: MUTE }}>
-                    {s.prior.arDays} → {s.current.arDays} days · denial +{s.delta.denialRate}pts · {s.delta.over90Pct >= 0 ? "+" : ""}{s.delta.over90Pct}pts over 90
+      ) : (
+        <>
+          {/* ── LEAD FINDING (largest) ── */}
+          <div style={{ padding: isMobile ? "20px 16px" : "30px 28px", border: `1px solid ${LINE}`, borderRadius: 14, borderLeft: `3px solid ${bandColor(lead)}`, marginBottom: 14 }}>
+            <div style={{ fontSize: isMobile ? 20 : 26, fontWeight: 600, lineHeight: 1.34, letterSpacing: "-0.01em" }}>
+              {lead.headline.pre}<span style={{ color: emColor(lead) }}>{lead.headline.em}</span>{lead.headline.mid}<span style={{ color: emColor(lead) }}>{lead.headline.em2}</span>{lead.headline.post}
+            </div>
+            <div style={{ fontSize: 14, color: MUTE, marginTop: 14, lineHeight: 1.55 }}>
+              <span style={{ color: INK, fontWeight: 600 }}>Why:</span> {lead.why}<br />
+              <span style={{ color: INK, fontWeight: 600 }}>So what:</span> {lead.soWhat}
+            </div>
+            {lead.drivers.length > 0 && (
+              <div style={{ marginTop: 20 }}>
+                {lead.drivers.map((d, i) => (
+                  <div key={d.name} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr auto" : "150px 1fr auto", alignItems: "center", gap: 14, padding: "11px 0", borderTop: `1px solid ${LINE}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: bandColor(lead) }} />
+                      <span style={{ fontSize: 15, fontWeight: 600 }}>{d.name}</span>
+                    </div>
+                    {!isMobile && <div style={{ fontSize: 13, color: MUTE }}>{d.detail}</div>}
+                    <div style={{ fontSize: 15, fontWeight: 600, color: bandColor(lead), textAlign: "right" }}>{d.magnitude}</div>
                   </div>
-                )}
-                <div style={{ fontSize: 15, fontWeight: 600, color: RED, textAlign: "right" }}>+{s.delta.arDays}d</div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        )}
-      </div>
+
+          {/* ── SUPPORTING FINDINGS (smaller, ranked) ── */}
+          {supporting.map(f => (
+            <div key={f.id} style={{ padding: isMobile ? "16px 16px" : "18px 24px", border: `1px solid ${LINE}`, borderRadius: 12, borderLeft: `3px solid ${bandColor(f)}`, marginBottom: 10 }}>
+              <div style={{ fontSize: isMobile ? 15 : 17, fontWeight: 600, lineHeight: 1.4 }}>
+                {f.headline.pre}<span style={{ color: emColor(f) }}>{f.headline.em}</span>{f.headline.mid}<span style={{ color: emColor(f) }}>{f.headline.em2}</span>{f.headline.post}
+              </div>
+              <div style={{ fontSize: 13, color: MUTE, marginTop: 8, lineHeight: 1.5 }}>{f.soWhat}</div>
+            </div>
+          ))}
+        </>
+      )}
 
     </div>
   );
