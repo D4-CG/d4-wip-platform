@@ -1591,15 +1591,13 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
             {lead.drivers.length > 0 && (
               <div style={{ marginTop: 20, paddingLeft: isMobile ? 4 : 16 }}>
                 {lead.drivers.map((d, i) => (
-                  <div key={d.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "11px 0", borderTop: `1px solid ${LINE}` }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <div key={d.name} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 52px" : "130px 1fr 52px", alignItems: "center", columnGap: 16, padding: "11px 0", borderTop: `1px solid ${LINE}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                       <span style={{ width: 6, height: 6, borderRadius: "50%", background: bandColor(lead), flexShrink: 0 }} />
                       <span style={{ fontSize: 15, fontWeight: 600 }}>{d.name}</span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 14, minWidth: 0 }}>
-                      {!isMobile && <span style={{ fontSize: 13, color: MUTE, whiteSpace: "nowrap" }}>{d.detail}</span>}
-                      <span style={{ fontSize: 15, fontWeight: 600, color: bandColor(lead), whiteSpace: "nowrap", flexShrink: 0 }}>{d.magnitude}</span>
-                    </div>
+                    {!isMobile && <div style={{ fontSize: 13, color: MUTE, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.detail}</div>}
+                    <div style={{ fontSize: 15, fontWeight: 600, color: bandColor(lead), textAlign: "right", whiteSpace: "nowrap" }}>{d.magnitude}</div>
                   </div>
                 ))}
               </div>
