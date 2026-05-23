@@ -176,6 +176,7 @@ const ROLE_DEFS = {
   him:                  { label: "HIM / Physician Doc",     paneLabel: "HIM & physician holds + WorkLink",      filter: ["all"],         mode: "area", area: "Clinical/HIM" },
   billing_scrubber:     { label: "Billing / Scrubber",      paneLabel: "Billing holds + WorkLink requests",     filter: ["all"],         mode: "area", area: "Billing/Scrubber" },
   credentialing:        { label: "Credentialing",           paneLabel: "Credentialing holds + WorkLink requests",filter: ["all"],        mode: "area", area: "Credentialing" },
+  physician:            { label: "Physician (light)",        paneLabel: "WorkLinks waiting on you",              filter: ["all"],         mode: "light_recipient", area: "Physician/Doc" },
 };
 
 const ESCALATION_DATA = {
@@ -257,6 +258,134 @@ const WORKLINK_REQUEST_TYPES = [
 ];
 
 const WORKLINK_TARGET_AREAS = ["Authorization","Charge Capture","Coding","Clinical/HIM","Billing/Scrubber","Credentialing","Physician/Doc"];
+
+// Seed realistic WorkLink requests for the demo, derived from real DNFB accounts.
+// Produces a credible by-area spread: a mix of open (some SLA-breached) and resolved.
+function seedWorklinks() {
+  // Map DNFB hold codes → target area + request meta
+  const HOLD_TO_REQ = {
+    "PHYSICIAN_QUERY":    { requestType: "physician_query", requestLabel: "Physician query",     requestIcon: "👨‍⚕️", targetArea: "Physician/Doc" },
+    "PHYSICIAN_UNSIGNED": { requestType: "physician_query", requestLabel: "Physician query",     requestIcon: "👨‍⚕️", targetArea: "Physician/Doc" },
+    "HIM_DEFICIENCY":     { requestType: "him_deficiency",  requestLabel: "HIM deficiency",      requestIcon: "📄", targetArea: "Clinical/HIM" },
+    "AUTH_MISSING":       { requestType: "chase_auth",      requestLabel: "Chase authorization", requestIcon: "🔐", targetArea: "Authorization" },
+    "AUTH_EXPIRED":       { requestType: "chase_auth",      requestLabel: "Chase authorization", requestIcon: "🔐", targetArea: "Authorization" },
+    "CHARGE_MISSING":     { requestType: "missing_charge",  requestLabel: "Missing charge",      requestIcon: "⚡", targetArea: "Charge Capture" },
+    "CHARGE_LAG":         { requestType: "missing_charge",  requestLabel: "Missing charge",      requestIcon: "⚡", targetArea: "Charge Capture" },
+    "CODING_UNASSIGNED":  { requestType: "recode",          requestLabel: "Recode account",      requestIcon: "💻", targetArea: "Coding" },
+    "CODING_COMPLEX":     { requestType: "recode",          requestLabel: "Recode account",      requestIcon: "💻", targetArea: "Coding" },
+    "CREDENTIALING":      { requestType: "cred_gap",        requestLabel: "Credentialing gap",   requestIcon: "📋", targetArea: "Credentialing" },
+    "SCRUBBER_EDIT":      { requestType: "resubmit",        requestLabel: "Resubmit claim",      requestIcon: "🔄", targetArea: "Billing/Scrubber" },
+  };
+  const now = Date.now();
+  const hr = 3600000;
+  // Target counts per area: open (with a few breached) + resolved. Tuned for a realistic spread.
+  const PLAN = {
+    "Authorization":   { open: 7, resolved: 5 },
+    "Charge Capture":  { open: 5, resolved: 6 },
+    "Coding":          { open: 6, resolved: 8 },
+    "Clinical/HIM":    { open: 4, resolved: 5 },
+    "Billing/Scrubber":{ open: 9, resolved: 7 },
+    "Credentialing":   { open: 3, resolved: 2 },
+    "Physician/Doc":   { open: 6, resolved: 4 },
+  };
+  // Bucket DNFB accounts by their mapped target area
+  const byArea = {};
+  for (const a of DNFB_DATA) {
+    const meta = HOLD_TO_REQ[a.holdCode];
+    if (!meta) continue;
+    (byArea[meta.targetArea] = byArea[meta.targetArea] || []).push({ a, meta });
+  }
+  const out = [];
+  let seq = 0;
+  for (const area of WORKLINK_TARGET_AREAS) {
+    const pool = (byArea[area] || []).slice().sort((x, y) => y.a.amount - x.a.amount);
+    const plan = PLAN[area] || { open: 0, resolved: 0 };
+    let idx = 0;
+    // Open requests — vary age; mark ~25% as SLA-breached (sent earlier than SLA window)
+    for (let i = 0; i < plan.open && idx < pool.length; i++, idx++) {
+      const { a, meta } = pool[idx];
+      const ageHrs = 4 + (i * 9) % 60;            // 4–64h old
+      const breached = i % 4 === 0;                // ~25% breached
+      const slaWindow = breached ? ageHrs - 6 : ageHrs + 18;
+      out.push({
+        id: `WL-SEED-${++seq}`,
+        accountId: a.id, patient: a.patient, payer: a.payer, vertical: a.vertical,
+        amount: a.amount, expectedValue: Math.round(a.amount * 0.78),
+        originType: "DNFB", sourceArea: "Billing/Scrubber",
+        requestType: meta.requestType, requestLabel: meta.requestLabel, requestIcon: meta.requestIcon,
+        targetArea: area, note: `${meta.requestLabel} needed — ${a.holdCode.replace(/_/g, " ").toLowerCase()} on ${a.id}. ${fmtSeed(a.amount)} at stake.`,
+        status: "open",
+        sentAt: new Date(now - ageHrs * hr),
+        slaDue: new Date(now - ageHrs * hr + slaWindow * hr),
+        slaHrs: slaWindow, slaSeverity: breached ? "URGENT" : "MODERATE",
+        slaLabel: breached ? "BREACHED" : `${slaWindow}h`,
+        createdAt: new Date(now - ageHrs * hr).toISOString(),
+      });
+    }
+    // Resolved requests — sent earlier, resolved within a plausible window
+    for (let i = 0; i < plan.resolved && idx < pool.length; i++, idx++) {
+      const { a, meta } = pool[idx];
+      const sentHrs = 30 + (i * 11) % 80;
+      const resolveHrs = 6 + (i * 5) % 28;
+      out.push({
+        id: `WL-SEED-${++seq}`,
+        accountId: a.id, patient: a.patient, payer: a.payer, vertical: a.vertical,
+        amount: a.amount, expectedValue: Math.round(a.amount * 0.78),
+        requestType: meta.requestType, requestLabel: meta.requestLabel, requestIcon: meta.requestIcon,
+        targetArea: area, note: `${meta.requestLabel} on ${a.id}.`,
+        status: "resolved",
+        sentAt: new Date(now - sentHrs * hr),
+        resolvedAt: new Date(now - (sentHrs - resolveHrs) * hr),
+        resolutionNote: "Resolved by receiving area.",
+        slaDue: new Date(now - sentHrs * hr + 24 * hr),
+        slaHrs: 24, slaSeverity: "MODERATE", slaLabel: "24h",
+        createdAt: new Date(now - sentHrs * hr).toISOString(),
+      });
+    }
+  }
+  // ---- AR-originated WorkLinks (Collections → upstream areas) ----
+  // Collectors working billed AR hit internal blockers and send WorkLinks upstream.
+  // These accounts are suppressed from Follow-up WIP (the AR-side of the mesh).
+  // AR denial code → target area for the collector-originated request.
+  const AR_DENIAL_TO_REQ = {
+    "CO-16": { requestType: "missing_charge",  requestLabel: "Missing info / charge", requestIcon: "⚡", targetArea: "Charge Capture" },
+    "CO-22": { requestType: "resubmit",         requestLabel: "COB correction",        requestIcon: "🔄", targetArea: "Billing/Scrubber" },
+    "CO-50": { requestType: "physician_query",  requestLabel: "Physician query",       requestIcon: "👨‍⚕️", targetArea: "Physician/Doc" },
+    "CO-97": { requestType: "recode",           requestLabel: "Recode (unbundle)",     requestIcon: "💻", targetArea: "Coding" },
+    "CO-4":  { requestType: "chase_auth",       requestLabel: "Chase authorization",   requestIcon: "🔐", targetArea: "Authorization" },
+  };
+  // Pull denied AR accounts (collectors originate from these), highest-value first
+  const deniedAR = AR_DATA.filter(a => a.denialCode && AR_DENIAL_TO_REQ[a.denialCode])
+    .sort((a, b) => b.amount - a.amount);
+  // Seed ~30 AR-originated open WorkLinks across the mapped areas — these demonstrate
+  // Follow-up WIP suppression (account leaves collector queue, enters WorkLink-in-flight).
+  const AR_ORIGINATED_COUNT = 30;
+  for (let i = 0; i < AR_ORIGINATED_COUNT && i < deniedAR.length; i++) {
+    const a = deniedAR[i];
+    const meta = AR_DENIAL_TO_REQ[a.denialCode];
+    const ageHrs = 3 + (i * 7) % 70;
+    const breached = i % 5 === 0;
+    const slaWindow = breached ? ageHrs - 5 : ageHrs + 20;
+    out.push({
+      id: `WL-SEED-AR-${++seq}`,
+      accountId: a.id, patient: a.patient, payer: a.payer, vertical: a.vertical,
+      amount: a.amount, expectedValue: a.amount,  // AR carries net/EV currency, NOT gross
+      originType: "AR", sourceArea: "Collections",
+      requestType: meta.requestType, requestLabel: meta.requestLabel, requestIcon: meta.requestIcon,
+      targetArea: meta.targetArea,
+      note: `${meta.requestLabel} — ${a.denialCode} denial on ${a.id}. Collector blocked pending ${meta.targetArea} action. ${fmtSeed(a.amount)} EV in flight.`,
+      status: "open",
+      sentAt: new Date(now - ageHrs * hr),
+      slaDue: new Date(now - ageHrs * hr + slaWindow * hr),
+      slaHrs: slaWindow, slaSeverity: breached ? "URGENT" : "MODERATE",
+      slaLabel: breached ? "BREACHED" : `${slaWindow}h`,
+      createdAt: new Date(now - ageHrs * hr).toISOString(),
+    });
+  }
+  return out;
+}
+function fmtSeed(n) { return "$" + n.toLocaleString(); }
+
 
 const WORKLINK_SLA_HRS = { CRITICAL: 4, URGENT: 24, MODERATE: 48, ROUTINE: 72 };
 
@@ -1186,7 +1315,81 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
   );
 }
 
-// ─── WorkLink Reporting ───────────────────────────────────────────────────────
+// ─── Light Recipient View ─────────────────────────────────────────────────────
+// Low-frequency recipients (physicians, credentialing) get NO work-generating queue —
+// just a lightweight "WorkLinks waiting on you" list with one-tap status. Easier than email.
+function LightRecipientView({ area, worklinks, onResolve, roleLabel }) {
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 768;
+  const waiting = worklinks
+    .filter(w => w.targetArea === area && w.status === "open")
+    .sort((a, b) => new Date(a.slaDue) - new Date(b.slaDue));
+  const resolvedToday = worklinks.filter(w => w.targetArea === area && w.status !== "open");
+
+  const oneTap = (w, label) => onResolve(w.id, `${roleLabel}: ${label}`);
+
+  return (
+    <div style={{ padding: isMobile ? "16px 12px 80px" : "24px 32px", maxWidth: 760, margin: "0 auto" }}>
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>WorkLinks waiting on you</div>
+        <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
+          {waiting.length === 0
+            ? "You're all caught up — nothing waiting."
+            : `${waiting.length} request${waiting.length > 1 ? "s" : ""} need your response. One tap to clear each.`}
+        </div>
+      </div>
+
+      {waiting.length === 0 ? (
+        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "40px 24px", textAlign: "center" }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#16a34a" }}>All clear</div>
+          <div style={{ fontSize: 13, color: "#166534", marginTop: 4 }}>No open requests waiting on you.</div>
+        </div>
+      ) : (
+        waiting.map(w => {
+          const breached = new Date() > new Date(w.slaDue);
+          return (
+            <div key={w.id} style={{ background: "#fff", border: `1px solid ${breached ? "#fecaca" : "#e2e8f0"}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: "#0f172a" }}>{w.patient}</div>
+                  <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>{w.accountId} · {w.payer}{w.vertical ? ` · ${w.vertical}` : ""}</div>
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: breached ? "#dc2626" : "#0369a1", background: breached ? "#fef2f2" : "#e0f2fe", borderRadius: 8, padding: "3px 9px", whiteSpace: "nowrap" }}>
+                  {breached ? "SLA breached" : "Awaiting you"}
+                </div>
+              </div>
+              <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.5, marginBottom: 6 }}>{w.requestIcon} {w.note}</div>
+              <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 12 }}>
+                From {w.sourceArea || "revenue cycle"} · sent {new Date(w.sentAt).toLocaleDateString([], { month: "short", day: "numeric" })}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {[
+                  { label: "Answered", color: "#16a34a" },
+                  { label: "Addendum signed", color: "#0369a1" },
+                  { label: "Need more info", color: "#c2410c" },
+                ].map(b => (
+                  <button key={b.label} onClick={() => oneTap(w, b.label)}
+                    style={{ flex: isMobile ? "1 1 100%" : "0 1 auto", padding: "9px 16px", background: "#fff", border: `1.5px solid ${b.color}`, borderRadius: 8, color: b.color, cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
+                    {b.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })
+      )}
+
+      {resolvedToday.length > 0 && (
+        <div style={{ marginTop: 20, fontSize: 12, color: "#94a3b8" }}>
+          ✓ {resolvedToday.length} cleared this session
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 
 function WorkLinkReporting({ worklinks, isMobile }) {
   const [drillArea, setDrillArea] = useState(null);
@@ -1212,6 +1415,13 @@ function WorkLinkReporting({ worklinks, isMobile }) {
   const totalOpenEV = open.reduce((s,w) => s+w.expectedValue, 0);
   const totalBreached = open.filter(w => new Date() > w.slaDue).length;
 
+  // WorkLink-in-flight currency split — AR-origin carries net/EV, DNFB-origin carries gross.
+  // These are DIFFERENT currencies and must never be summed into one headline.
+  const arInFlight = open.filter(w => w.originType === "AR");
+  const dnfbInFlight = open.filter(w => w.originType !== "AR"); // DNFB or legacy/unmarked
+  const arInFlightEV = arInFlight.reduce((s,w) => s+w.expectedValue, 0);
+  const dnfbInFlightGross = dnfbInFlight.reduce((s,w) => s+w.amount, 0);
+
   // Donut for EV by area
   const cx = 56, cy = 56, outerR = 46, innerR = 28;
   const areaColors2 = { "Coding":"#6d28d9","Physician/Doc":"#1d4ed8","Charge Capture":"#be185d","Credentialing":"#9f1239","Authorization":"#c2410c","Clinical/HIM":"#0369a1","Billing/Scrubber":"#0f766e" };
@@ -1233,19 +1443,22 @@ function WorkLinkReporting({ worklinks, isMobile }) {
 
   return (
     <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 20px", marginBottom: 16 }}>
-      <div style={{ fontSize: 10, color: "#0369a1", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 14 }}>⇄ WIP WorkLink — by area</div>
+      <div style={{ fontSize: 10, color: "#0369a1", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>⇄ WIP WorkLink — by area</div>
+      <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 14 }}>Internal rework in flight · AR shown as net/EV, DNFB as gross charges · the two are different currencies and never summed</div>
 
-      {/* Summary row */}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 10, marginBottom: 16 }}>
+      {/* Summary row — currency-split: AR (EV) and DNFB (gross) shown separately */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(5,1fr)", gap: 10, marginBottom: 16 }}>
         {[
           { label: "Open requests", value: open.length, color: "#0369a1" },
-          { label: "Total EV at stake", value: fmt(totalOpenEV), color: "#2563eb" },
+          { label: "AR in flight (EV)", value: fmt(arInFlightEV), color: "#2563eb", sub: `${arInFlight.length} accts` },
+          { label: "DNFB in flight (gross)", value: fmt(dnfbInFlightGross), color: "#7c3aed", sub: `${dnfbInFlight.length} accts` },
           { label: "SLA breached", value: totalBreached, color: totalBreached > 0 ? "#dc2626" : "#16a34a" },
           { label: "Resolved this session", value: resolved.length, color: "#16a34a" },
         ].map(m => (
           <div key={m.label} style={{ background: "#f8fafc", borderRadius: 8, padding: "10px 12px", border: "1px solid #f1f5f9" }}>
             <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>{m.label}</div>
             <div style={{ fontSize: 18, fontWeight: 700, color: m.color }}>{m.value}</div>
+            {m.sub && <div style={{ fontSize: 9, color: "#cbd5e1", marginTop: 2 }}>{m.sub}</div>}
           </div>
         ))}
       </div>
@@ -3131,12 +3344,21 @@ export default function WIPPlatform() {
   const [critFilter, setCritFilter] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [donutExpanded, setDonutExpanded] = useState(false);
-  const [worklinks, setWorklinks] = useState([]);
+  const [worklinks, setWorklinks] = useState(() => seedWorklinks());
   const [siteFilter, setSiteFilter] = useState(null);
   const [activeTier, setActiveTier] = useState(null);
 
   // Tracks worked account IDs in React state so donuts re-render when accounts are logged
   const [workedIdSet, setWorkedIdSet] = useState(() => new Set(Object.keys(getFollowUpStore())));
+
+  // Accounts with an open WorkLink are blocked on an internal dependency — suppressed from
+  // the originator's active WIP (collector Follow-up WIP, area native queue) until resolved.
+  const openWorkLinkAcctIds = useMemo(
+    () => new Set(worklinks.filter(w => w.status === "open").map(w => w.accountId)),
+    [worklinks]
+  );
+  // Collector-actionable AR = unworked in platform AND no open WorkLink blocking it.
+  const isCollectorActionable = (a) => !workedIdSet.has(a.id) && !openWorkLinkAcctIds.has(a.id);
 
   useEffect(() => {
     const handler = (e) => setWorkedIdSet(prev => new Set([...prev, e.detail.id]));
@@ -3192,7 +3414,7 @@ export default function WIPPlatform() {
     }
     // AR follow-up tier filter — set when clicking a Collections tier on Metrics tab
     if (severityFilter && tab === "ar") {
-      const pd = (a) => !workedIdSet.has(a.id); // unworked in platform
+      const pd = (a) => !workedIdSet.has(a.id) && !openWorkLinkAcctIds.has(a.id); // collector-actionable
       if (severityFilter === "followup_high") list = list.filter(a => pd(a) && a.amount >= 10000);
       else if (severityFilter === "followup_mid") list = list.filter(a => pd(a) && a.amount >= 1000 && a.amount < 10000);
       else if (severityFilter === "followup_low") list = list.filter(a => pd(a) && a.amount < 1000);
@@ -3207,7 +3429,7 @@ export default function WIPPlatform() {
       );
     }
     return list;
-  }, [current, areaFilter, activeTier, severityFilter, searchQuery, tab]);
+  }, [current, areaFilter, activeTier, severityFilter, searchQuery, tab, workedIdSet, openWorkLinkAcctIds]);
 
   const exportToExcel = () => {
     let rows, filename;
@@ -3362,6 +3584,17 @@ Return JSON with:
   const isSelfPayMode = roleConfig?.mode === "self_pay";
   const isCollectorMode = roleConfig?.mode === "collector" || roleConfig?.mode === "medicare_bc";
   const isAreaMode = roleConfig?.mode === "area";
+  const isLightRecipientMode = roleConfig?.mode === "light_recipient";
+  if (isLightRecipientMode) {
+    return (
+      <LightRecipientView
+        area={roleConfig.area}
+        worklinks={worklinks}
+        onResolve={handleResolveWorklink}
+        roleLabel={roleConfig.label}
+      />
+    );
+  }
   if (isSelfPayMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif" }}>
@@ -3683,6 +3916,7 @@ Return JSON with:
                     {seg("HIM", "him")}
                     {seg("Billing", "billing_scrubber")}
                     {seg("Cred", "credentialing")}
+                    {seg("Physician", "physician")}
                   </div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -4005,7 +4239,7 @@ Return JSON with:
               <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 16px" }}>
                 <div style={{ fontSize: 10, color: "#c2410c", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>Follow-up WIP — Collections</div>
                 {(() => {
-                  const pastDue = arFiltered.filter(a => !workedIdSet.has(a.id)); // unworked in platform
+                  const pastDue = arFiltered.filter(isCollectorActionable); // unworked in platform
                   const tiers = [
                     { label: "$10K+",    key: "followup_high", accs: pastDue.filter(a => a.amount >= 10000), color: "#b91c1c" },
                     { label: "$1K–$10K", key: "followup_mid",  accs: pastDue.filter(a => a.amount >= 1000 && a.amount < 10000), color: "#c2410c" },
@@ -4027,9 +4261,9 @@ Return JSON with:
                     </div>
                   ));
                 })()}
-                <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 6, paddingTop: 6, borderTop: "1px solid #f1f5f9" }}>{arFiltered.filter(a => !workedIdSet.has(a.id)).length.toLocaleString()} accounts unworked in platform</div>
+                <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 6, paddingTop: 6, borderTop: "1px solid #f1f5f9" }}>{arFiltered.filter(isCollectorActionable).length.toLocaleString()} accounts unworked in platform</div>
               </div>
-              <DonutChartPanel accounts={arFiltered.filter(a => !workedIdSet.has(a.id))} title="Collections WIP — past due by area" onFilter={(area) => { setTab("ar"); setAreaFilter(area); setSeverityFilter(null); setSearchQuery(""); window.scrollTo(0,0); }} activeFilter={null} />
+              <DonutChartPanel accounts={arFiltered.filter(isCollectorActionable)} title="Collections WIP — past due by area" onFilter={(area) => { setTab("ar"); setAreaFilter(area); setSeverityFilter(null); setSearchQuery(""); window.scrollTo(0,0); }} activeFilter={null} />
             </div>
             {/* NCR + Denial Rate — CFO metrics tab only */}
             {(() => {
@@ -4294,7 +4528,7 @@ Return JSON with:
         {(role === "supervisor") && <AreaChart accounts={current} onFilter={setAreaFilter} activeFilter={areaFilter} />}
 
         {role === "cfo" && tab === "ar" && (() => {
-          const pastDue = arForRole.filter(a => !workedIdSet.has(a.id)); // unworked in platform
+          const pastDue = arForRole.filter(isCollectorActionable); // unworked in platform
           const tiers = [
             { label: "$10K+",    key: "followup_high", accs: pastDue.filter(a => a.amount >= 10000), color: "#b91c1c" },
             { label: "$1K–$10K", key: "followup_mid",  accs: pastDue.filter(a => a.amount >= 1000 && a.amount < 10000), color: "#c2410c" },
