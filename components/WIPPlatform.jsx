@@ -4907,6 +4907,7 @@ Return JSON with:
           )}</>);
         })()}
 
+        {!(role === "cfo" && tab === "metrics") && (<>
         <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Search by account ID, patient, payer, or site..." />
 
         {(role === "biller" || role === "medicaid" || role === "wc") && (
@@ -5006,6 +5007,7 @@ Return JSON with:
             Showing top 100 of {filtered.length.toLocaleString()} accounts by expected value · refine with search or filters
           </div>
         )}
+        </>)}
       </div>
       )}
 
