@@ -1435,7 +1435,7 @@ function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
       id: "aging_trend", tone: "risk", rankClass: "lead",
       severity: Math.min(100, 40 + deltaDays * 7),
       headline: { pre: "AR slowed ", em: `${priorDays} → ${curDays} days`, mid: " this month, delaying roughly ", em2: fmtUSD(cashDrift), post: " of cash collection." },
-      why: `${deterioratingSites.length} sites are aging faster, led by the ${Math.min(3, deterioratingSites.length)} below — denials and follow-up gaps compounding.`,
+
       recommendation: `Direct collectors to the highest-EV accounts in ${deterioratingSites.slice(0, 3).map(([n]) => n).join(", ")} first — recovering the biggest dollars fastest pulls cash back in.`,
       drivers: deterioratingSites.slice(0, 3).map(([name, s]) => ({
         name, detail: `${s.prior.arDays} → ${s.current.arDays} days · denial +${s.delta.denialRate}pts · +${s.delta.over90Pct}pts over 90`,
@@ -1458,11 +1458,16 @@ function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
   const over120 = ar.filter(a => a.daysOut > 120).reduce((s, a) => s + a.amount, 0);
   const over90Pct = totalAR > 0 ? Math.round(over90 / totalAR * 100) : 0;
   if (over90Pct > 10) {
+    // Which sites are driving the aging — biggest over-90 increases this period
+    const cliffDrivers = Object.entries(baseline.sites)
+      .filter(([, s]) => (s.delta.over90Pct || 0) > 0)
+      .sort((a, b) => b[1].delta.over90Pct - a[1].delta.over90Pct)
+      .slice(0, 3).map(([n]) => n);
     findings.push({
       id: "aging_cliff", tone: "risk", rankClass: "context",
       severity: Math.min(100, 45 + (over90Pct - 10) * 3),
       headline: { pre: "", em: fmtUSD(round10k(over90)), mid: " has aged past 90 days — ", em2: `${over90Pct}% of AR`, post: ", above the 10% PE target." },
-      why: `Collectability falls sharply past 90 days; ${fmtUSD(round10k(over120))} is already past 120.`,
+      why: `Concentrated in ${cliffDrivers.join(", ")}, where aging accelerated most this month; ${fmtUSD(round10k(over120))} is already past 120.`,
       recommendation: `As collectors work by EV, flag high-EV accounts nearing 90 days so the biggest dollars are recovered before they slip toward write-off.`,
       drivers: [],
     });
@@ -1492,11 +1497,16 @@ function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
   const denialRate = ar.length > 0 ? Math.round(deniedAccts.length / ar.length * 100) : 0;
   const deniedBalance = deniedAccts.reduce((s, a) => s + a.amount, 0);
   if (denialRate >= 10) {
+    // Where denials rose most this month (real baseline deltas)
+    const denialRisers = Object.entries(baseline.sites)
+      .filter(([, s]) => (s.delta.denialRate || 0) > 0)
+      .sort((a, b) => b[1].delta.denialRate - a[1].delta.denialRate)
+      .slice(0, 3).map(([n]) => n);
     findings.push({
       id: "denial_bleed", tone: "risk", rankClass: "context",
       severity: Math.min(80, 25 + denialRate * 2.2),
       headline: { pre: "First-pass denials at ", em: `${denialRate}%`, mid: " — ", em2: fmtUSD(round10k(deniedBalance)), post: " in denied balance, above the 10% line." },
-      why: `Recurring denials signal upstream issues (coding, auth, eligibility) feeding back as rework.`,
+      why: `Denial volume climbed this month, concentrated at ${denialRisers.join(", ")} — upstream coding, auth, and eligibility gaps feeding back as rework.`,
       recommendation: `Route high-EV denied accounts through WorkLink to the responsible area; each point of denial reduction is recurring margin, not a one-time recovery.`,
       drivers: [],
     });
@@ -1579,15 +1589,15 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
               <span style={{ color: INK, fontWeight: 600 }}>Recommendation:</span> {lead.recommendation}
             </div>
             {lead.drivers.length > 0 && (
-              <div style={{ marginTop: 20, paddingLeft: isMobile ? 8 : 16 }}>
+              <div style={{ marginTop: 20, paddingLeft: isMobile ? 4 : 16, paddingRight: isMobile ? 4 : 8 }}>
                 {lead.drivers.map((d, i) => (
-                  <div key={d.name} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr auto" : "150px 1fr 70px", alignItems: "center", gap: 14, padding: "11px 0", borderTop: `1px solid ${LINE}` }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: bandColor(lead) }} />
+                  <div key={d.name} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 56px" : "150px 1fr 64px", alignItems: "center", gap: 12, padding: "11px 0", borderTop: `1px solid ${LINE}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: bandColor(lead), flexShrink: 0 }} />
                       <span style={{ fontSize: 15, fontWeight: 600 }}>{d.name}</span>
                     </div>
-                    {!isMobile && <div style={{ fontSize: 13, color: MUTE }}>{d.detail}</div>}
-                    <div style={{ fontSize: 15, fontWeight: 600, color: bandColor(lead), textAlign: "right" }}>{d.magnitude}</div>
+                    {!isMobile && <div style={{ fontSize: 13, color: MUTE, minWidth: 0 }}>{d.detail}</div>}
+                    <div style={{ fontSize: 15, fontWeight: 600, color: bandColor(lead), textAlign: "right", whiteSpace: "nowrap" }}>{d.magnitude}</div>
                   </div>
                 ))}
               </div>
@@ -1600,10 +1610,7 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
               <div style={{ fontSize: isMobile ? 15 : 17, fontWeight: 600, lineHeight: 1.4 }}>
                 {f.headline.pre}<span style={{ color: emColor(f) }}>{f.headline.em}</span>{f.headline.mid}<span style={{ color: emColor(f) }}>{f.headline.em2}</span>{f.headline.post}
               </div>
-              <div style={{ fontSize: 13, color: MUTE, marginTop: 10, lineHeight: 1.5 }}>
-                <span style={{ color: INK, fontWeight: 600 }}>Why:</span> {f.why}<br />
-                <span style={{ color: INK, fontWeight: 600 }}>Recommendation:</span> {f.recommendation}
-              </div>
+              <div style={{ fontSize: 13, color: MUTE, marginTop: 8, lineHeight: 1.5 }}>{f.recommendation}</div>
             </div>
           ))}
         </>
