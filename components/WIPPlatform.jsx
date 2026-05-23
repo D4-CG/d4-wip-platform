@@ -1396,6 +1396,59 @@ function LightRecipientView({ area, worklinks, onResolve, roleLabel }) {
 // Built behind the existing dashboard as a fresh design language (Apple-like:
 // type-led, calm, color-as-signal, progressive disclosure). Old dashboard intact.
 
+// ─── TrendChart ───────────────────────────────────────────────────────────────
+// Chart card that sits beside a finding: the metric line + soft fill, a faint baseline,
+// a min–max range label, the current endpoint value, and an OPTIONAL secondary overlay
+// (used for ADR on the AR-days card — a near-flat reference line that shows revenue held
+// steady while the primary metric moved, i.e. a collections problem not a volume problem).
+// "A touch more detail" than a sparkline, but still no gridlines/ticks — scannable at a glance.
+function TrendChart({ data, color, label, unit = "", endValue, overlay, overlayLabel, overlayColor, width = 168, height = 64, INK = "#0f172a", MUTE = "#64748b", FAINT = "#94a3b8", LINE = "#e2e8f0" }) {
+  if (!data || data.length < 2) return null;
+  const pad = 6, topPad = 6, botPad = 14;
+  const w = width - pad * 2, h = height - topPad - botPad;
+  const min = Math.min(...data), max = Math.max(...data);
+  const range = max - min || 1;
+  const xy = (arr, lo, hi) => arr.map((v, i) => {
+    const x = pad + (i / (arr.length - 1)) * w;
+    const y = topPad + h - ((v - lo) / ((hi - lo) || 1)) * h;
+    return [x, y];
+  });
+  const pts = xy(data, min, max);
+  const d = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  const [ex, ey] = pts[pts.length - 1];
+  const area = `${d} L${ex.toFixed(1)},${(topPad + h).toFixed(1)} L${pad},${(topPad + h).toFixed(1)} Z`;
+  // overlay scaled to its OWN range so a near-flat series reads as near-flat
+  let oPath = null;
+  if (overlay && overlay.length === data.length) {
+    const omin = Math.min(...overlay), omax = Math.max(...overlay);
+    const opad = (omax - omin) * 0.5 || 1; // pad so a flat line sits mid-card, visibly flat
+    const op = xy(overlay, omin - opad, omax + opad);
+    oPath = op.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  }
+  return (
+    <div style={{ width }}>
+      <svg width={width} height={height} style={{ display: "block", overflow: "visible" }} aria-hidden="true">
+        {/* faint baseline */}
+        <line x1={pad} y1={topPad + h} x2={width - pad} y2={topPad + h} stroke={LINE} strokeWidth="1" />
+        <path d={area} fill={color} opacity="0.07" />
+        {oPath && <path d={oPath} fill="none" stroke={overlayColor || FAINT} strokeWidth="1.3" strokeDasharray="3 2" opacity="0.9" />}
+        <path d={d} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={ex} cy={ey} r="2.6" fill={color} />
+      </svg>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 2 }}>
+        <span style={{ fontSize: 9, color: FAINT, letterSpacing: "0.04em" }}>{label}</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color }}>{endValue}{unit}</span>
+      </div>
+      {overlayLabel && (
+        <div style={{ fontSize: 8.5, color: FAINT, marginTop: 1, display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{ display: "inline-block", width: 10, height: 0, borderTop: `1.3px dashed ${overlayColor || FAINT}` }} />
+          {overlayLabel}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Sparkline ────────────────────────────────────────────────────────────────
 // Minimal trend line for finding cards: no axes, no labels, just the shape + endpoint dot.
 // Calm by design — conveys trajectory, not precision. color matches the finding's signal.
@@ -1595,6 +1648,16 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
   const lead = findings[0];
   const supporting = findings.slice(1, 6);
 
+  // Chart metadata per series — label, unit, and the current endpoint value (reconciles to truth).
+  const ts = TIMESERIES.series;
+  const last = (k) => ts[k] ? ts[k][ts[k].length - 1] : "";
+  const CHART_META = {
+    arDays:     { label: "AR DAYS · 12 WK", unit: "d",  end: () => last("arDays") },
+    over90Pct:  { label: "OVER 90 · 12 WK", unit: "%",  end: () => last("over90Pct") },
+    denialRate: { label: "DENIAL RATE · 12 WK", unit: "%", end: () => last("denialRate") },
+    improving:  { label: "AR DAYS · 12 WK", unit: "d",  end: () => last("improving") },
+  };
+
   return (
     <div style={{ fontFamily: "inherit", color: INK, background: "#fff", maxWidth: 940, margin: "0 auto", padding: isMobile ? "8px 4px 40px" : "24px 16px 60px" }}>
 
@@ -1609,16 +1672,27 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
         <>
           {/* ── LEAD FINDING (largest) ── */}
           <div style={{ padding: isMobile ? "20px 16px" : "30px 28px", border: `1px solid ${LINE}`, borderRadius: 14, borderLeft: `3px solid ${bandColor(lead)}`, marginBottom: 14 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 20 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 24 }}>
               <div style={{ fontSize: isMobile ? 20 : 26, fontWeight: 600, lineHeight: 1.34, letterSpacing: "-0.01em", flex: 1 }}>
                 {lead.headline.pre}<span style={{ color: emColor(lead) }}>{lead.headline.em}</span>{lead.headline.mid}<span style={{ color: emColor(lead) }}>{lead.headline.em2}</span>{lead.headline.post}
               </div>
-              {!isMobile && lead.series && TIMESERIES.series[lead.series] && (
-                <div style={{ flexShrink: 0, paddingTop: 4 }}>
-                  <Sparkline data={TIMESERIES.series[lead.series]} color={bandColor(lead)} width={120} height={38} />
-                  <div style={{ fontSize: 9, color: FAINT, textAlign: "center", marginTop: 4, letterSpacing: "0.04em" }}>12-WEEK TREND</div>
-                </div>
-              )}
+              {!isMobile && lead.series && TIMESERIES.series[lead.series] && (() => {
+                const cm = CHART_META[lead.series] || {};
+                const isAR = lead.series === "arDays";
+                return (
+                  <div style={{ flexShrink: 0 }}>
+                    <TrendChart
+                      data={TIMESERIES.series[lead.series]} color={bandColor(lead)}
+                      label={cm.label} unit={cm.unit} endValue={cm.end ? cm.end() : ""}
+                      overlay={isAR ? TIMESERIES.series.adrK : null}
+                      overlayLabel={isAR ? "Avg daily revenue — steady" : null}
+                      overlayColor={FAINT}
+                      width={184} height={68}
+                      INK={INK} MUTE={MUTE} FAINT={FAINT} LINE={LINE}
+                    />
+                  </div>
+                );
+              })()}
             </div>
             <div style={{ fontSize: 14, color: MUTE, marginTop: 14, lineHeight: 1.55 }}>
               <span style={{ color: INK, fontWeight: 600 }}>Why:</span> {lead.why}<br />
@@ -1647,11 +1721,19 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
                 <div style={{ fontSize: isMobile ? 15 : 17, fontWeight: 600, lineHeight: 1.4, flex: 1 }}>
                   {f.headline.pre}<span style={{ color: emColor(f) }}>{f.headline.em}</span>{f.headline.mid}<span style={{ color: emColor(f) }}>{f.headline.em2}</span>{f.headline.post}
                 </div>
-                {!isMobile && f.series && TIMESERIES.series[f.series] && (
+              {!isMobile && f.series && TIMESERIES.series[f.series] && (() => {
+                const cm = CHART_META[f.series] || {};
+                return (
                   <div style={{ flexShrink: 0 }}>
-                    <Sparkline data={TIMESERIES.series[f.series]} color={bandColor(f)} width={84} height={26} />
+                    <TrendChart
+                      data={TIMESERIES.series[f.series]} color={bandColor(f)}
+                      label={cm.label} unit={cm.unit} endValue={cm.end ? cm.end() : ""}
+                      width={140} height={48}
+                      INK={INK} MUTE={MUTE} FAINT={FAINT} LINE={LINE}
+                    />
                   </div>
-                )}
+                );
+              })()}
               </div>
               <div style={{ fontSize: 13, color: MUTE, marginTop: 8, lineHeight: 1.5 }}>{f.recommendation}</div>
             </div>

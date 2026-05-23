@@ -45,6 +45,10 @@ const curImprovingDays = Math.round(
   Math.max(1, improvingSites.reduce((s, [, st]) => s + st.current.ar, 0))
 );
 
+// Average daily revenue = annual NPR / 365, expressed in $thousands/day for the overlay.
+const annualNPR = Object.values(require(path.join(__dirname, "..", "app", "data", "site-npr.json"))).reduce((s, v) => s + v, 0);
+const curADRk = Math.round(annualNPR / 365 / 1000);
+
 // Build a smoothed weekly series from a start value to an end value with mild noise.
 // direction is implied by start vs end. Smoothing = small random walk around the trend line.
 function buildSeries(startVal, endVal, { noise = 0.4, round = 0 } = {}) {
@@ -71,6 +75,10 @@ const out = {
     over90Pct:  buildSeries(curOver90 - 7, curOver90, { noise: 0.8 }),   // ~15 -> 22
     denialRate: buildSeries(curDenial - 5, curDenial, { noise: 0.6 }),   // ~8 -> 13
     improving:  buildSeries(curImprovingDays + 7, curImprovingDays, { noise: 0.6 }), // down (green)
+    // Average daily revenue ($/day, in thousands) — NPR is a fixed accounting given,
+    // so ADR is near-flat by design. Overlaid on the AR-days card to make the honest
+    // point: AR days rose while revenue held steady => a COLLECTIONS problem, not volume.
+    adrK:       buildSeries(Math.round(curADRk * 0.99), curADRk, { noise: 0.4, round: 0 }),
   },
 };
 
