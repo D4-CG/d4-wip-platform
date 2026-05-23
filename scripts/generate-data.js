@@ -75,20 +75,69 @@ function pickPayer() {
   return weightedPick(e); // returns [name, hcMin, hcMax, weight]
 }
 
+// ---- Site performance profiles ----
+// Each site is assigned the site loop deterministically so dispersion lands where it falls.
+// tier drives: payer mix bias, denial propensity, aging skew.
+// "strong" = commercial-heavy, low denials, tight AR. "weak" = Medicaid/self-pay-heavy, denial-heavy, aged AR.
+// Moderate spread: 3 strong, 6 average, 3 weak — distributed across the 12 sites.
+const SITE_PROFILES = {
+  "Site 1":  { tier: "average", denialMult: 1.00, agingShift: 0,  govBias: 1.00 },
+  "Site 2":  { tier: "average", denialMult: 1.05, agingShift: 4,  govBias: 1.05 },
+  "Site 3":  { tier: "weak",    denialMult: 1.45, agingShift: 16, govBias: 1.40 },
+  "Site 4":  { tier: "average", denialMult: 1.10, agingShift: 6,  govBias: 1.05 },
+  "Site 5":  { tier: "weak",    denialMult: 1.40, agingShift: 18, govBias: 1.35 },
+  "Site 6":  { tier: "strong",  denialMult: 0.62, agingShift: -14, govBias: 0.70 },
+  "Site 7":  { tier: "average", denialMult: 0.95, agingShift: -2, govBias: 0.95 },
+  "Site 8":  { tier: "average", denialMult: 1.00, agingShift: 2,  govBias: 1.00 },
+  "Site 9":  { tier: "strong",  denialMult: 0.65, agingShift: -12, govBias: 0.72 },
+  "Site 10": { tier: "strong",  denialMult: 0.70, agingShift: -10, govBias: 0.75 },
+  "Site 11": { tier: "average", denialMult: 1.08, agingShift: 5,  govBias: 1.05 },
+  "Site 12": { tier: "weak",    denialMult: 1.38, agingShift: 14, govBias: 1.32 },
+};
+
+// Payer pick biased by site profile: govBias > 1 raises Medicaid/Self-Pay weight, < 1 lowers it
+function pickPayerForSite(profile) {
+  const e = PAYERS.map(p => {
+    let w = p[3];
+    if (p[0] === "Medicaid" || p[0] === "Self-Pay") w = w * profile.govBias;
+    else if (p[0].includes("Blue") || p[0] === "Aetna" || p[0] === "Cigna" || p[0] === "United Health" || p[0] === "Anthem") {
+      w = w * (2 - profile.govBias); // commercial inversely biased
+    }
+    return [p, w];
+  });
+  return weightedPick(e);
+}
+
+// Aging biased by site profile agingShift (days added/removed from the base draw)
+function daysOutForSite(profile) {
+  const base = weightedPick([[randint(1, 30), 30], [randint(31, 60), 30], [randint(61, 90), 20], [randint(91, 150), 13], [randint(151, 270), 7]]);
+  return Math.max(1, base + profile.agingShift + randint(-4, 4));
+}
+
+// Denial draw biased by site profile denialMult
+function denialForSite(profile) {
+  // base denial probability ~ proportion of non-null in AR_DENIALS (5/9 ≈ 0.56)
+  const baseDenialProb = 5 / 9;
+  const p = Math.min(0.95, baseDenialProb * profile.denialMult);
+  if (rand() < p) return pick(["CO-16", "CO-22", "CO-50", "CO-97", "CO-4"]);
+  return null;
+}
+
 // ---- AR generation ----
 const AR_COUNT = 11473;
 const ar = [];
 for (let i = 1; i <= AR_COUNT; i++) {
-  const p = pickPayer();
+  const site = pick(SITES);
+  const profile = SITE_PROFILES[site];
+  const p = pickPayerForSite(profile);
   const payer = p[0], hcMin = p[1], hcMax = p[2];
   const net = bimodalNet();
   // gross = net / (1 - haircut); self-pay gross == net
   const haircut = payer === "Self-Pay" ? 0 : (hcMin + rand() * (hcMax - hcMin));
   const gross = haircut > 0 ? Math.round(net / (1 - haircut)) : net;
   const contractual = gross - net;
-  // days outstanding — skew toward 60-day story; long tail of aged
-  const daysOut = weightedPick([[randint(1, 30), 30], [randint(31, 60), 30], [randint(61, 90), 20], [randint(91, 150), 13], [randint(151, 270), 7]]);
-  const denial = pick(AR_DENIALS);
+  const daysOut = daysOutForSite(profile);
+  const denial = denialForSite(profile);
   ar.push({
     id: `AR-${String(i).padStart(5, "0")}`,
     patient: name(),
@@ -100,7 +149,7 @@ for (let i = 1; i <= AR_COUNT; i++) {
     serviceDate: isoDaysAgo(daysOut + randint(2, 10)),
     lastContact: isoDaysAgo(randint(0, Math.min(daysOut, 60))),
     denialCode: denial,
-    site: pick(SITES),
+    site,
     vertical: pick(VERTICALS),
     claimStatus: denial ? "Adjudicated — Denied" : pick(AR_CLAIM_STATUS),
   });
