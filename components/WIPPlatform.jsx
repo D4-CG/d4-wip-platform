@@ -1435,7 +1435,7 @@ function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
       id: "aging_trend", tone: "risk", rankClass: "lead",
       severity: Math.min(100, 40 + deltaDays * 7),
       headline: { pre: "AR slowed ", em: `${priorDays} → ${curDays} days`, mid: " this month, delaying roughly ", em2: fmtUSD(cashDrift), post: " of cash collection." },
-      why: `${deterioratingSites.length} sites are aging faster — denials and follow-up gaps compounding.`,
+      why: `${deterioratingSites.length} sites are aging faster, led by the ${Math.min(3, deterioratingSites.length)} below — denials and follow-up gaps compounding.`,
       recommendation: `Direct collectors to the highest-EV accounts in ${deterioratingSites.slice(0, 3).map(([n]) => n).join(", ")} first — recovering the biggest dollars fastest pulls cash back in.`,
       drivers: deterioratingSites.slice(0, 3).map(([name, s]) => ({
         name, detail: `${s.prior.arDays} → ${s.current.arDays} days · denial +${s.delta.denialRate}pts · +${s.delta.over90Pct}pts over 90`,
@@ -1579,9 +1579,9 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
               <span style={{ color: INK, fontWeight: 600 }}>Recommendation:</span> {lead.recommendation}
             </div>
             {lead.drivers.length > 0 && (
-              <div style={{ marginTop: 20 }}>
+              <div style={{ marginTop: 20, paddingLeft: isMobile ? 8 : 16 }}>
                 {lead.drivers.map((d, i) => (
-                  <div key={d.name} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr auto" : "150px 1fr auto", alignItems: "center", gap: 14, padding: "11px 0", borderTop: `1px solid ${LINE}` }}>
+                  <div key={d.name} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr auto" : "150px 1fr 70px", alignItems: "center", gap: 14, padding: "11px 0", borderTop: `1px solid ${LINE}` }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ width: 6, height: 6, borderRadius: "50%", background: bandColor(lead) }} />
                       <span style={{ fontSize: 15, fontWeight: 600 }}>{d.name}</span>
@@ -1600,7 +1600,10 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
               <div style={{ fontSize: isMobile ? 15 : 17, fontWeight: 600, lineHeight: 1.4 }}>
                 {f.headline.pre}<span style={{ color: emColor(f) }}>{f.headline.em}</span>{f.headline.mid}<span style={{ color: emColor(f) }}>{f.headline.em2}</span>{f.headline.post}
               </div>
-              <div style={{ fontSize: 13, color: MUTE, marginTop: 8, lineHeight: 1.5 }}>{f.recommendation}</div>
+              <div style={{ fontSize: 13, color: MUTE, marginTop: 10, lineHeight: 1.5 }}>
+                <span style={{ color: INK, fontWeight: 600 }}>Why:</span> {f.why}<br />
+                <span style={{ color: INK, fontWeight: 600 }}>Recommendation:</span> {f.recommendation}
+              </div>
             </div>
           ))}
         </>
