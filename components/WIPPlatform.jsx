@@ -3698,6 +3698,8 @@ export default function WIPPlatform() {
   const [aiText, setAiText] = useState(null);
   const [critFilter, setCritFilter] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [execSummary, setExecSummary] = useState(null);
+  const [execLoading, setExecLoading] = useState(false);
   const [donutExpanded, setDonutExpanded] = useState(false);
   const [worklinks, setWorklinks] = useState(() => seedWorklinks());
   const [siteFilter, setSiteFilter] = useState(null);
@@ -3891,6 +3893,88 @@ Return JSON with:
       setAiText({ status: "AI analysis temporarily unavailable — check that ANTHROPIC_API_KEY is set in Vercel environment variables.", priorities: [], risks: [], decisions: [] });
     }
     setAiLoading(false);
+  };
+
+  // Navigate to a Detail-tab section anchor (used by AI summary links — every claim
+  // is one click from the verifiable data, which also keeps the model honest).
+  const scrollToDetail = (anchorId) => {
+    setTab("detail"); setSeverityFilter(null); setActiveTier(null); setAreaFilter(null);
+    setTimeout(() => {
+      const el = document.getElementById(anchorId);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  };
+
+  // AI Executive Summary — findings-FED (option A). The ranked risk engine owns the
+  // numbers (reconciled truth); the model only writes the prose + points into the Detail
+  // tab. It must NOT restate the findings — it adds nuance and tells Marcus where to verify.
+  const runExecSummary = async () => {
+    setExecLoading(true);
+    const findings = computeRiskFindings({
+      ar: arFiltered, baseline: SITE_BASELINE, siteNpr: SITE_NPR, siteFilter, fmtUSD: fmt,
+    });
+    // Compact, already-reconciled finding summaries for the model (numbers are fixed).
+    const findingLines = findings.map((f, i) => {
+      const h = `${f.headline.pre}${f.headline.em}${f.headline.mid}${f.headline.em2}${f.headline.post}`;
+      return `${i + 1}. [${f.rankClass}/${f.tone}] ${h} — why: ${f.why}`;
+    }).join("\n");
+    // The honest ADR nuance to surface (AR days rose while revenue held/grew => balance problem).
+    const ts = TIMESERIES.series;
+    const adrNote = `Average daily revenue held roughly steady (~$${(ts.adrK[ts.adrK.length-1]/1000).toFixed(2)}M/day, ~${Math.round((ts.adrK[ts.adrK.length-1]-ts.adrK[0])/ts.adrK[0]*100)}% over 12 weeks) while AR days rose ${SITE_BASELINE.portfolio.prior.arDays}→${SITE_BASELINE.portfolio.current.arDays}. Because AR days = AR balance ÷ daily revenue, AR days rising while revenue was flat-to-up means the uncollected balance grew FASTER than the topline — the collection gap is worse than the days figure alone suggests.`;
+
+    const prompt = `You are a healthcare revenue cycle expert writing a brief executive note for a multisite CFO. The CFO is already looking at a ranked risk briefing (the findings below) directly above your note. 
+
+DO NOT restate or list the findings — the CFO can already see them. Your job is to add the connective narrative and the ONE non-obvious insight, then point the CFO to the detailed data to verify and act.
+
+RECONCILED FINDINGS (numbers are fixed truth — do not alter them):
+${findingLines}
+
+KEY NUANCE TO SURFACE (this is the insight the cards do not state):
+${adrNote}
+
+Available detail sections the CFO can open (use these exact anchor ids in your pointers): 
+- "detail-sites" (site performance table)
+- "detail-kpis" (headline KPIs: NPR, AR, AR days, NCR)
+- "detail-payers" (expected recovery by payer group)
+- "detail-wip" (Billing WIP + Collections WIP stratification)
+
+Return ONLY valid JSON (no markdown, no code fences) with exactly:
+{
+  "narrative": "2-3 sentences. Lead with the nuance/insight (the balance-vs-revenue point), connect the findings into one story about cash risk, and frame next step around working highest-EV accounts first. Board-ready, calm, specific. Do NOT repeat the finding headlines verbatim.",
+  "pointers": [
+    {"label": "short verb phrase, e.g. 'Verify the deteriorating sites'", "anchor": "detail-sites"},
+    {"label": "...", "anchor": "detail-kpis"}
+  ]
+}
+Limit pointers to the 2-3 most relevant sections.`;
+
+    try {
+      const res = await fetch("/api/claude", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 700, messages: [{ role: "user", content: prompt }] })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setExecSummary({ narrative: `API error ${res.status}: ${data.error || "Unknown error"}`, pointers: [] });
+        setExecLoading(false);
+        return;
+      }
+      const raw = data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "{}";
+      const cleaned = raw.replace(/```json|```/g, "").trim();
+      try {
+        const parsed = JSON.parse(cleaned);
+        // keep only pointers with valid known anchors (guard against model drift)
+        const valid = new Set(["detail-sites", "detail-kpis", "detail-payers", "detail-wip"]);
+        parsed.pointers = (parsed.pointers || []).filter(p => valid.has(p.anchor)).slice(0, 3);
+        setExecSummary(parsed);
+      } catch {
+        setExecSummary({ narrative: raw.slice(0, 500), pointers: [] });
+      }
+    } catch (err) {
+      console.error("Exec summary error:", err);
+      setExecSummary({ narrative: "Executive summary temporarily unavailable — check that ANTHROPIC_API_KEY is set in Vercel environment variables.", pointers: [] });
+    }
+    setExecLoading(false);
   };
 
   // ─── Notification Tray ──────────────────────────────────────────────────────
@@ -4378,9 +4462,40 @@ Return JSON with:
       <div style={{ padding: isMobile ? "16px 12px 80px" : isTablet ? "20px 20px" : "24px 32px" }}>
         {role === "cfo" && (tab === "metrics" || tab === "detail") ? (
           <div>
-            {/* DASHBOARD TAB: risk briefing (AI summary added next chunk) */}
+            {/* DASHBOARD TAB: risk briefing + AI executive summary */}
             {tab === "metrics" && (
               <CFODashboardV2 arFiltered={arFiltered} dnfbFiltered={dnfbFiltered} siteFilter={siteFilter} SITE_NPR={SITE_NPR} isCollectorActionable={isCollectorActionable} worklinks={worklinks} />
+            )}
+            {tab === "metrics" && (
+              <div style={{ maxWidth: 940, margin: "0 auto", padding: isMobile ? "0 4px 40px" : "0 16px 40px" }}>
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 14, borderLeft: "3px solid #2563eb", padding: isMobile ? "18px 16px" : "22px 28px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: execSummary ? 14 : 0 }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase" }}>Executive summary</div>
+                      <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>AI-written · grounded in the briefing above · verify in Detail</div>
+                    </div>
+                    <button onClick={runExecSummary} disabled={execLoading}
+                      style={{ flexShrink: 0, padding: "8px 16px", background: execLoading ? "#eff6ff" : "#2563eb", border: "none", borderRadius: 8, color: execLoading ? "#2563eb" : "#fff", cursor: execLoading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
+                      {execLoading ? "Writing…" : execSummary ? "Regenerate" : "Generate summary"}
+                    </button>
+                  </div>
+                  {execSummary && (
+                    <>
+                      <div style={{ fontSize: 15, color: "#0f172a", lineHeight: 1.6 }}>{execSummary.narrative}</div>
+                      {execSummary.pointers && execSummary.pointers.length > 0 && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
+                          {execSummary.pointers.map((p, i) => (
+                            <button key={i} onClick={() => scrollToDetail(p.anchor)}
+                              style={{ padding: "6px 12px", background: "#fff", border: "1px solid #bfdbfe", borderRadius: 8, color: "#2563eb", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+                              {p.label} <span style={{ fontSize: 13 }}>→</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
             )}
             {/* DETAIL TAB: full data dashboard */}
             {tab === "detail" && (<>
