@@ -3835,7 +3835,7 @@ Return JSON with:
                       {/* Header */}
                       <div style={{ display: "grid", gridTemplateColumns: cols9, minWidth: 820, fontSize: 9, color: "#94a3b8", letterSpacing: "0.07em", textTransform: "uppercase", padding: "7px 16px", background: "#f8fafc", borderTop: "1px solid #f1f5f9" }}>
                         <span>Site</span>
-                        <span style={{ textAlign:"right" }}>NPR (est.)</span>
+                        <span style={{ textAlign:"right" }}>NPR</span>
                         <span style={{ textAlign:"right" }}>Total AR</span>
                         <span style={{ textAlign:"right" }}>DNFB</span>
                         <span style={{ textAlign:"right" }}>Total Exposure</span>

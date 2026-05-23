@@ -81,19 +81,22 @@ function pickPayer() {
 // "strong" = commercial-heavy, low denials, tight AR. "weak" = Medicaid/self-pay-heavy, denial-heavy, aged AR.
 // Moderate spread: 3 strong, 6 average, 3 weak — distributed across the 12 sites.
 const SITE_PROFILES = {
-  "Site 1":  { tier: "average", denialMult: 1.00, agingShift: 0,  govBias: 1.00 },
-  "Site 2":  { tier: "average", denialMult: 1.05, agingShift: 4,  govBias: 1.05 },
-  "Site 3":  { tier: "weak",    denialMult: 1.45, agingShift: 16, govBias: 1.40 },
-  "Site 4":  { tier: "average", denialMult: 1.10, agingShift: 6,  govBias: 1.05 },
-  "Site 5":  { tier: "weak",    denialMult: 1.40, agingShift: 18, govBias: 1.35 },
-  "Site 6":  { tier: "strong",  denialMult: 0.62, agingShift: -14, govBias: 0.70 },
-  "Site 7":  { tier: "average", denialMult: 0.95, agingShift: -2, govBias: 0.95 },
-  "Site 8":  { tier: "average", denialMult: 1.00, agingShift: 2,  govBias: 1.00 },
-  "Site 9":  { tier: "strong",  denialMult: 0.65, agingShift: -12, govBias: 0.72 },
-  "Site 10": { tier: "strong",  denialMult: 0.70, agingShift: -10, govBias: 0.75 },
-  "Site 11": { tier: "average", denialMult: 1.08, agingShift: 5,  govBias: 1.05 },
-  "Site 12": { tier: "weak",    denialMult: 1.38, agingShift: 14, govBias: 1.32 },
+  "Site 1":  { tier: "average", denialMult: 1.00, agingShift: 0,  govBias: 1.00, sizeWeight: 9 },
+  "Site 2":  { tier: "average", denialMult: 1.05, agingShift: 4,  govBias: 1.05, sizeWeight: 13 },
+  "Site 3":  { tier: "weak",    denialMult: 1.45, agingShift: 16, govBias: 1.40, sizeWeight: 6 },
+  "Site 4":  { tier: "average", denialMult: 1.10, agingShift: 6,  govBias: 1.05, sizeWeight: 7 },
+  "Site 5":  { tier: "weak",    denialMult: 1.40, agingShift: 18, govBias: 1.35, sizeWeight: 4 },
+  "Site 6":  { tier: "strong",  denialMult: 0.62, agingShift: -14, govBias: 0.70, sizeWeight: 18 },
+  "Site 7":  { tier: "average", denialMult: 0.95, agingShift: -2, govBias: 0.95, sizeWeight: 11 },
+  "Site 8":  { tier: "average", denialMult: 1.00, agingShift: 2,  govBias: 1.00, sizeWeight: 10 },
+  "Site 9":  { tier: "strong",  denialMult: 0.65, agingShift: -12, govBias: 0.72, sizeWeight: 14 },
+  "Site 10": { tier: "strong",  denialMult: 0.70, agingShift: -10, govBias: 0.75, sizeWeight: 8 },
+  "Site 11": { tier: "average", denialMult: 1.08, agingShift: 5,  govBias: 1.05, sizeWeight: 3 },
+  "Site 12": { tier: "weak",    denialMult: 1.38, agingShift: 14, govBias: 1.32, sizeWeight: 5 },
 };
+// Weighted site picker — accounts distribute by sizeWeight so sites vary in size realistically
+const SITE_WEIGHTS = Object.entries(SITE_PROFILES).map(([k, v]) => [k, v.sizeWeight]);
+function pickSite() { return weightedPick(SITE_WEIGHTS); }
 
 // Payer pick biased by site profile: govBias > 1 raises Medicaid/Self-Pay weight, < 1 lowers it
 function pickPayerForSite(profile) {
@@ -127,7 +130,7 @@ function denialForSite(profile) {
 const AR_COUNT = 11473;
 const ar = [];
 for (let i = 1; i <= AR_COUNT; i++) {
-  const site = pick(SITES);
+  const site = pickSite();
   const profile = SITE_PROFILES[site];
   const p = pickPayerForSite(profile);
   const payer = p[0], hcMin = p[1], hcMax = p[2];
@@ -173,7 +176,7 @@ for (let i = 1; i <= DNFB_COUNT; i++) {
     serviceDate: isoDaysAgo(daysInDNFB + randint(1, 5)),
     lastContact: isoDaysAgo(randint(0, daysInDNFB)),
     holdCode: pick(DNFB_HOLDS),
-    site: pick(SITES),
+    site: pickSite(),
     vertical: pick(VERTICALS),
   });
 }
@@ -183,18 +186,18 @@ for (let i = 1; i <= DNFB_COUNT; i++) {
 // annual net patient revenue, scaled to site size with strong sites turning AR
 // faster (more annual revenue per dollar of AR). Sums to ~$353M.
 const SITE_NPR = {
-  "Site 1":  23274468,
-  "Site 2":  26682256,
-  "Site 3":  23882742,
-  "Site 4":  29165068,
-  "Site 5":  25374089,
-  "Site 6":  45570337,
-  "Site 7":  36063018,
-  "Site 8":  32522595,
-  "Site 9":  36075485,
-  "Site 10": 31202324,
-  "Site 11": 19778382,
-  "Site 12": 23487957,
+  "Site 1":  30273527,
+  "Site 2":  38170723,
+  "Site 3":  13948331,
+  "Site 4":  24938523,
+  "Site 5":  11679553,
+  "Site 6":  74783215,
+  "Site 7":  39027507,
+  "Site 8":  28744210,
+  "Site 9":  51980767,
+  "Site 10": 23956961,
+  "Site 11": 10283392,
+  "Site 12": 9787508,
 };
 
 // ---- Write ----
