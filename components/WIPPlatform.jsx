@@ -3796,7 +3796,7 @@ Return JSON with:
                 const totalExposure = totalAR + totalDNFB;
                 const totalEV = siteAR.reduce((sum,a) => sum+a.expectedValue, 0);
                 const avgDays = totalAR > 0 ? Math.round(siteAR.reduce((s,a) => s+a.daysOut*a.amount, 0) / totalAR) : 0;
-                const npr = avgDays > 0 ? Math.round(totalAR / avgDays * 365 * 0.82) : 0;
+                const npr = avgDays > 0 ? Math.round(totalAR / avgDays * 365) : 0;
                 // Net collection rate = expected collections / net billable AR (both net-of-contractual)
                 const ncr = totalAR > 0 ? Math.round(totalEV / totalAR * 100) : 0;
                 const deniedCount = siteAR.filter(a => a.denialCode !== null).length;
@@ -3893,7 +3893,7 @@ Return JSON with:
             {(() => {
               const grossAR = arFiltered.reduce((s,a) => s+a.amount, 0);
               const arDays = grossAR > 0 ? Math.round(arFiltered.reduce((s,a) => s + a.amount * a.daysOut, 0) / grossAR) : 0;
-              const annualNPR = arDays > 0 ? Math.round(grossAR / arDays * 365 * 0.82) : 0;
+              const annualNPR = arDays > 0 ? Math.round(grossAR / arDays * 365) : 0;
               const arDaysColor = arDays < 55 ? "#16a34a" : arDays < 65 ? "#d97706" : "#dc2626";
               const arDaysLabel = arDays < 40 ? "Excellent" : arDays < 55 ? "Good" : arDays < 65 ? "Needs attention" : "Critical";
               return (
@@ -3901,7 +3901,7 @@ Return JSON with:
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Net Patient Revenue (est.)</div>
                     <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(annualNPR)}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Annualized · 82% net revenue factor · from accounting system in production{siteFilter ? ` · ${siteFilter}` : ""}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Annualized from net AR · from accounting system in production{siteFilter ? ` · ${siteFilter}` : ""}</div>
                   </div>
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Total AR</div>
