@@ -4,6 +4,7 @@ import DNFB_DATA from "../app/data/dnfb-accounts.json";
 import SITE_NPR from "../app/data/site-npr.json";
 import SITE_BASELINE from "../app/data/site-baseline.json";
 import TIMESERIES from "../app/data/timeseries.json";
+import DAILY from "../app/data/daily-baseline.json";
 
 function useWindowWidth() {
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1280);
@@ -1494,12 +1495,13 @@ function Sparkline({ data, color, width = 96, height = 30 }) {
 //
 // Every finding answers WHY (driver) and RECOMMENDATION (EV-first action / consequence).
 // Recommendations must ALWAYS point to EV-first work, never "work your oldest accounts."
-function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
+function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD, horizon = "month", daily = null }) {
   const findings = [];
   const annualNPR = siteFilter ? (siteNpr[siteFilter] || 0) : Object.values(siteNpr).reduce((s, v) => s + v, 0);
   const dailyNPR = annualNPR / 365;
   const totalAR = ar.reduce((s, a) => s + a.amount, 0);
   const round10k = (n) => Math.round(n / 10000) * 10000;
+  const isMonth = horizon === "month";
 
   // ---- LEAD: Portfolio AR aging trend (the EV-aligned diagnostic) ----
   const curDays = totalAR > 0 ? Math.round(ar.reduce((s, a) => s + a.amount * a.daysOut, 0) / totalAR) : 0;
@@ -1619,15 +1621,128 @@ function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
     });
   }
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // HORIZON-SPECIFIC FINDINGS (Today / This Week) — event-driven + root-cause.
+  // The metric findings above are month-trend findings. For shorter horizons we
+  // suppress those and surface what actually MOVED in the window plus the
+  // operational root causes (the five-whys behind the deterioration). Same card
+  // format: trigger in the headline, cause→effect chain as the "why".
+  // ──────────────────────────────────────────────────────────────────────────
+  const monthFindings = findings.splice(0); // remove all month findings; re-add if month
+  const horizonFindings = [];
+
+  if (isMonth) {
+    horizonFindings.push(...monthFindings);
+  } else if (daily) {
+    const windowDays = horizon === "today" ? 1 : 7;
+    const within = (offset) => Math.abs(offset) <= windowDays || (horizon === "today" && offset === 0);
+    const evs = (daily.events || []).filter(e => within(e.dayOffset));
+
+    // --- Event: accounts crossed the 90-day line in the window ---
+    const crossings = evs.filter(e => e.type === "crossed_90");
+    if (crossings.length) {
+      const cnt = crossings.reduce((s, e) => s + e.count, 0);
+      const amt = crossings.reduce((s, e) => s + e.amount, 0);
+      horizonFindings.push({
+        id: "ev_crossed_90", tone: "risk", rankClass: "lead", series: "over90Pct",
+        severity: Math.min(100, 55 + cnt * 2),
+        headline: { pre: "", em: `${cnt} accounts`, mid: horizon === "today" ? " crossed 90 days since yesterday — " : " crossed 90 days this week — ", em2: fmtUSD(round10k(amt)), post: " now past the collectability cliff." },
+        why: `Aging accounts tipped over the 90-day line where collection probability drops sharply.`,
+        recommendation: `Work these by EV immediately — they are the freshest additions to the over-90 cohort and the most recoverable.`,
+        drivers: [],
+      });
+    }
+
+    // --- Event: write-offs landed on the desk ---
+    const wos = evs.filter(e => e.type === "writeoff_landed");
+    if (wos.length) {
+      const amt = wos.reduce((s, e) => s + e.amount, 0);
+      horizonFindings.push({
+        id: "ev_writeoff", tone: "risk", rankClass: "context",
+        severity: 70,
+        headline: { pre: `${wos.length} write-off${wos.length > 1 ? "s" : ""} ` , em: `${fmtUSD(round10k(amt))}`, mid: horizon === "today" ? " landed on your desk for decision" : " reached your desk this week", em2: "", post: "." },
+        why: `${wos.map(w => `${w.accountId} (${w.payer}, ${fmtUSD(w.amount)})`).join("; ")} — recovery paths exhausted, recommended for write-off.`,
+        recommendation: `Decide before timely-filing or appeal windows fully close; approving promptly frees the team to work recoverable EV instead.`,
+        drivers: [],
+      });
+    }
+
+    // --- Event: a site jumped overnight (today only) ---
+    const jumps = evs.filter(e => e.type === "site_jump");
+    if (jumps.length && horizon === "today") {
+      const j = jumps[0];
+      horizonFindings.push({
+        id: "ev_site_jump", tone: "risk", rankClass: "context", series: "arDays",
+        severity: 64,
+        headline: { pre: "", em: j.site, mid: " jumped ", em2: `+${j.daysAdded} days`, post: ` overnight to ${j.current} AR days.` },
+        why: `A sharp single-day move usually signals a batch event — a billing run, a denial cluster, or a posting delay at ${j.site}.`,
+        recommendation: `Have ${j.site} confirm the cause today; if it is a denial cluster, route the high-EV accounts through WorkLink now.`,
+        drivers: [],
+      });
+    }
+
+    // --- Event: SLA breaches in the window ---
+    const slas = evs.filter(e => e.type === "sla_breach");
+    if (slas.length) {
+      const cnt = slas.reduce((s, e) => s + e.count, 0);
+      const areas = [...new Set(slas.map(e => e.area))];
+      horizonFindings.push({
+        id: "ev_sla", tone: "risk", rankClass: "context",
+        severity: 50,
+        headline: { pre: "", em: `${cnt} follow-up SLA breach${cnt > 1 ? "es" : ""}`, mid: horizon === "today" ? " today" : " this week", em2: "", post: ` in ${areas.join(", ")}.` },
+        why: `Accounts past their scheduled follow-up date age unworked and drift toward the 90-day cliff.`,
+        recommendation: `Reassign or escalate the breached accounts so the highest-EV ones are worked first.`,
+        drivers: [],
+      });
+    }
+
+    // --- Root causes (the five-whys) for this horizon ---
+    const rcs = (daily.rootCauses || []).filter(r => r.horizon.includes(horizon));
+    rcs.forEach((r, i) => {
+      horizonFindings.push({
+        id: r.id, tone: "risk", rankClass: i === 0 && crossings.length === 0 ? "lead" : "context",
+        severity: r.severity === "high" ? 58 - i : 44 - i,
+        rootCause: true,
+        headline: { pre: r.site === "Portfolio" ? "" : `${r.site}: `, em: r.trigger, mid: "", em2: "", post: "." },
+        why: r.chain + (r.impact?.note ? ` — ${r.impact.note}.` : "."),
+        recommendation: `Address the root cause, not just the symptom: ${rootCauseFix(r.id)}`,
+        drivers: [],
+      });
+    });
+
+    // Honest quiet-day state
+    if (horizonFindings.length === 0) {
+      horizonFindings.push({
+        id: "quiet", tone: "good", rankClass: "good",
+        severity: 10,
+        headline: { pre: "", em: horizon === "today" ? "No material change since yesterday" : "No material change this week", mid: " — the portfolio is holding.", em2: "", post: "" },
+        why: `No accounts crossed 90 days, no write-offs landed, and no sites moved sharply in this window.`,
+        recommendation: `Keep working the highest-EV accounts; the month view shows the longer trend.`,
+        drivers: [],
+      });
+    }
+  }
+
   // ---- RANK: lead first, then context (by severity), then good (by severity) ----
   const classRank = { lead: 0, context: 1, good: 2 };
-  return findings.sort((a, b) => {
+  return horizonFindings.sort((a, b) => {
     if (classRank[a.rankClass] !== classRank[b.rankClass]) return classRank[a.rankClass] - classRank[b.rankClass];
     return b.severity - a.severity;
   });
 }
 
-function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isCollectorActionable, worklinks }) {
+// Short root-cause remediation phrases (the "fix the cause" half of the recommendation).
+function rootCauseFix(id) {
+  switch (id) {
+    case "rc_billers_site5": return "backfill the biller roles and clear the DNFB backlog before it ages further.";
+    case "rc_integration_site12": return "add a transmission-confirmation check to the interface so a failed batch is caught same-day.";
+    case "rc_coding_site3": return "audit the changed HIM coding step and correct the modifier logic to stop the downstream denials.";
+    case "rc_collectors_understaffed": return "rebalance collector capacity to denial volume so high-EV denials are worked within SLA.";
+    default: return "trace the operational cause and correct it at the source.";
+  }
+}
+
+function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isCollectorActionable, worklinks, horizon, setHorizon }) {
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
 
@@ -1635,9 +1750,10 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
   const INK = "#0f172a", MUTE = "#64748b", FAINT = "#94a3b8", LINE = "#e2e8f0";
   const RED = "#dc2626", AMBER = "#d97706", GREEN = "#16a34a", BLUE = "#2563eb";
 
-  // Run the ranked risk engine — findings reorder as the metrics move.
+  // Run the ranked risk engine — findings reorder as the metrics move AND as the horizon changes.
   const findings = computeRiskFindings({
     ar: arFiltered, baseline: SITE_BASELINE, siteNpr: SITE_NPR, siteFilter, fmtUSD: fmt,
+    horizon, daily: DAILY,
   });
 
   const label = { fontSize: 11, fontWeight: 600, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase" };
@@ -1661,7 +1777,20 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
   return (
     <div style={{ fontFamily: "inherit", color: INK, background: "#fff", maxWidth: 940, margin: "0 auto", padding: isMobile ? "8px 4px 40px" : "24px 16px 60px" }}>
 
-      <div style={{ ...label, marginBottom: 14, paddingLeft: 4 }}>Risk briefing{siteFilter ? ` · ${siteFilter}` : " · portfolio"} · this month</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 14, paddingLeft: 4 }}>
+        <div style={label}>Risk briefing{siteFilter ? ` · ${siteFilter}` : " · portfolio"} · {horizon === "today" ? "today" : horizon === "week" ? "this week" : "this month"}</div>
+        <div style={{ display: "inline-flex", background: "#f1f5f9", borderRadius: 9, padding: 2 }}>
+          {[["today", "Today"], ["week", "This Week"], ["month", "This Month"]].map(([key, lbl]) => (
+            <button key={key} onClick={() => setHorizon(key)}
+              style={{ padding: "6px 14px", border: "none", borderRadius: 7, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600,
+                background: horizon === key ? "#fff" : "transparent",
+                color: horizon === key ? INK : MUTE,
+                boxShadow: horizon === key ? "0 1px 2px rgba(15,23,42,0.08)" : "none" }}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {!lead ? (
         <div style={{ padding: "32px 28px", border: `1px solid ${LINE}`, borderRadius: 14, borderLeft: `3px solid ${GREEN}` }}>
@@ -3700,6 +3829,7 @@ export default function WIPPlatform() {
   const [aiLoading, setAiLoading] = useState(false);
   const [execSummary, setExecSummary] = useState(null);
   const [execLoading, setExecLoading] = useState(false);
+  const [horizon, setHorizon] = useState("month"); // month | week | today — shared by briefing + exec summary
   const [donutExpanded, setDonutExpanded] = useState(false);
   const [worklinks, setWorklinks] = useState(() => seedWorklinks());
   const [siteFilter, setSiteFilter] = useState(null);
@@ -3912,29 +4042,35 @@ Return JSON with:
     setExecLoading(true);
     const findings = computeRiskFindings({
       ar: arFiltered, baseline: SITE_BASELINE, siteNpr: SITE_NPR, siteFilter, fmtUSD: fmt,
+      horizon, daily: DAILY,
     });
     // Compact, already-reconciled finding summaries for the model (numbers are fixed).
     const findingLines = findings.map((f, i) => {
       const h = `${f.headline.pre}${f.headline.em}${f.headline.mid}${f.headline.em2}${f.headline.post}`;
-      return `${i + 1}. [${f.rankClass}/${f.tone}] ${h} — why: ${f.why}`;
+      return `${i + 1}. [${f.rankClass}/${f.tone}${f.rootCause ? "/root-cause" : ""}] ${h} — why: ${f.why}`;
     }).join("\n");
-    // The honest ADR nuance to surface (AR days rose while revenue held/grew => balance problem).
+    const horizonLabel = horizon === "today" ? "today (since yesterday)" : horizon === "week" ? "this week (last 7 days)" : "this month (last 30 days)";
+    // The honest ADR nuance — most relevant on the month view (the trend story).
     const ts = TIMESERIES.series;
-    const adrNote = `Average daily revenue held roughly steady (~$${(ts.adrK[ts.adrK.length-1]/1000).toFixed(2)}M/day, ~${Math.round((ts.adrK[ts.adrK.length-1]-ts.adrK[0])/ts.adrK[0]*100)}% over 12 weeks) while AR days rose ${SITE_BASELINE.portfolio.prior.arDays}→${SITE_BASELINE.portfolio.current.arDays}. Because AR days = AR balance ÷ daily revenue, AR days rising while revenue was flat-to-up means the uncollected balance grew FASTER than the topline — the collection gap is worse than the days figure alone suggests.`;
+    const adrNote = horizon === "month"
+      ? `Average daily revenue held roughly steady (~$${(ts.adrK[ts.adrK.length-1]/1000).toFixed(2)}M/day, ~${Math.round((ts.adrK[ts.adrK.length-1]-ts.adrK[0])/ts.adrK[0]*100)}% over 12 weeks) while AR days rose ${SITE_BASELINE.portfolio.prior.arDays}→${SITE_BASELINE.portfolio.current.arDays}. Because AR days = AR balance ÷ daily revenue, AR days rising while revenue was flat-to-up means the uncollected balance grew FASTER than the topline — the collection gap is worse than the days figure alone suggests.`
+      : `On shorter horizons, the story is operational: focus on what moved in the window and the root causes behind it (staffing gaps, an EHR integration transmission gap, an HIM coding change creating lagged denials). Connect the discrete events to those root causes.`;
 
     // REAL write-off / decision data (so Decisions names actual accounts, not invented ones).
     const woLines = ESCALATION_DATA.writeOffPending.map(w =>
       `${w.accountId} · ${w.patient} · ${w.payer} · ${fmt(w.amount)} — ${w.rationale}`
     ).join("\n");
 
-    const prompt = `You are a healthcare revenue cycle expert writing a brief executive note for a multisite CFO. The CFO is already looking at a ranked risk briefing (the findings below) directly above your note.
+    const prompt = `You are a healthcare revenue cycle expert writing a brief executive note for a multisite CFO. The CFO is viewing the "${horizonLabel}" horizon of a ranked risk briefing (the findings below) directly above your note.
 
-DO NOT restate or list the findings verbatim — the CFO can already see them. Your job: (1) a short connective narrative with the ONE non-obvious insight, (2) three tight action sections, (3) pointers to the detail data to verify.
+DO NOT restate or list the findings verbatim — the CFO can already see them. Your job: (1) a short connective narrative for THIS horizon with the ONE non-obvious insight, (2) three tight action sections, (3) pointers to the detail data to verify.
+
+HORIZON: ${horizonLabel}
 
 RECONCILED FINDINGS (numbers are fixed truth — do not alter them):
 ${findingLines}
 
-KEY NUANCE TO SURFACE (the insight the cards do not state):
+KEY NUANCE / FRAMING FOR THIS HORIZON:
 ${adrNote}
 
 WRITE-OFFS PENDING CFO DECISION (use these REAL accounts/amounts in "decisions" — do not invent others):
@@ -4475,7 +4611,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
           <div>
             {/* DASHBOARD TAB: risk briefing + AI executive summary */}
             {tab === "metrics" && (
-              <CFODashboardV2 arFiltered={arFiltered} dnfbFiltered={dnfbFiltered} siteFilter={siteFilter} SITE_NPR={SITE_NPR} isCollectorActionable={isCollectorActionable} worklinks={worklinks} />
+              <CFODashboardV2 arFiltered={arFiltered} dnfbFiltered={dnfbFiltered} siteFilter={siteFilter} SITE_NPR={SITE_NPR} isCollectorActionable={isCollectorActionable} worklinks={worklinks} horizon={horizon} setHorizon={(h) => { setHorizon(h); setExecSummary(null); }} />
             )}
             {tab === "metrics" && (
               <div style={{ maxWidth: 940, margin: "0 auto", padding: isMobile ? "0 4px 40px" : "0 16px 40px" }}>
@@ -4483,7 +4619,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: execSummary ? 14 : 0 }}>
                     <div>
                       <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase" }}>Executive summary</div>
-                      <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>AI-written · grounded in the briefing above · verify in Detail</div>
+                      <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>AI-written · {horizon === "today" ? "today" : horizon === "week" ? "this week" : "this month"} · grounded in the briefing above · verify in Detail</div>
                     </div>
                     <button onClick={runExecSummary} disabled={execLoading}
                       style={{ flexShrink: 0, padding: "8px 16px", background: execLoading ? "#eff6ff" : "#2563eb", border: "none", borderRadius: 8, color: execLoading ? "#2563eb" : "#fff", cursor: execLoading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
