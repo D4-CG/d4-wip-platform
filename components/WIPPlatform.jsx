@@ -3922,17 +3922,25 @@ Return JSON with:
     const ts = TIMESERIES.series;
     const adrNote = `Average daily revenue held roughly steady (~$${(ts.adrK[ts.adrK.length-1]/1000).toFixed(2)}M/day, ~${Math.round((ts.adrK[ts.adrK.length-1]-ts.adrK[0])/ts.adrK[0]*100)}% over 12 weeks) while AR days rose ${SITE_BASELINE.portfolio.prior.arDays}→${SITE_BASELINE.portfolio.current.arDays}. Because AR days = AR balance ÷ daily revenue, AR days rising while revenue was flat-to-up means the uncollected balance grew FASTER than the topline — the collection gap is worse than the days figure alone suggests.`;
 
-    const prompt = `You are a healthcare revenue cycle expert writing a brief executive note for a multisite CFO. The CFO is already looking at a ranked risk briefing (the findings below) directly above your note. 
+    // REAL write-off / decision data (so Decisions names actual accounts, not invented ones).
+    const woLines = ESCALATION_DATA.writeOffPending.map(w =>
+      `${w.accountId} · ${w.patient} · ${w.payer} · ${fmt(w.amount)} — ${w.rationale}`
+    ).join("\n");
 
-DO NOT restate or list the findings — the CFO can already see them. Your job is to add the connective narrative and the ONE non-obvious insight, then point the CFO to the detailed data to verify and act.
+    const prompt = `You are a healthcare revenue cycle expert writing a brief executive note for a multisite CFO. The CFO is already looking at a ranked risk briefing (the findings below) directly above your note.
+
+DO NOT restate or list the findings verbatim — the CFO can already see them. Your job: (1) a short connective narrative with the ONE non-obvious insight, (2) three tight action sections, (3) pointers to the detail data to verify.
 
 RECONCILED FINDINGS (numbers are fixed truth — do not alter them):
 ${findingLines}
 
-KEY NUANCE TO SURFACE (this is the insight the cards do not state):
+KEY NUANCE TO SURFACE (the insight the cards do not state):
 ${adrNote}
 
-Available detail sections the CFO can open (use these exact anchor ids in your pointers): 
+WRITE-OFFS PENDING CFO DECISION (use these REAL accounts/amounts in "decisions" — do not invent others):
+${woLines}
+
+Available detail sections (use these exact anchor ids in pointers):
 - "detail-sites" (site performance table)
 - "detail-kpis" (headline KPIs: NPR, AR, AR days, NCR)
 - "detail-payers" (expected recovery by payer group)
@@ -3940,22 +3948,22 @@ Available detail sections the CFO can open (use these exact anchor ids in your p
 
 Return ONLY valid JSON (no markdown, no code fences) with exactly:
 {
-  "narrative": "2-3 sentences. Lead with the nuance/insight (the balance-vs-revenue point), connect the findings into one story about cash risk, and frame next step around working highest-EV accounts first. Board-ready, calm, specific. Do NOT repeat the finding headlines verbatim.",
-  "pointers": [
-    {"label": "short verb phrase, e.g. 'Verify the deteriorating sites'", "anchor": "detail-sites"},
-    {"label": "...", "anchor": "detail-kpis"}
-  ]
+  "narrative": "2-3 sentences. Lead with the balance-vs-revenue insight, connect the findings into one cash-risk story, frame next step around working highest-EV accounts first. Calm, board-ready. Do NOT repeat finding headlines verbatim.",
+  "priorities": ["2-3 short imperative actions, EV-first (work highest-value accounts first), each naming a site/area and the point of leverage. No invented dollar figures."],
+  "risks": ["2-3 short risk flags drawn from the findings — what threatens cash if not addressed. Concise."],
+  "decisions": ["1-2 items needing CFO sign-off, using the REAL write-off accounts above (account id + amount + one-line rationale). Frame as a decision to make, not a loss already taken."],
+  "pointers": [{"label": "short verb phrase e.g. 'Verify the deteriorating sites'", "anchor": "detail-sites"}]
 }
-Limit pointers to the 2-3 most relevant sections.`;
+Keep every item to one line. Limit pointers to 2-3.`;
 
     try {
       const res = await fetch("/api/claude", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 700, messages: [{ role: "user", content: prompt }] })
+        body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 1100, messages: [{ role: "user", content: prompt }] })
       });
       const data = await res.json();
       if (!res.ok) {
-        setExecSummary({ narrative: `API error ${res.status}: ${data.error || "Unknown error"}`, pointers: [] });
+        setExecSummary({ narrative: `API error ${res.status}: ${data.error || "Unknown error"}`, priorities: [], risks: [], decisions: [], pointers: [] });
         setExecLoading(false);
         return;
       }
@@ -3963,16 +3971,19 @@ Limit pointers to the 2-3 most relevant sections.`;
       const cleaned = raw.replace(/```json|```/g, "").trim();
       try {
         const parsed = JSON.parse(cleaned);
-        // keep only pointers with valid known anchors (guard against model drift)
+        // guard against model drift: keep only valid anchors; ensure sections are arrays
         const valid = new Set(["detail-sites", "detail-kpis", "detail-payers", "detail-wip"]);
         parsed.pointers = (parsed.pointers || []).filter(p => valid.has(p.anchor)).slice(0, 3);
+        parsed.priorities = Array.isArray(parsed.priorities) ? parsed.priorities.slice(0, 3) : [];
+        parsed.risks = Array.isArray(parsed.risks) ? parsed.risks.slice(0, 3) : [];
+        parsed.decisions = Array.isArray(parsed.decisions) ? parsed.decisions.slice(0, 2) : [];
         setExecSummary(parsed);
       } catch {
-        setExecSummary({ narrative: raw.slice(0, 500), pointers: [] });
+        setExecSummary({ narrative: raw.slice(0, 500), priorities: [], risks: [], decisions: [], pointers: [] });
       }
     } catch (err) {
       console.error("Exec summary error:", err);
-      setExecSummary({ narrative: "Executive summary temporarily unavailable — check that ANTHROPIC_API_KEY is set in Vercel environment variables.", pointers: [] });
+      setExecSummary({ narrative: "Executive summary temporarily unavailable — check that ANTHROPIC_API_KEY is set in Vercel environment variables.", priorities: [], risks: [], decisions: [], pointers: [] });
     }
     setExecLoading(false);
   };
@@ -4482,8 +4493,30 @@ Limit pointers to the 2-3 most relevant sections.`;
                   {execSummary && (
                     <>
                       <div style={{ fontSize: 15, color: "#0f172a", lineHeight: 1.6 }}>{execSummary.narrative}</div>
+                      {(execSummary.priorities?.length || execSummary.risks?.length || execSummary.decisions?.length) > 0 && (
+                        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: isMobile ? 14 : 22, marginTop: 18 }}>
+                          {[
+                            { key: "priorities", label: "Priorities", color: "#2563eb", items: execSummary.priorities },
+                            { key: "risks", label: "Risks", color: "#d97706", items: execSummary.risks },
+                            { key: "decisions", label: "Decisions", color: "#dc2626", items: execSummary.decisions },
+                          ].map(sec => (
+                            <div key={sec.key}>
+                              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: sec.color, marginBottom: 8 }}>{sec.label}</div>
+                              {(sec.items || []).length === 0 ? (
+                                <div style={{ fontSize: 12.5, color: "#cbd5e1" }}>—</div>
+                              ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                  {sec.items.map((it, i) => (
+                                    <div key={i} style={{ fontSize: 12.5, color: "#475569", lineHeight: 1.5, paddingLeft: 10, borderLeft: `2px solid ${sec.color}22` }}>{it}</div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       {execSummary.pointers && execSummary.pointers.length > 0 && (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 18, paddingTop: 16, borderTop: "1px solid #f1f5f9" }}>
                           {execSummary.pointers.map((p, i) => (
                             <button key={i} onClick={() => scrollToDetail(p.anchor)}
                               style={{ padding: "6px 12px", background: "#fff", border: "1px solid #bfdbfe", borderRadius: 8, color: "#2563eb", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
