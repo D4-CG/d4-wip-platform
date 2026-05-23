@@ -178,11 +178,31 @@ for (let i = 1; i <= DNFB_COUNT; i++) {
   });
 }
 
+// ---- Fixed annual NPR per site (as if pulled from the accounting system) ----
+// These are independent givens — NOT derived live from AR. Each is a realistic
+// annual net patient revenue, scaled to site size with strong sites turning AR
+// faster (more annual revenue per dollar of AR). Sums to ~$353M.
+const SITE_NPR = {
+  "Site 1":  23274468,
+  "Site 2":  26682256,
+  "Site 3":  23882742,
+  "Site 4":  29165068,
+  "Site 5":  25374089,
+  "Site 6":  45570337,
+  "Site 7":  36063018,
+  "Site 8":  32522595,
+  "Site 9":  36075485,
+  "Site 10": 31202324,
+  "Site 11": 19778382,
+  "Site 12": 23487957,
+};
+
 // ---- Write ----
 const outDir = path.join(__dirname, "..", "app", "data");
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(path.join(outDir, "ar-accounts.json"), JSON.stringify(ar));
 fs.writeFileSync(path.join(outDir, "dnfb-accounts.json"), JSON.stringify(dnfb));
+fs.writeFileSync(path.join(outDir, "site-npr.json"), JSON.stringify(SITE_NPR));
 
 // ---- Report ----
 const arGross = ar.reduce((s, a) => s + a.grossCharges, 0);

@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import AR_DATA from "../app/data/ar-accounts.json";
 import DNFB_DATA from "../app/data/dnfb-accounts.json";
+import SITE_NPR from "../app/data/site-npr.json";
 
 function useWindowWidth() {
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1280);
@@ -3796,7 +3797,7 @@ Return JSON with:
                 const totalExposure = totalAR + totalDNFB;
                 const totalEV = siteAR.reduce((sum,a) => sum+a.expectedValue, 0);
                 const avgDays = totalAR > 0 ? Math.round(siteAR.reduce((s,a) => s+a.daysOut*a.amount, 0) / totalAR) : 0;
-                const npr = avgDays > 0 ? Math.round(totalAR / avgDays * 365) : 0;
+                const npr = SITE_NPR[s] || 0;
                 // Net collection rate = expected collections / net billable AR (both net-of-contractual)
                 const ncr = totalAR > 0 ? Math.round(totalEV / totalAR * 100) : 0;
                 const deniedCount = siteAR.filter(a => a.denialCode !== null).length;
@@ -3893,15 +3894,18 @@ Return JSON with:
             {(() => {
               const grossAR = arFiltered.reduce((s,a) => s+a.amount, 0);
               const arDays = grossAR > 0 ? Math.round(arFiltered.reduce((s,a) => s + a.amount * a.daysOut, 0) / grossAR) : 0;
-              const annualNPR = arDays > 0 ? Math.round(grossAR / arDays * 365) : 0;
+              // NPR is a fixed accounting given per site — sum the relevant sites (all, or the filtered one)
+              const annualNPR = siteFilter
+                ? (SITE_NPR[siteFilter] || 0)
+                : Object.values(SITE_NPR).reduce((s,v) => s+v, 0);
               const arDaysColor = arDays < 55 ? "#16a34a" : arDays < 65 ? "#d97706" : "#dc2626";
               const arDaysLabel = arDays < 40 ? "Excellent" : arDays < 55 ? "Good" : arDays < 65 ? "Needs attention" : "Critical";
               return (
                 <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Net Patient Revenue (est.)</div>
+                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Net Patient Revenue</div>
                     <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(annualNPR)}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Annualized from net AR · from accounting system in production{siteFilter ? ` · ${siteFilter}` : ""}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Annual · from accounting system{siteFilter ? ` · ${siteFilter}` : ""}</div>
                   </div>
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Total AR</div>
