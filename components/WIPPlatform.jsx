@@ -3801,9 +3801,7 @@ Return JSON with:
                 // Net collection rate = expected collections / net billable AR (both net-of-contractual)
                 const ncr = totalAR > 0 ? Math.round(totalEV / totalAR * 100) : 0;
                 const deniedCount = siteAR.filter(a => a.denialCode !== null).length;
-                // Scale reported first-pass denial rate to realistic range (raw synthetic ~35-79% → ~6-34%)
-                const rawDenial = siteAR.length > 0 ? deniedCount / siteAR.length : 0;
-                const denialRate = Math.round(rawDenial * 0.30 * 100);
+                const denialRate = siteAR.length > 0 ? Math.round(deniedCount / siteAR.length * 100) : 0;
                 const openWL = worklinks.filter(w => w.status==="open" && [...siteAR,...siteDNFB].some(a => a.id===w.accountId)).length;
                 return { site: s, npr, totalAR, totalDNFB, totalExposure, totalEV, avgDays, ncr, denialRate, openWL };
               });
@@ -3848,7 +3846,7 @@ Return JSON with:
                       {siteStatsTableSorted.map(s => {
                         const daysColor = s.avgDays < 55 ? "#16a34a" : s.avgDays < 65 ? "#d97706" : "#dc2626";
                         const ncrColor = s.ncr >= 95 ? "#16a34a" : s.ncr >= 85 ? "#d97706" : "#dc2626";
-                        const denialColor = s.denialRate <= 12 ? "#16a34a" : s.denialRate <= 18 ? "#d97706" : "#dc2626";
+                        const denialColor = s.denialRate <= 10 ? "#16a34a" : s.denialRate <= 18 ? "#d97706" : "#dc2626";
                         return (
                           <div key={s.site} onClick={() => setSiteFilter(s.site)}
                             style={{ display: "grid", gridTemplateColumns: cols9, minWidth: 820, padding: "7px 16px", cursor: "pointer", borderTop: "1px solid #f8fafc", background: "transparent", alignItems: "center" }}
@@ -3879,7 +3877,7 @@ Return JSON with:
                         const ncrColor = s.ncr >= 95 ? "#16a34a" : s.ncr >= 85 ? "#d97706" : "#dc2626";
                         return (
                           <span style={{ fontWeight: 400, color: "#64748b", fontSize: 11 }}>
-                            · NPR {fmt(s.npr)} · AR {fmt(s.totalAR)} · DNFB {fmt(s.totalDNFB)} · EV <span style={{ color: "#2563eb", fontWeight: 600 }}>{fmt(s.totalEV)}</span> · AR Days <span style={{ color: daysColor, fontWeight: 600 }}>{s.avgDays}d</span> · NCR <span style={{ color: ncrColor, fontWeight: 600 }}>{s.ncr}%</span> · Denial <span style={{ color: s.denialRate <= 12 ? "#16a34a" : s.denialRate <= 18 ? "#d97706" : "#dc2626", fontWeight: 600 }}>{s.denialRate}%</span>
+                            · NPR {fmt(s.npr)} · AR {fmt(s.totalAR)} · DNFB {fmt(s.totalDNFB)} · EV <span style={{ color: "#2563eb", fontWeight: 600 }}>{fmt(s.totalEV)}</span> · AR Days <span style={{ color: daysColor, fontWeight: 600 }}>{s.avgDays}d</span> · NCR <span style={{ color: ncrColor, fontWeight: 600 }}>{s.ncr}%</span> · Denial <span style={{ color: s.denialRate <= 10 ? "#16a34a" : s.denialRate <= 18 ? "#d97706" : "#dc2626", fontWeight: 600 }}>{s.denialRate}%</span>
                           </span>
                         );
                       })()}
@@ -4042,12 +4040,11 @@ Return JSON with:
               const ncrColor = ncr >= 95 ? "#16a34a" : ncr >= 85 ? "#d97706" : "#dc2626";
               const ncrLabel = ncr >= 95 ? "Excellent" : ncr >= 85 ? "Acceptable" : "Needs attention";
               const totalDenied = arFiltered.filter(a => a.denialCode !== null).length;
-              // Scale to realistic first-pass denial range, consistent with per-site table
-              const denialRate = arFiltered.length > 0 ? Math.round(totalDenied / arFiltered.length * 0.30 * 100) : 0;
+              const denialRate = arFiltered.length > 0 ? Math.round(totalDenied / arFiltered.length * 100) : 0;
               const deniedBalance = arFiltered.filter(a => a.denialCode !== null).reduce((s,a) => s+a.amount, 0);
-              const denialBalanceRate = totalGrossAR > 0 ? Math.round(deniedBalance / totalGrossAR * 0.30 * 100) : 0;
-              const denialColor = denialRate <= 12 ? "#16a34a" : denialRate <= 18 ? "#d97706" : "#dc2626";
-              const denialLabel = denialRate <= 12 ? "Excellent" : denialRate <= 18 ? "Acceptable" : "Needs attention";
+              const denialBalanceRate = totalGrossAR > 0 ? Math.round(deniedBalance / totalGrossAR * 100) : 0;
+              const denialColor = denialRate <= 10 ? "#16a34a" : denialRate <= 18 ? "#d97706" : "#dc2626";
+              const denialLabel = denialRate <= 10 ? "Excellent" : denialRate <= 18 ? "Acceptable" : "Needs attention";
               return (
                 <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>

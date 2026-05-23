@@ -119,9 +119,9 @@ function daysOutForSite(profile) {
 
 // Denial draw biased by site profile denialMult
 function denialForSite(profile) {
-  // base denial probability ~ proportion of non-null in AR_DENIALS (5/9 ≈ 0.56)
-  const baseDenialProb = 5 / 9;
-  const p = Math.min(0.95, baseDenialProb * profile.denialMult);
+  // Realistic first-pass denial: ~14% base, site multiplier spreads good ~9% to weak ~20%+
+  const baseDenialProb = 0.14;
+  const p = Math.min(0.40, baseDenialProb * profile.denialMult);
   if (rand() < p) return pick(["CO-16", "CO-22", "CO-50", "CO-97", "CO-4"]);
   return null;
 }
