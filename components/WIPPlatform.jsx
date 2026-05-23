@@ -1390,6 +1390,105 @@ function LightRecipientView({ area, worklinks, onResolve, roleLabel }) {
 }
 
 
+// ─── CFO Dashboard V2 — refined, layered, cash-health-first ───────────────────
+// Built behind the existing dashboard as a fresh design language (Apple-like:
+// type-led, calm, color-as-signal, progressive disclosure). Old dashboard intact.
+function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isCollectorActionable, worklinks }) {
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 768;
+
+  // ---- Cash-health metrics (Layer 1 hero) ----
+  const totalAR = arFiltered.reduce((s, a) => s + a.amount, 0);
+  const arDays = totalAR > 0 ? Math.round(arFiltered.reduce((s, a) => s + a.amount * a.daysOut, 0) / totalAR) : 0;
+  const totalEV = arFiltered.reduce((s, a) => s + a.expectedValue, 0);
+  const ncr = totalAR > 0 ? Math.round(totalEV / totalAR * 100) : 0;
+  const annualNPR = siteFilter ? (SITE_NPR[siteFilter] || 0) : Object.values(SITE_NPR).reduce((s, v) => s + v, 0);
+
+  // Benchmark health → signal color ONLY when off-benchmark; healthy stays calm ink.
+  const INK = "#0a0a0a", QUIET = "#8a8f98", LINE = "#ececec", AMBER = "#b45309", RED = "#b42318";
+  const arDaysOff = arDays >= 65 ? RED : arDays >= 55 ? AMBER : null;
+  const ncrOff = ncr < 80 ? RED : ncr < 90 ? AMBER : null;
+
+  // ---- "Where it's trapped" (Layer 1b) — site dispersion, problem sites surfaced ----
+  const sites = {};
+  arFiltered.forEach(a => {
+    if (!sites[a.site]) sites[a.site] = { ar: 0, wd: 0, den: 0, n: 0 };
+    const s = sites[a.site]; s.ar += a.amount; s.wd += a.daysOut * a.amount; s.den += a.denialCode ? 1 : 0; s.n++;
+  });
+  const siteRows = Object.entries(sites).map(([name, s]) => ({
+    name, ar: s.ar, days: Math.round(s.wd / s.ar), denial: Math.round(s.den / s.n * 100),
+  })).sort((a, b) => b.days - a.days);
+  const worstThree = new Set(siteRows.slice(0, 3).map(r => r.name));
+  const trappedDollars = siteRows.slice(0, 3).reduce((s, r) => s + r.ar, 0);
+
+  const heroNum = { fontFamily: "'Spline Sans Mono', ui-monospace, monospace", fontWeight: 600, letterSpacing: "-0.03em", color: INK, lineHeight: 1 };
+  const labelStyle = { fontSize: 11, fontWeight: 500, color: QUIET, letterSpacing: "0.04em", textTransform: "uppercase" };
+
+  return (
+    <div style={{ fontFamily: "'Spline Sans', -apple-system, sans-serif", color: INK, background: "#fff", padding: isMobile ? "8px 4px 60px" : "16px 8px 80px", maxWidth: 1100, margin: "0 auto" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600;700&display=swap');`}</style>
+
+      {/* ── Layer 1: HERO — cash health in one glance ── */}
+      <div style={{ padding: isMobile ? "24px 16px 8px" : "40px 24px 16px" }}>
+        <div style={{ ...labelStyle, marginBottom: 6 }}>Cash health{siteFilter ? ` · ${siteFilter}` : " · all sites"}</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: isMobile ? 4 : 10, flexWrap: "wrap" }}>
+          <span style={{ ...heroNum, fontSize: isMobile ? 44 : 68 }}>{fmt(totalAR)}</span>
+          <span style={{ fontSize: isMobile ? 14 : 18, color: QUIET, fontWeight: 500 }}>in accounts receivable</span>
+        </div>
+        <div style={{ fontSize: 14, color: QUIET, marginTop: 8 }}>
+          {arFiltered.length.toLocaleString()} open accounts · {fmt(annualNPR)} annual net patient revenue
+        </div>
+      </div>
+
+      {/* Health indicators — large, calm; color only if off-benchmark */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3, 1fr)", gap: isMobile ? 16 : 32, padding: isMobile ? "16px" : "24px", borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, marginTop: 16 }}>
+        <div>
+          <div style={labelStyle}>AR Days</div>
+          <div style={{ ...heroNum, fontSize: isMobile ? 30 : 40, color: arDaysOff || INK, marginTop: 8 }}>{arDays}</div>
+          <div style={{ fontSize: 12, color: arDaysOff || QUIET, marginTop: 6 }}>{arDaysOff ? (arDays >= 65 ? "Above target" : "Watch") : "On target"} · benchmark &lt;55</div>
+        </div>
+        <div>
+          <div style={labelStyle}>Net Collection Rate</div>
+          <div style={{ ...heroNum, fontSize: isMobile ? 30 : 40, color: ncrOff || INK, marginTop: 8 }}>{ncr}%</div>
+          <div style={{ fontSize: 12, color: ncrOff || QUIET, marginTop: 6 }}>{ncrOff ? "Below benchmark" : "Healthy"} · {fmt(totalEV)} expected</div>
+        </div>
+        <div style={{ gridColumn: isMobile ? "span 2" : "auto" }}>
+          <div style={labelStyle}>Trapped in 3 weakest sites</div>
+          <div style={{ ...heroNum, fontSize: isMobile ? 30 : 40, color: INK, marginTop: 8 }}>{fmt(trappedDollars)}</div>
+          <div style={{ fontSize: 12, color: QUIET, marginTop: 6 }}>{[...worstThree].join(" · ")}</div>
+        </div>
+      </div>
+
+      {/* ── Layer 1b: WHERE IT'S TRAPPED — quiet table, problem sites surfaced ── */}
+      <div style={{ padding: isMobile ? "24px 16px" : "32px 24px" }}>
+        <div style={{ ...labelStyle, marginBottom: 16 }}>Where it's trapped</div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr auto auto" : "1.4fr 1fr 0.8fr 0.8fr", gap: 12, padding: "0 8px 8px" }}>
+          <span style={{ ...labelStyle, fontSize: 10 }}>Site</span>
+          <span style={{ ...labelStyle, fontSize: 10, textAlign: "right" }}>AR</span>
+          {!isMobile && <span style={{ ...labelStyle, fontSize: 10, textAlign: "right" }}>Days</span>}
+          <span style={{ ...labelStyle, fontSize: 10, textAlign: "right" }}>Denial</span>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {siteRows.map(r => {
+            const isWorst = worstThree.has(r.name);
+            return (
+              <div key={r.name} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr auto auto" : "1.4fr 1fr 0.8fr 0.8fr", alignItems: "center", gap: 12, padding: "12px 8px", borderTop: `1px solid ${LINE}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {isWorst && <span style={{ width: 6, height: 6, borderRadius: "50%", background: RED, display: "inline-block" }} />}
+                  <span style={{ fontSize: 14, fontWeight: isWorst ? 600 : 500, color: isWorst ? INK : QUIET }}>{r.name}</span>
+                </div>
+                <div style={{ fontFamily: "'Spline Sans Mono', monospace", fontSize: 14, color: INK, textAlign: "right" }}>{fmt(r.ar)}</div>
+                {!isMobile && <div style={{ fontFamily: "'Spline Sans Mono', monospace", fontSize: 13, color: r.days >= 65 ? RED : r.days >= 55 ? AMBER : QUIET, textAlign: "right" }}>{r.days}d</div>}
+                <div style={{ fontFamily: "'Spline Sans Mono', monospace", fontSize: 13, color: r.denial >= 18 ? RED : r.denial > 10 ? AMBER : QUIET, textAlign: "right" }}>{r.denial}%</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function WorkLinkReporting({ worklinks, isMobile }) {
   const [drillArea, setDrillArea] = useState(null);
@@ -4020,6 +4119,9 @@ Return JSON with:
       <div style={{ padding: isMobile ? "16px 12px 80px" : isTablet ? "20px 20px" : "24px 32px" }}>
         {role === "cfo" && tab === "metrics" ? (
           <div>
+            {/* NEW: CFO Dashboard V2 (refined/layered) — rendered above existing for review */}
+            <CFODashboardV2 arFiltered={arFiltered} dnfbFiltered={dnfbFiltered} siteFilter={siteFilter} SITE_NPR={SITE_NPR} isCollectorActionable={isCollectorActionable} worklinks={worklinks} />
+            <div style={{ borderTop: "3px solid #e2e8f0", margin: "32px 0", paddingTop: 8, textAlign: "center", fontSize: 10, color: "#cbd5e1", letterSpacing: "0.1em", textTransform: "uppercase" }}>↓ Current dashboard below (for comparison) ↓</div>
             {/* Site filter */}
             {(() => {
               const sites = [...new Set([...dnfbForRole, ...arForRole].map(a => a.site))].sort((a,b) => parseInt(a.replace(/\D/g,"")) - parseInt(b.replace(/\D/g,"")));
