@@ -4615,14 +4615,14 @@ Keep every item to one line. Limit pointers to 2-3.`;
             )}
             {tab === "metrics" && (
               <div style={{ maxWidth: 940, margin: "0 auto", padding: isMobile ? "0 4px 40px" : "0 16px 40px" }}>
-                <div style={{ border: "1px solid #e2e8f0", borderRadius: 14, borderLeft: "3px solid #2563eb", padding: isMobile ? "18px 16px" : "22px 28px" }}>
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 14, borderLeft: "3px solid #334155", padding: isMobile ? "18px 16px" : "22px 28px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: execSummary ? 14 : 0 }}>
                     <div>
                       <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase" }}>Executive summary</div>
                       <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>AI-written · {horizon === "today" ? "today" : horizon === "week" ? "this week" : "this month"} · grounded in the briefing above · verify in Detail</div>
                     </div>
                     <button onClick={runExecSummary} disabled={execLoading}
-                      style={{ flexShrink: 0, padding: "8px 16px", background: execLoading ? "#eff6ff" : "#2563eb", border: "none", borderRadius: 8, color: execLoading ? "#2563eb" : "#fff", cursor: execLoading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
+                      style={{ flexShrink: 0, padding: "8px 16px", background: execLoading ? "#f1f5f9" : "#0f172a", border: "none", borderRadius: 8, color: execLoading ? "#64748b" : "#fff", cursor: execLoading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
                       {execLoading ? "Writing…" : execSummary ? "Regenerate" : "Generate summary"}
                     </button>
                   </div>
@@ -4632,7 +4632,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
                       {(execSummary.priorities?.length || execSummary.risks?.length || execSummary.decisions?.length) > 0 && (
                         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: isMobile ? 14 : 22, marginTop: 18 }}>
                           {[
-                            { key: "priorities", label: "Priorities", color: "#2563eb", items: execSummary.priorities },
+                            { key: "priorities", label: "Priorities", color: "#334155", items: execSummary.priorities },
                             { key: "risks", label: "Risks", color: "#d97706", items: execSummary.risks },
                             { key: "decisions", label: "Decisions", color: "#dc2626", items: execSummary.decisions },
                           ].map(sec => (
@@ -4655,7 +4655,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 18, paddingTop: 16, borderTop: "1px solid #f1f5f9" }}>
                           {execSummary.pointers.map((p, i) => (
                             <button key={i} onClick={() => scrollToDetail(p.anchor)}
-                              style={{ padding: "6px 12px", background: "#fff", border: "1px solid #bfdbfe", borderRadius: 8, color: "#2563eb", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+                              style={{ padding: "6px 12px", background: "#fff", border: "1px solid #cbd5e1", borderRadius: 8, color: "#334155", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
                               {p.label} <span style={{ fontSize: 13 }}>→</span>
                             </button>
                           ))}
