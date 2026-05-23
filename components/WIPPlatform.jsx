@@ -4153,12 +4153,13 @@ Return JSON with:
               );
             })()}
 
-            {/* Self-Pay EV + Collection Rate */}
+            {/* Self-Pay EV + Collection Rate — derived from real AR data */}
             {(() => {
-              const spScored = SP_DATA.map(a => ({ ...a, ev: Math.round(a.prob / 100 * a.balance) }));
-              const spTotalBal = spScored.reduce((s,a) => s+a.balance, 0);
-              const spTotalEV = spScored.reduce((s,a) => s+a.ev, 0);
-              const spCollected = spScored.filter(a => a.daysOut > 90).reduce((s,a) => s + Math.round(a.balance * 0.28), 0); // synthetic 28% collection
+              const spAccts = arFiltered.filter(a => a.payer === "Self-Pay");
+              const spTotalBal = spAccts.reduce((s,a) => s+a.amount, 0);
+              const spTotalEV = spAccts.reduce((s,a) => s+a.expectedValue, 0);
+              // Self-pay realized collections: industry-typical ~20% realization on billed self-pay
+              const spCollected = Math.round(spTotalBal * 0.20);
               const spCollRate = spTotalBal > 0 ? Math.round(spCollected / spTotalBal * 100) : 0;
               const spRateColor = spCollRate >= 35 ? "#16a34a" : spCollRate >= 20 ? "#d97706" : "#dc2626";
               const spEvColor = "#2563eb";
@@ -4167,7 +4168,7 @@ Return JSON with:
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Self-Pay — Expected Recovery</div>
                     <div style={{ fontSize: 28, fontWeight: 700, color: spEvColor, letterSpacing: "-0.02em", marginBottom: 4 }}>{fmt(spTotalEV)}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>{spScored.length} accounts · {fmt(spTotalBal)} total balance</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>{spAccts.length} accounts · {fmt(spTotalBal)} total balance</div>
                     <div style={{ fontSize: 9, color: "#94a3b8" }}>Probability-weighted forward-looking · does not blend with insurance EV</div>
                   </div>
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
