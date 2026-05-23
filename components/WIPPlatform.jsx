@@ -3,6 +3,7 @@ import AR_DATA from "../app/data/ar-accounts.json";
 import DNFB_DATA from "../app/data/dnfb-accounts.json";
 import SITE_NPR from "../app/data/site-npr.json";
 import SITE_BASELINE from "../app/data/site-baseline.json";
+import TIMESERIES from "../app/data/timeseries.json";
 
 function useWindowWidth() {
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1280);
@@ -1395,6 +1396,33 @@ function LightRecipientView({ area, worklinks, onResolve, roleLabel }) {
 // Built behind the existing dashboard as a fresh design language (Apple-like:
 // type-led, calm, color-as-signal, progressive disclosure). Old dashboard intact.
 
+// ─── Sparkline ────────────────────────────────────────────────────────────────
+// Minimal trend line for finding cards: no axes, no labels, just the shape + endpoint dot.
+// Calm by design — conveys trajectory, not precision. color matches the finding's signal.
+function Sparkline({ data, color, width = 96, height = 30 }) {
+  if (!data || data.length < 2) return null;
+  const min = Math.min(...data), max = Math.max(...data);
+  const range = max - min || 1;
+  const pad = 3;
+  const w = width - pad * 2, h = height - pad * 2;
+  const pts = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * w;
+    const y = pad + h - ((v - min) / range) * h;
+    return [x, y];
+  });
+  const d = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  const [ex, ey] = pts[pts.length - 1];
+  // soft area fill under the line
+  const area = `${d} L${ex.toFixed(1)},${(height - pad).toFixed(1)} L${pad},${(height - pad).toFixed(1)} Z`;
+  return (
+    <svg width={width} height={height} style={{ display: "block", overflow: "visible" }} aria-hidden="true">
+      <path d={area} fill={color} opacity="0.08" />
+      <path d={d} fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={ex} cy={ey} r="2.4" fill={color} />
+    </svg>
+  );
+}
+
 // ─── Ranked Risk Engine ───────────────────────────────────────────────────────
 // Pure function: computes ALL candidate findings, ranks them, returns sorted.
 // As metrics move, ranking shifts so what matters most to Marcus is always on top.
@@ -1432,7 +1460,7 @@ function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
     .sort((a, b) => b[1].delta.arDays - a[1].delta.arDays);
   if (deltaDays > 0) {
     findings.push({
-      id: "aging_trend", tone: "risk", rankClass: "lead",
+      id: "aging_trend", tone: "risk", rankClass: "lead", series: "arDays",
       severity: Math.min(100, 40 + deltaDays * 7),
       headline: { pre: "AR slowed ", em: `${priorDays} → ${curDays} days`, mid: " this month, delaying roughly ", em2: fmtUSD(cashDrift), post: " of cash collection." },
       why: `Rising denials and slower follow-up at the sites below are pushing accounts deeper into aging.`,
@@ -1444,7 +1472,7 @@ function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
     });
   } else if (deltaDays < 0) {
     findings.push({
-      id: "aging_trend", tone: "good", rankClass: "good",
+      id: "aging_trend", tone: "good", rankClass: "good", series: "arDays",
       severity: 20,
       headline: { pre: "AR improved ", em: `${priorDays} → ${curDays} days`, mid: " this month, pulling roughly ", em2: fmtUSD(cashDrift), post: " of cash closer to collection." },
       why: `Recovery is broad-based across sites.`,
@@ -1464,7 +1492,7 @@ function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
       .sort((a, b) => b[1].delta.over90Pct - a[1].delta.over90Pct)
       .slice(0, 3).map(([n]) => n);
     findings.push({
-      id: "aging_cliff", tone: "risk", rankClass: "context",
+      id: "aging_cliff", tone: "risk", rankClass: "context", series: "over90Pct",
       severity: Math.min(100, 45 + (over90Pct - 10) * 3),
       headline: { pre: "", em: fmtUSD(round10k(over90)), mid: " has aged past 90 days — ", em2: `${over90Pct}% of AR`, post: ", above the 10% PE target." },
       why: `Concentrated in ${cliffDrivers.join(", ")}, where aging accelerated most this month; ${fmtUSD(round10k(over120))} is already past 120.`,
@@ -1503,7 +1531,7 @@ function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
       .sort((a, b) => b[1].delta.denialRate - a[1].delta.denialRate)
       .slice(0, 3).map(([n]) => n);
     findings.push({
-      id: "denial_bleed", tone: "risk", rankClass: "context",
+      id: "denial_bleed", tone: "risk", rankClass: "context", series: "denialRate",
       severity: Math.min(80, 25 + denialRate * 2.2),
       headline: { pre: "First-pass denials at ", em: `${denialRate}%`, mid: " — ", em2: fmtUSD(round10k(deniedBalance)), post: " in denied balance, above the 10% line." },
       why: `Denial volume climbed this month, concentrated at ${denialRisers.join(", ")} — upstream coding, auth, and eligibility gaps feeding back as rework.`,
@@ -1529,7 +1557,7 @@ function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
     const impEVShare = totalAR > 0 ? totalEV * (impAR / totalAR) : 0;
     const evGain = round10k(impEVShare * impDriftWeighted);
     findings.push({
-      id: "improving_sites", tone: "good", rankClass: "good",
+      id: "improving_sites", tone: "good", rankClass: "good", series: "improving",
       severity: 16,
       headline: { pre: "", em: `${improvingSites.length} sites`, mid: " improved this month — ", em2: top.map(([n]) => n).join(", "), post: `, recovering AR up to ${bestDays} days faster${evGain > 0 ? ` and adding ~${fmtUSD(evGain)} of recoverable cash` : ""}.` },
       why: `Consistent EV-first follow-up and lower denials are compounding at the strongest sites.`,
@@ -1581,8 +1609,16 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
         <>
           {/* ── LEAD FINDING (largest) ── */}
           <div style={{ padding: isMobile ? "20px 16px" : "30px 28px", border: `1px solid ${LINE}`, borderRadius: 14, borderLeft: `3px solid ${bandColor(lead)}`, marginBottom: 14 }}>
-            <div style={{ fontSize: isMobile ? 20 : 26, fontWeight: 600, lineHeight: 1.34, letterSpacing: "-0.01em" }}>
-              {lead.headline.pre}<span style={{ color: emColor(lead) }}>{lead.headline.em}</span>{lead.headline.mid}<span style={{ color: emColor(lead) }}>{lead.headline.em2}</span>{lead.headline.post}
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 20 }}>
+              <div style={{ fontSize: isMobile ? 20 : 26, fontWeight: 600, lineHeight: 1.34, letterSpacing: "-0.01em", flex: 1 }}>
+                {lead.headline.pre}<span style={{ color: emColor(lead) }}>{lead.headline.em}</span>{lead.headline.mid}<span style={{ color: emColor(lead) }}>{lead.headline.em2}</span>{lead.headline.post}
+              </div>
+              {!isMobile && lead.series && TIMESERIES.series[lead.series] && (
+                <div style={{ flexShrink: 0, paddingTop: 4 }}>
+                  <Sparkline data={TIMESERIES.series[lead.series]} color={bandColor(lead)} width={120} height={38} />
+                  <div style={{ fontSize: 9, color: FAINT, textAlign: "center", marginTop: 4, letterSpacing: "0.04em" }}>12-WEEK TREND</div>
+                </div>
+              )}
             </div>
             <div style={{ fontSize: 14, color: MUTE, marginTop: 14, lineHeight: 1.55 }}>
               <span style={{ color: INK, fontWeight: 600 }}>Why:</span> {lead.why}<br />
@@ -1607,8 +1643,15 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
           {/* ── SUPPORTING FINDINGS (smaller, ranked) ── */}
           {supporting.map(f => (
             <div key={f.id} style={{ padding: isMobile ? "16px 16px" : "18px 24px", border: `1px solid ${LINE}`, borderRadius: 12, borderLeft: `3px solid ${bandColor(f)}`, marginBottom: 10 }}>
-              <div style={{ fontSize: isMobile ? 15 : 17, fontWeight: 600, lineHeight: 1.4 }}>
-                {f.headline.pre}<span style={{ color: emColor(f) }}>{f.headline.em}</span>{f.headline.mid}<span style={{ color: emColor(f) }}>{f.headline.em2}</span>{f.headline.post}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+                <div style={{ fontSize: isMobile ? 15 : 17, fontWeight: 600, lineHeight: 1.4, flex: 1 }}>
+                  {f.headline.pre}<span style={{ color: emColor(f) }}>{f.headline.em}</span>{f.headline.mid}<span style={{ color: emColor(f) }}>{f.headline.em2}</span>{f.headline.post}
+                </div>
+                {!isMobile && f.series && TIMESERIES.series[f.series] && (
+                  <div style={{ flexShrink: 0 }}>
+                    <Sparkline data={TIMESERIES.series[f.series]} color={bandColor(f)} width={84} height={26} />
+                  </div>
+                )}
               </div>
               <div style={{ fontSize: 13, color: MUTE, marginTop: 8, lineHeight: 1.5 }}>{f.recommendation}</div>
             </div>
