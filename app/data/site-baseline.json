@@ -6,11 +6,12 @@
       "arDays": 62
     },
     "prior": {
-      "arDays": 59
+      "arDays": 60
     },
     "delta": {
-      "arDays": 3
-    }
+      "arDays": 2
+    },
+    "evDriftPct": -0.009414512394363719
   },
   "sites": {
     "Site 10": {
@@ -21,18 +22,19 @@
         "over90Pct": 19
       },
       "prior": {
-        "arDays": 52,
+        "arDays": 55,
         "denialRate": 11,
-        "ar": 3360854,
-        "over90Pct": 20
+        "ar": 3401840,
+        "over90Pct": 21
       },
       "delta": {
-        "arDays": -1,
+        "arDays": -4,
         "denialRate": -1,
-        "arPct": 0,
-        "over90Pct": -1
+        "arPct": -2,
+        "over90Pct": -2
       },
-      "trend": "stable"
+      "evDriftPct": 0.02,
+      "trend": "improving"
     },
     "Site 2": {
       "current": {
@@ -53,6 +55,7 @@
         "arPct": 3,
         "over90Pct": 5
       },
+      "evDriftPct": -0.04,
       "trend": "deteriorating"
     },
     "Site 4": {
@@ -63,17 +66,18 @@
         "over90Pct": 17
       },
       "prior": {
-        "arDays": 58,
+        "arDays": 59,
         "denialRate": 15,
-        "ar": 4118387,
-        "over90Pct": 15
+        "ar": 4134730,
+        "over90Pct": 16
       },
       "delta": {
-        "arDays": 3,
+        "arDays": 2,
         "denialRate": 0,
         "arPct": 1,
-        "over90Pct": 2
+        "over90Pct": 1
       },
+      "evDriftPct": -0.01,
       "trend": "stable"
     },
     "Site 6": {
@@ -84,18 +88,19 @@
         "over90Pct": 16
       },
       "prior": {
-        "arDays": 55,
-        "denialRate": 9,
-        "ar": 10783448,
-        "over90Pct": 18
+        "arDays": 58,
+        "denialRate": 10,
+        "ar": 10916032,
+        "over90Pct": 20
       },
       "delta": {
-        "arDays": -3,
-        "denialRate": -1,
-        "arPct": -1,
-        "over90Pct": -2
+        "arDays": -6,
+        "denialRate": -2,
+        "arPct": -2,
+        "over90Pct": -4
       },
-      "trend": "stable"
+      "evDriftPct": 0.03,
+      "trend": "improving"
     },
     "Site 5": {
       "current": {
@@ -116,6 +121,7 @@
         "arPct": 6,
         "over90Pct": 9
       },
+      "evDriftPct": -0.075,
       "trend": "deteriorating"
     },
     "Site 3": {
@@ -137,6 +143,7 @@
         "arPct": 4,
         "over90Pct": 7
       },
+      "evDriftPct": -0.055,
       "trend": "deteriorating"
     },
     "Site 7": {
@@ -147,17 +154,18 @@
         "over90Pct": 21
       },
       "prior": {
-        "arDays": 57,
+        "arDays": 59,
         "denialRate": 12,
-        "ar": 6258488,
-        "over90Pct": 20
+        "ar": 6308556,
+        "over90Pct": 21
       },
       "delta": {
-        "arDays": 2,
+        "arDays": 0,
         "denialRate": 0,
-        "arPct": 1,
-        "over90Pct": 1
+        "arPct": 0,
+        "over90Pct": 0
       },
+      "evDriftPct": 0,
       "trend": "stable"
     },
     "Site 1": {
@@ -168,17 +176,18 @@
         "over90Pct": 23
       },
       "prior": {
-        "arDays": 61,
+        "arDays": 62,
         "denialRate": 14,
-        "ar": 5306276,
+        "ar": 5327249,
         "over90Pct": 21
       },
       "delta": {
-        "arDays": 4,
+        "arDays": 3,
         "denialRate": 1,
-        "arPct": 2,
+        "arPct": 1,
         "over90Pct": 2
       },
+      "evDriftPct": -0.015,
       "trend": "stable"
     },
     "Site 8": {
@@ -200,6 +209,7 @@
         "arPct": 2,
         "over90Pct": 4
       },
+      "evDriftPct": -0.03,
       "trend": "deteriorating"
     },
     "Site 9": {
@@ -210,18 +220,19 @@
         "over90Pct": 16
       },
       "prior": {
-        "arDays": 51,
-        "denialRate": 10,
-        "ar": 7034516,
-        "over90Pct": 17
+        "arDays": 54,
+        "denialRate": 11,
+        "ar": 7120653,
+        "over90Pct": 19
       },
       "delta": {
-        "arDays": -2,
-        "denialRate": -1,
-        "arPct": -1,
-        "over90Pct": -1
+        "arDays": -5,
+        "denialRate": -2,
+        "arPct": -2,
+        "over90Pct": -3
       },
-      "trend": "stable"
+      "evDriftPct": 0.025,
+      "trend": "improving"
     },
     "Site 11": {
       "current": {
@@ -231,17 +242,18 @@
         "over90Pct": 24
       },
       "prior": {
-        "arDays": 63,
+        "arDays": 64,
         "denialRate": 11,
-        "ar": 1878245,
-        "over90Pct": 21
+        "ar": 1885640,
+        "over90Pct": 22
       },
       "delta": {
-        "arDays": 5,
+        "arDays": 4,
         "denialRate": 1,
         "arPct": 2,
-        "over90Pct": 3
+        "over90Pct": 2
       },
+      "evDriftPct": -0.02,
       "trend": "stable"
     },
     "Site 12": {
@@ -263,6 +275,7 @@
         "arPct": 5,
         "over90Pct": 8
       },
+      "evDriftPct": -0.065,
       "trend": "deteriorating"
     }
   }

@@ -1396,13 +1396,23 @@ function LightRecipientView({ area, worklinks, onResolve, roleLabel }) {
 // type-led, calm, color-as-signal, progressive disclosure). Old dashboard intact.
 
 // ─── Ranked Risk Engine ───────────────────────────────────────────────────────
-// Pure function: computes ALL candidate findings, scores each by threat-to-business,
-// returns ranked desc. The briefing renders top N. As metrics move, ranking shifts,
-// so the most important risk to Marcus is always on top. Every finding answers
-// WHY (what's driving it) and SO WHAT (cash consequence + the path).
-//   severity: 0..100 (drives rank + color band)
-//   tone: "risk" | "good" (good news shown calmly, never as a threat)
-// fmtUSD passed in to keep currency formatting consistent with the app.
+// Pure function: computes ALL candidate findings, ranks them, returns sorted.
+// As metrics move, ranking shifts so what matters most to Marcus is always on top.
+//
+// RANKING MODEL — two axes, deliberately separated:
+//   rankClass: ordering priority, NOT color.
+//     "lead"    = EV-aligned diagnostic (aging TREND). Its implied action — work
+//                 deteriorating sites by expected value — REINFORCES the platform's
+//                 EV-first thesis, so it is allowed to lead the briefing.
+//     "context" = diagnostic risk (over-90 cliff, concentration, denial). Important
+//                 to show, but its naive reading ("work oldest first") would CONTRADICT
+//                 EV-first collection and reduce cash. So it ranks BELOW the lead and is
+//                 framed as context, never as the top directive.
+//     "good"    = positive finding (improving sites, strong NCR) for board/CEO wins.
+//   severity: 0..100, drives COLOR band only (red/amber/quiet), not rank order.
+//
+// Every finding answers WHY (driver) and RECOMMENDATION (EV-first action / consequence).
+// Recommendations must ALWAYS point to EV-first work, never "work your oldest accounts."
 function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
   const findings = [];
   const annualNPR = siteFilter ? (siteNpr[siteFilter] || 0) : Object.values(siteNpr).reduce((s, v) => s + v, 0);
@@ -1410,7 +1420,7 @@ function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
   const totalAR = ar.reduce((s, a) => s + a.amount, 0);
   const round10k = (n) => Math.round(n / 10000) * 10000;
 
-  // ---- Finding 1: Portfolio AR aging trend (deterioration over the month) ----
+  // ---- LEAD: Portfolio AR aging trend (the EV-aligned diagnostic) ----
   const curDays = totalAR > 0 ? Math.round(ar.reduce((s, a) => s + a.amount * a.daysOut, 0) / totalAR) : 0;
   const priorDays = siteFilter
     ? (baseline.sites[siteFilter]?.prior.arDays ?? curDays)
@@ -1422,12 +1432,11 @@ function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
     .sort((a, b) => b[1].delta.arDays - a[1].delta.arDays);
   if (deltaDays > 0) {
     findings.push({
-      id: "aging_trend", tone: "risk",
-      // severity scales with magnitude of slip; +3 days portfolio ≈ ~60
+      id: "aging_trend", tone: "risk", rankClass: "lead",
       severity: Math.min(100, 40 + deltaDays * 7),
       headline: { pre: "AR slowed ", em: `${priorDays} → ${curDays} days`, mid: " this month, delaying roughly ", em2: fmtUSD(cashDrift), post: " of cash collection." },
-      why: `Driven by ${deterioratingSites.length} sites aging faster — denials and follow-up gaps compounding.`,
-      soWhat: `Recoverable if worked before accounts cross the 90-day collectability cliff.`,
+      why: `${deterioratingSites.length} sites are aging faster — denials and follow-up gaps compounding.`,
+      recommendation: `Direct collectors to the highest-EV accounts in ${deterioratingSites.slice(0, 3).map(([n]) => n).join(", ")} first — recovering the biggest dollars fastest pulls cash back in.`,
       drivers: deterioratingSites.slice(0, 3).map(([name, s]) => ({
         name, detail: `${s.prior.arDays} → ${s.current.arDays} days · denial +${s.delta.denialRate}pts · +${s.delta.over90Pct}pts over 90`,
         magnitude: `+${s.delta.arDays}d`,
@@ -1435,32 +1444,31 @@ function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
     });
   } else if (deltaDays < 0) {
     findings.push({
-      id: "aging_trend", tone: "good",
+      id: "aging_trend", tone: "good", rankClass: "good",
       severity: 20,
       headline: { pre: "AR improved ", em: `${priorDays} → ${curDays} days`, mid: " this month, pulling roughly ", em2: fmtUSD(cashDrift), post: " of cash closer to collection." },
       why: `Recovery is broad-based across sites.`,
-      soWhat: `Hold the gains by keeping the weakest sites worked.`,
+      recommendation: `Hold the gains by keeping the highest-EV accounts worked first.`,
       drivers: [],
     });
   }
 
-  // ---- Finding 2: Money aging past the recoverability cliff (>90 / >120) ----
+  // ---- CONTEXT: Money aging past the recoverability cliff (>90 / >120) ----
   const over90 = ar.filter(a => a.daysOut > 90).reduce((s, a) => s + a.amount, 0);
   const over120 = ar.filter(a => a.daysOut > 120).reduce((s, a) => s + a.amount, 0);
   const over90Pct = totalAR > 0 ? Math.round(over90 / totalAR * 100) : 0;
   if (over90Pct > 10) {
     findings.push({
-      id: "aging_cliff", tone: "risk",
-      // PE target is <10%; severity scales above that
+      id: "aging_cliff", tone: "risk", rankClass: "context",
       severity: Math.min(100, 45 + (over90Pct - 10) * 3),
       headline: { pre: "", em: fmtUSD(round10k(over90)), mid: " has aged past 90 days — ", em2: `${over90Pct}% of AR`, post: ", above the 10% PE target." },
-      why: `Collectability falls sharply after 90 days; ${fmtUSD(round10k(over120))} is already past 120.`,
-      soWhat: `Prioritize the over-90 cohort now to keep it from reaching write-off.`,
+      why: `Collectability falls sharply past 90 days; ${fmtUSD(round10k(over120))} is already past 120.`,
+      recommendation: `As collectors work by EV, flag high-EV accounts nearing 90 days so the biggest dollars are recovered before they slip toward write-off.`,
       drivers: [],
     });
   }
 
-  // ---- Finding 3: Concentration risk (single site = outsized exposure) ----
+  // ---- CONTEXT: Concentration risk (single site = outsized exposure) ----
   const bySite = {};
   ar.forEach(a => { bySite[a.site] = (bySite[a.site] || 0) + a.amount; });
   const siteEntries = Object.entries(bySite).sort((a, b) => b[1] - a[1]);
@@ -1469,32 +1477,63 @@ function computeRiskFindings({ ar, baseline, siteNpr, siteFilter, fmtUSD }) {
     const topPct = Math.round(topAR / totalAR * 100);
     if (topPct >= 15) {
       findings.push({
-        id: "concentration", tone: "risk",
+        id: "concentration", tone: "risk", rankClass: "context",
         severity: Math.min(85, 30 + topPct * 1.5),
         headline: { pre: "", em: `${topPct}% of AR`, mid: " sits in a single site — ", em2: topSite, post: ` holds ${fmtUSD(round10k(topAR))}.` },
         why: `Concentrated exposure means one site's performance swings the whole portfolio.`,
-        soWhat: `Watch ${topSite} closely; its trajectory is the portfolio's trajectory.`,
+        recommendation: `Keep ${topSite} staffed and worked first by EV; its trajectory is the portfolio's trajectory.`,
         drivers: [],
       });
     }
   }
 
-  // ---- Finding 4: Denial bleed (first-pass denials as recurring leakage) ----
+  // ---- CONTEXT: Denial bleed (first-pass denials as recurring leakage) ----
   const deniedAccts = ar.filter(a => a.denialCode);
   const denialRate = ar.length > 0 ? Math.round(deniedAccts.length / ar.length * 100) : 0;
   const deniedBalance = deniedAccts.reduce((s, a) => s + a.amount, 0);
   if (denialRate >= 10) {
     findings.push({
-      id: "denial_bleed", tone: "risk",
+      id: "denial_bleed", tone: "risk", rankClass: "context",
       severity: Math.min(80, 25 + denialRate * 2.2),
-      headline: { pre: "First-pass denials at ", em: `${denialRate}%`, mid: " — ", em2: fmtUSD(round10k(deniedBalance)), post: " in denied balance, above the 10% acceptable line." },
+      headline: { pre: "First-pass denials at ", em: `${denialRate}%`, mid: " — ", em2: fmtUSD(round10k(deniedBalance)), post: " in denied balance, above the 10% line." },
       why: `Recurring denials signal upstream issues (coding, auth, eligibility) feeding back as rework.`,
-      soWhat: `Each point of denial reduction is recurring margin, not a one-time recovery.`,
+      recommendation: `Route high-EV denied accounts through WorkLink to the responsible area; each point of denial reduction is recurring margin, not a one-time recovery.`,
       drivers: [],
     });
   }
 
-  return findings.sort((a, b) => b.severity - a.severity);
+  // ---- GOOD: Improving sites (board/CEO success story) ----
+  const improvingSites = Object.entries(baseline.sites)
+    .filter(([, s]) => s.trend === "improving")
+    .sort((a, b) => a[1].delta.arDays - b[1].delta.arDays); // most improved first
+  // ---- GOOD: Improving sites + the recoverable cash they added (EV gain, scoped) ----
+  // EV gain is only truthful where performance improved — NOT portfolio-wide (portfolio
+  // net-deteriorated). Scope the EV win to the improving sites' share.
+  if (improvingSites.length > 0) {
+    const top = improvingSites.slice(0, 3);
+    const bestDays = Math.abs(top[0][1].delta.arDays);
+    // Recoverable-cash gain at improving sites: their AR share × |drift| applied to portfolio EV.
+    const totalEV = ar.reduce((s, a) => s + a.expectedValue, 0);
+    const impAR = improvingSites.reduce((s, [, st]) => s + st.current.ar, 0);
+    const impDriftWeighted = improvingSites.reduce((s, [, st]) => s + Math.abs(st.evDriftPct) * st.current.ar, 0) / Math.max(1, impAR);
+    const impEVShare = totalAR > 0 ? totalEV * (impAR / totalAR) : 0;
+    const evGain = round10k(impEVShare * impDriftWeighted);
+    findings.push({
+      id: "improving_sites", tone: "good", rankClass: "good",
+      severity: 16,
+      headline: { pre: "", em: `${improvingSites.length} sites`, mid: " improved this month — ", em2: top.map(([n]) => n).join(", "), post: `, recovering AR up to ${bestDays} days faster${evGain > 0 ? ` and adding ~${fmtUSD(evGain)} of recoverable cash` : ""}.` },
+      why: `Consistent EV-first follow-up and lower denials are compounding at the strongest sites.`,
+      recommendation: `A repeatable playbook for the board — apply what's working here to the deteriorating sites.`,
+      drivers: [],
+    });
+  }
+
+  // ---- RANK: lead first, then context (by severity), then good (by severity) ----
+  const classRank = { lead: 0, context: 1, good: 2 };
+  return findings.sort((a, b) => {
+    if (classRank[a.rankClass] !== classRank[b.rankClass]) return classRank[a.rankClass] - classRank[b.rankClass];
+    return b.severity - a.severity;
+  });
 }
 
 function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isCollectorActionable, worklinks }) {
@@ -1516,7 +1555,7 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
   const emColor = (f) => f.tone === "good" ? GREEN : f.severity >= 60 ? RED : f.severity >= 40 ? AMBER : INK;
 
   const lead = findings[0];
-  const supporting = findings.slice(1, 4);
+  const supporting = findings.slice(1, 6);
 
   return (
     <div style={{ fontFamily: "inherit", color: INK, background: "#fff", maxWidth: 940, margin: "0 auto", padding: isMobile ? "8px 4px 40px" : "24px 16px 60px" }}>
@@ -1537,7 +1576,7 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
             </div>
             <div style={{ fontSize: 14, color: MUTE, marginTop: 14, lineHeight: 1.55 }}>
               <span style={{ color: INK, fontWeight: 600 }}>Why:</span> {lead.why}<br />
-              <span style={{ color: INK, fontWeight: 600 }}>So what:</span> {lead.soWhat}
+              <span style={{ color: INK, fontWeight: 600 }}>Recommendation:</span> {lead.recommendation}
             </div>
             {lead.drivers.length > 0 && (
               <div style={{ marginTop: 20 }}>
@@ -1561,7 +1600,7 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
               <div style={{ fontSize: isMobile ? 15 : 17, fontWeight: 600, lineHeight: 1.4 }}>
                 {f.headline.pre}<span style={{ color: emColor(f) }}>{f.headline.em}</span>{f.headline.mid}<span style={{ color: emColor(f) }}>{f.headline.em2}</span>{f.headline.post}
               </div>
-              <div style={{ fontSize: 13, color: MUTE, marginTop: 8, lineHeight: 1.5 }}>{f.soWhat}</div>
+              <div style={{ fontSize: 13, color: MUTE, marginTop: 8, lineHeight: 1.5 }}>{f.recommendation}</div>
             </div>
           ))}
         </>

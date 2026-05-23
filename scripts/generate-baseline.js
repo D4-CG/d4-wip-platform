@@ -29,13 +29,13 @@ const DRIFT = {
   "Site 3":  { days: +11, denial: +3 },    // deteriorating
   "Site 2":  { days: +8,  denial: +2 },    // slipping
   "Site 8":  { days: +6,  denial: +1 },    // slipping
-  "Site 11": { days: +5,  denial: +1 },
-  "Site 1":  { days: +4,  denial: +1 },
-  "Site 4":  { days: +3,  denial: 0  },
-  "Site 7":  { days: +2,  denial: 0  },
-  "Site 10": { days: -1,  denial: -1 },     // roughly flat / slight improve
-  "Site 9":  { days: -2,  denial: -1 },     // improving
-  "Site 6":  { days: -3,  denial: -1 },     // improving (strong holding)
+  "Site 11": { days: +4,  denial: +1 },
+  "Site 1":  { days: +3,  denial: +1 },
+  "Site 4":  { days: +2,  denial: 0  },
+  "Site 7":  { days: 0,   denial: 0  },     // flat
+  "Site 10": { days: -4,  denial: -1 },     // improving
+  "Site 9":  { days: -5,  denial: -2 },     // improving
+  "Site 6":  { days: -6,  denial: -2 },     // improving (strong getting stronger)
 };
 
 const baseline = {};
@@ -54,10 +54,16 @@ Object.keys(cur).forEach(site => {
   const priorAR = Math.round(c.ar / (1 + arDriftPct));
   // prior over-90%: deteriorating sites had less aged AR a month ago
   const priorOver90Pct = Math.max(0, curOver90Pct - Math.round(d.days * 0.6));
+  // EV drift FACTOR (not absolute — EV is computed at runtime from the probability model).
+  // Aging erodes collection probability: improving sites (neg days) raised recoverable EV,
+  // deteriorating sites lost it. Component applies this to the live EV to derive prior EV.
+  // ~0.5% EV shift per day of drift, opposite sign to days.
+  const evDriftPct = -d.days * 0.005;
   baseline[site] = {
     current:  { arDays: curDays, denialRate: curDenial, ar: c.ar, over90Pct: curOver90Pct },
     prior:    { arDays: priorDays, denialRate: priorDenial, ar: priorAR, over90Pct: priorOver90Pct },
     delta:    { arDays: d.days, denialRate: d.denial, arPct: Math.round((c.ar - priorAR) / priorAR * 100), over90Pct: curOver90Pct - priorOver90Pct },
+    evDriftPct, // multiply live EV by 1/(1+evDriftPct) to get prior EV
     trend: d.days >= 6 ? "deteriorating" : d.days <= -4 ? "improving" : "stable",
   };
 });
@@ -69,11 +75,19 @@ const priorPortfolioDays = Math.round(
   Object.entries(baseline).reduce((s, [, b]) => s + b.prior.arDays * b.prior.ar, 0) /
   Object.values(baseline).reduce((s, b) => s + b.prior.ar, 0)
 );
+const totCurEV = null; // EV computed at runtime; baseline carries drift factor only
+// AR-weighted portfolio EV drift factor
+const portfolioEvDriftPct = Object.entries(baseline).reduce((s, [, b]) => s + b.evDriftPct * b.current.ar, 0) / totCurAR;
 
 const out = {
   generatedFor: "2026-05-22",
   priorPeriod: "2026-04-22",
-  portfolio: { current: { arDays: totCurDays }, prior: { arDays: priorPortfolioDays }, delta: { arDays: totCurDays - priorPortfolioDays } },
+  portfolio: {
+    current: { arDays: totCurDays },
+    prior:   { arDays: priorPortfolioDays },
+    delta:   { arDays: totCurDays - priorPortfolioDays },
+    evDriftPct: portfolioEvDriftPct, // multiply live portfolio EV by 1/(1+evDriftPct) for prior EV
+  },
   sites: baseline,
 };
 
@@ -81,6 +95,7 @@ fs.writeFileSync(path.join(__dirname, "..", "app", "data", "site-baseline.json")
 
 // ---- report ----
 console.log("Portfolio AR days: prior", priorPortfolioDays, "-> current", totCurDays, "(", (totCurDays - priorPortfolioDays >= 0 ? "+" : "") + (totCurDays - priorPortfolioDays), ")");
+console.log("Portfolio EV drift factor:", (portfolioEvDriftPct * 100).toFixed(2) + "% (negative => EV grew this month)");
 console.log("");
 console.log("Site".padEnd(9), "PriorDays".padStart(10), "CurDays".padStart(8), "Delta".padStart(6), "Trend".padStart(14));
 Object.entries(baseline).sort((a,b)=>b[1].delta.arDays - a[1].delta.arDays).forEach(([site, b]) => {
