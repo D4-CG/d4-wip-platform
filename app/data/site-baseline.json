@@ -1,0 +1,269 @@
+{
+  "generatedFor": "2026-05-22",
+  "priorPeriod": "2026-04-22",
+  "portfolio": {
+    "current": {
+      "arDays": 62
+    },
+    "prior": {
+      "arDays": 59
+    },
+    "delta": {
+      "arDays": 3
+    }
+  },
+  "sites": {
+    "Site 10": {
+      "current": {
+        "arDays": 51,
+        "denialRate": 10,
+        "ar": 3347411,
+        "over90Pct": 19
+      },
+      "prior": {
+        "arDays": 52,
+        "denialRate": 11,
+        "ar": 3360854,
+        "over90Pct": 20
+      },
+      "delta": {
+        "arDays": -1,
+        "denialRate": -1,
+        "arPct": 0,
+        "over90Pct": -1
+      },
+      "trend": "stable"
+    },
+    "Site 2": {
+      "current": {
+        "arDays": 74,
+        "denialRate": 16,
+        "ar": 7738722,
+        "over90Pct": 31
+      },
+      "prior": {
+        "arDays": 66,
+        "denialRate": 14,
+        "ar": 7498762,
+        "over90Pct": 26
+      },
+      "delta": {
+        "arDays": 8,
+        "denialRate": 2,
+        "arPct": 3,
+        "over90Pct": 5
+      },
+      "trend": "deteriorating"
+    },
+    "Site 4": {
+      "current": {
+        "arDays": 61,
+        "denialRate": 15,
+        "ar": 4167808,
+        "over90Pct": 17
+      },
+      "prior": {
+        "arDays": 58,
+        "denialRate": 15,
+        "ar": 4118387,
+        "over90Pct": 15
+      },
+      "delta": {
+        "arDays": 3,
+        "denialRate": 0,
+        "arPct": 1,
+        "over90Pct": 2
+      },
+      "trend": "stable"
+    },
+    "Site 6": {
+      "current": {
+        "arDays": 52,
+        "denialRate": 8,
+        "ar": 10654047,
+        "over90Pct": 16
+      },
+      "prior": {
+        "arDays": 55,
+        "denialRate": 9,
+        "ar": 10783448,
+        "over90Pct": 18
+      },
+      "delta": {
+        "arDays": -3,
+        "denialRate": -1,
+        "arPct": -1,
+        "over90Pct": -2
+      },
+      "trend": "stable"
+    },
+    "Site 5": {
+      "current": {
+        "arDays": 80,
+        "denialRate": 17,
+        "ar": 2559902,
+        "over90Pct": 39
+      },
+      "prior": {
+        "arDays": 65,
+        "denialRate": 13,
+        "ar": 2415002,
+        "over90Pct": 30
+      },
+      "delta": {
+        "arDays": 15,
+        "denialRate": 4,
+        "arPct": 6,
+        "over90Pct": 9
+      },
+      "trend": "deteriorating"
+    },
+    "Site 3": {
+      "current": {
+        "arDays": 76,
+        "denialRate": 22,
+        "ar": 2904310,
+        "over90Pct": 26
+      },
+      "prior": {
+        "arDays": 65,
+        "denialRate": 19,
+        "ar": 2781906,
+        "over90Pct": 19
+      },
+      "delta": {
+        "arDays": 11,
+        "denialRate": 3,
+        "arPct": 4,
+        "over90Pct": 7
+      },
+      "trend": "deteriorating"
+    },
+    "Site 7": {
+      "current": {
+        "arDays": 59,
+        "denialRate": 12,
+        "ar": 6308556,
+        "over90Pct": 21
+      },
+      "prior": {
+        "arDays": 57,
+        "denialRate": 12,
+        "ar": 6258488,
+        "over90Pct": 20
+      },
+      "delta": {
+        "arDays": 2,
+        "denialRate": 0,
+        "arPct": 1,
+        "over90Pct": 1
+      },
+      "trend": "stable"
+    },
+    "Site 1": {
+      "current": {
+        "arDays": 65,
+        "denialRate": 15,
+        "ar": 5391176,
+        "over90Pct": 23
+      },
+      "prior": {
+        "arDays": 61,
+        "denialRate": 14,
+        "ar": 5306276,
+        "over90Pct": 21
+      },
+      "delta": {
+        "arDays": 4,
+        "denialRate": 1,
+        "arPct": 2,
+        "over90Pct": 2
+      },
+      "trend": "stable"
+    },
+    "Site 8": {
+      "current": {
+        "arDays": 69,
+        "denialRate": 15,
+        "ar": 5433837,
+        "over90Pct": 25
+      },
+      "prior": {
+        "arDays": 63,
+        "denialRate": 14,
+        "ar": 5306481,
+        "over90Pct": 21
+      },
+      "delta": {
+        "arDays": 6,
+        "denialRate": 1,
+        "arPct": 2,
+        "over90Pct": 4
+      },
+      "trend": "deteriorating"
+    },
+    "Site 9": {
+      "current": {
+        "arDays": 49,
+        "denialRate": 9,
+        "ar": 6978240,
+        "over90Pct": 16
+      },
+      "prior": {
+        "arDays": 51,
+        "denialRate": 10,
+        "ar": 7034516,
+        "over90Pct": 17
+      },
+      "delta": {
+        "arDays": -2,
+        "denialRate": -1,
+        "arPct": -1,
+        "over90Pct": -1
+      },
+      "trend": "stable"
+    },
+    "Site 11": {
+      "current": {
+        "arDays": 68,
+        "denialRate": 12,
+        "ar": 1915810,
+        "over90Pct": 24
+      },
+      "prior": {
+        "arDays": 63,
+        "denialRate": 11,
+        "ar": 1878245,
+        "over90Pct": 21
+      },
+      "delta": {
+        "arDays": 5,
+        "denialRate": 1,
+        "arPct": 2,
+        "over90Pct": 3
+      },
+      "trend": "stable"
+    },
+    "Site 12": {
+      "current": {
+        "arDays": 78,
+        "denialRate": 18,
+        "ar": 2091577,
+        "over90Pct": 26
+      },
+      "prior": {
+        "arDays": 65,
+        "denialRate": 15,
+        "ar": 1988191,
+        "over90Pct": 18
+      },
+      "delta": {
+        "arDays": 13,
+        "denialRate": 3,
+        "arPct": 5,
+        "over90Pct": 8
+      },
+      "trend": "deteriorating"
+    }
+  }
+}

@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import AR_DATA from "../app/data/ar-accounts.json";
 import DNFB_DATA from "../app/data/dnfb-accounts.json";
 import SITE_NPR from "../app/data/site-npr.json";
+import SITE_BASELINE from "../app/data/site-baseline.json";
 
 function useWindowWidth() {
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1280);
@@ -1397,94 +1398,86 @@ function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isColl
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
 
-  // ---- Cash-health metrics (Layer 1 hero) ----
+  // Platform-native palette (matches existing app — no new fonts)
+  const INK = "#0f172a", MUTE = "#64748b", FAINT = "#94a3b8", LINE = "#e2e8f0";
+  const RED = "#dc2626", AMBER = "#d97706", GREEN = "#16a34a", BLUE = "#2563eb";
+
+  // ---- Current portfolio metrics ----
   const totalAR = arFiltered.reduce((s, a) => s + a.amount, 0);
-  const arDays = totalAR > 0 ? Math.round(arFiltered.reduce((s, a) => s + a.amount * a.daysOut, 0) / totalAR) : 0;
-  const totalEV = arFiltered.reduce((s, a) => s + a.expectedValue, 0);
-  const ncr = totalAR > 0 ? Math.round(totalEV / totalAR * 100) : 0;
+  const curDays = totalAR > 0 ? Math.round(arFiltered.reduce((s, a) => s + a.amount * a.daysOut, 0) / totalAR) : 0;
+
+  // ---- Prior-period comparison (the FINDING: what changed) ----
+  // Use locked baseline for portfolio trend. Only meaningful for all-sites view.
+  const priorDays = siteFilter
+    ? (SITE_BASELINE.sites[siteFilter]?.prior.arDays ?? curDays)
+    : SITE_BASELINE.portfolio.prior.arDays;
+  const deltaDays = curDays - priorDays;
+  const deteriorating = deltaDays > 0;
+
+  // Cash consequence of the drift: days slower × daily net revenue rate.
+  // dailyNPR = annual NPR / 365. Each extra AR day ≈ one day of revenue sitting uncollected longer.
   const annualNPR = siteFilter ? (SITE_NPR[siteFilter] || 0) : Object.values(SITE_NPR).reduce((s, v) => s + v, 0);
+  const dailyNPR = annualNPR / 365;
+  const cashDrift = Math.round(Math.abs(deltaDays) * dailyNPR);
 
-  // Benchmark health → signal color ONLY when off-benchmark; healthy stays calm ink.
-  const INK = "#0a0a0a", QUIET = "#8a8f98", LINE = "#ececec", AMBER = "#b45309", RED = "#b42318";
-  const arDaysOff = arDays >= 65 ? RED : arDays >= 55 ? AMBER : null;
-  const ncrOff = ncr < 80 ? RED : ncr < 90 ? AMBER : null;
+  // ---- Deteriorating sites (where the drift concentrates) ----
+  const deterioratingSites = Object.entries(SITE_BASELINE.sites)
+    .filter(([, s]) => s.trend === "deteriorating")
+    .sort((a, b) => b[1].delta.arDays - a[1].delta.arDays);
+  const deterioratingCount = deterioratingSites.length;
 
-  // ---- "Where it's trapped" (Layer 1b) — site dispersion, problem sites surfaced ----
-  const sites = {};
-  arFiltered.forEach(a => {
-    if (!sites[a.site]) sites[a.site] = { ar: 0, wd: 0, den: 0, n: 0 };
-    const s = sites[a.site]; s.ar += a.amount; s.wd += a.daysOut * a.amount; s.den += a.denialCode ? 1 : 0; s.n++;
-  });
-  const siteRows = Object.entries(sites).map(([name, s]) => ({
-    name, ar: s.ar, days: Math.round(s.wd / s.ar), denial: Math.round(s.den / s.n * 100),
-  })).sort((a, b) => b.days - a.days);
-  const worstThree = new Set(siteRows.slice(0, 3).map(r => r.name));
-  const trappedDollars = siteRows.slice(0, 3).reduce((s, r) => s + r.ar, 0);
-
-  const heroNum = { fontFamily: "'Spline Sans Mono', ui-monospace, monospace", fontWeight: 600, letterSpacing: "-0.03em", color: INK, lineHeight: 1 };
-  const labelStyle = { fontSize: 11, fontWeight: 500, color: QUIET, letterSpacing: "0.04em", textTransform: "uppercase" };
+  const label = { fontSize: 11, fontWeight: 600, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase" };
+  const signalColor = deteriorating ? RED : GREEN;
 
   return (
-    <div style={{ fontFamily: "'Spline Sans', -apple-system, sans-serif", color: INK, background: "#fff", padding: isMobile ? "8px 4px 60px" : "16px 8px 80px", maxWidth: 1100, margin: "0 auto" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600;700&display=swap');`}</style>
+    <div style={{ fontFamily: "inherit", color: INK, background: "#fff", maxWidth: 940, margin: "0 auto", padding: isMobile ? "8px 4px 40px" : "24px 16px 60px" }}>
 
-      {/* ── Layer 1: HERO — cash health in one glance ── */}
-      <div style={{ padding: isMobile ? "24px 16px 8px" : "40px 24px 16px" }}>
-        <div style={{ ...labelStyle, marginBottom: 6 }}>Cash health{siteFilter ? ` · ${siteFilter}` : " · all sites"}</div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: isMobile ? 4 : 10, flexWrap: "wrap" }}>
-          <span style={{ ...heroNum, fontSize: isMobile ? 44 : 68 }}>{fmt(totalAR)}</span>
-          <span style={{ fontSize: isMobile ? 14 : 18, color: QUIET, fontWeight: 500 }}>in accounts receivable</span>
-        </div>
-        <div style={{ fontSize: 14, color: QUIET, marginTop: 8 }}>
-          {arFiltered.length.toLocaleString()} open accounts · {fmt(annualNPR)} annual net patient revenue
-        </div>
-      </div>
+      {/* ── LEAD FINDING — what changed, what it costs, where ── */}
+      <div style={{ padding: isMobile ? "20px 16px" : "32px 28px", border: `1px solid ${LINE}`, borderRadius: 14, borderLeft: `3px solid ${signalColor}` }}>
+        <div style={{ ...label, marginBottom: 14 }}>Risk briefing{siteFilter ? ` · ${siteFilter}` : " · portfolio"}</div>
 
-      {/* Health indicators — large, calm; color only if off-benchmark */}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3, 1fr)", gap: isMobile ? 16 : 32, padding: isMobile ? "16px" : "24px", borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, marginTop: 16 }}>
-        <div>
-          <div style={labelStyle}>AR Days</div>
-          <div style={{ ...heroNum, fontSize: isMobile ? 30 : 40, color: arDaysOff || INK, marginTop: 8 }}>{arDays}</div>
-          <div style={{ fontSize: 12, color: arDaysOff || QUIET, marginTop: 6 }}>{arDaysOff ? (arDays >= 65 ? "Above target" : "Watch") : "On target"} · benchmark &lt;55</div>
+        {/* The finding, stated as a sentence a CFO would repeat to the board */}
+        <div style={{ fontSize: isMobile ? 21 : 27, fontWeight: 600, lineHeight: 1.32, letterSpacing: "-0.01em" }}>
+          {deteriorating ? (
+            <>AR aged <span style={{ color: RED }}>{priorDays} → {curDays} days</span> this month, pushing about{" "}
+            <span style={{ color: RED }}>{fmt(cashDrift)}</span> of cash further from collection.</>
+          ) : (
+            <>AR improved <span style={{ color: GREEN }}>{priorDays} → {curDays} days</span> this month, pulling about{" "}
+            <span style={{ color: GREEN }}>{fmt(cashDrift)}</span> of cash closer to collection.</>
+          )}
         </div>
-        <div>
-          <div style={labelStyle}>Net Collection Rate</div>
-          <div style={{ ...heroNum, fontSize: isMobile ? 30 : 40, color: ncrOff || INK, marginTop: 8 }}>{ncr}%</div>
-          <div style={{ fontSize: 12, color: ncrOff || QUIET, marginTop: 6 }}>{ncrOff ? "Below benchmark" : "Healthy"} · {fmt(totalEV)} expected</div>
-        </div>
-        <div style={{ gridColumn: isMobile ? "span 2" : "auto" }}>
-          <div style={labelStyle}>Trapped in 3 weakest sites</div>
-          <div style={{ ...heroNum, fontSize: isMobile ? 30 : 40, color: INK, marginTop: 8 }}>{fmt(trappedDollars)}</div>
-          <div style={{ fontSize: 12, color: QUIET, marginTop: 6 }}>{[...worstThree].join(" · ")}</div>
-        </div>
-      </div>
 
-      {/* ── Layer 1b: WHERE IT'S TRAPPED — quiet table, problem sites surfaced ── */}
-      <div style={{ padding: isMobile ? "24px 16px" : "32px 24px" }}>
-        <div style={{ ...labelStyle, marginBottom: 16 }}>Where it's trapped</div>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr auto auto" : "1.4fr 1fr 0.8fr 0.8fr", gap: 12, padding: "0 8px 8px" }}>
-          <span style={{ ...labelStyle, fontSize: 10 }}>Site</span>
-          <span style={{ ...labelStyle, fontSize: 10, textAlign: "right" }}>AR</span>
-          {!isMobile && <span style={{ ...labelStyle, fontSize: 10, textAlign: "right" }}>Days</span>}
-          <span style={{ ...labelStyle, fontSize: 10, textAlign: "right" }}>Denial</span>
+        {/* Supporting context — quiet */}
+        <div style={{ fontSize: 14, color: MUTE, marginTop: 14, lineHeight: 1.5 }}>
+          {deteriorating ? (
+            <>The decline concentrates in <strong style={{ color: INK, fontWeight: 600 }}>{deterioratingCount} sites</strong>.{" "}
+            {deterioratingSites.slice(0, 3).map(([n]) => n).join(", ")} are aging fastest — recoverable if worked before they cross the 90-day collectability cliff.</>
+          ) : (
+            <>Recovery is broad-based across sites. Hold the gains by keeping the weakest sites worked.</>
+          )}
         </div>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          {siteRows.map(r => {
-            const isWorst = worstThree.has(r.name);
-            return (
-              <div key={r.name} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr auto auto" : "1.4fr 1fr 0.8fr 0.8fr", alignItems: "center", gap: 12, padding: "12px 8px", borderTop: `1px solid ${LINE}` }}>
+
+        {/* The three drivers, inline — magnitude per site */}
+        {deteriorating && (
+          <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 0 }}>
+            {deterioratingSites.slice(0, 3).map(([name, s], i) => (
+              <div key={name} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr auto" : "160px 1fr auto", alignItems: "center", gap: 14, padding: "12px 0", borderTop: i === 0 ? `1px solid ${LINE}` : `1px solid ${LINE}` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {isWorst && <span style={{ width: 6, height: 6, borderRadius: "50%", background: RED, display: "inline-block" }} />}
-                  <span style={{ fontSize: 14, fontWeight: isWorst ? 600 : 500, color: isWorst ? INK : QUIET }}>{r.name}</span>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: RED }} />
+                  <span style={{ fontSize: 15, fontWeight: 600 }}>{name}</span>
                 </div>
-                <div style={{ fontFamily: "'Spline Sans Mono', monospace", fontSize: 14, color: INK, textAlign: "right" }}>{fmt(r.ar)}</div>
-                {!isMobile && <div style={{ fontFamily: "'Spline Sans Mono', monospace", fontSize: 13, color: r.days >= 65 ? RED : r.days >= 55 ? AMBER : QUIET, textAlign: "right" }}>{r.days}d</div>}
-                <div style={{ fontFamily: "'Spline Sans Mono', monospace", fontSize: 13, color: r.denial >= 18 ? RED : r.denial > 10 ? AMBER : QUIET, textAlign: "right" }}>{r.denial}%</div>
+                {!isMobile && (
+                  <div style={{ fontSize: 13, color: MUTE }}>
+                    {s.prior.arDays} → {s.current.arDays} days · denial +{s.delta.denialRate}pts · {s.delta.over90Pct >= 0 ? "+" : ""}{s.delta.over90Pct}pts over 90
+                  </div>
+                )}
+                <div style={{ fontSize: 15, fontWeight: 600, color: RED, textAlign: "right" }}>+{s.delta.arDays}d</div>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
+
     </div>
   );
 }
