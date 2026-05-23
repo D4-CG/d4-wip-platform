@@ -4178,6 +4178,9 @@ Return JSON with:
           {role === "cfo" && (
             <button style={tabStyle(tab === "metrics")} onClick={() => { setTab("metrics"); setSeverityFilter(null); setActiveTier(null); setAreaFilter(null); }}>Dashboard</button>
           )}
+          {role === "cfo" && (
+            <button style={tabStyle(tab === "detail")} onClick={() => { setTab("detail"); setSeverityFilter(null); setActiveTier(null); setAreaFilter(null); }}>Detail</button>
+          )}
           {(role === "supervisor" || role === "cfo") && (
             <button style={tabStyle(tab === "dnfb")} onClick={() => { setTab("dnfb"); setAreaFilter(null); setSeverityFilter(null); setActiveTier(null); setSearchQuery(""); setAiText(null); }}>Billing WIP ({dnfbForRole.length})</button>
           )}
@@ -4248,11 +4251,15 @@ Return JSON with:
       )}
       {tab !== "escalation" && tab !== "worklink" && (
       <div style={{ padding: isMobile ? "16px 12px 80px" : isTablet ? "20px 20px" : "24px 32px" }}>
-        {role === "cfo" && tab === "metrics" ? (
+        {role === "cfo" && (tab === "metrics" || tab === "detail") ? (
           <div>
-            {/* NEW: CFO Dashboard V2 (refined/layered) — rendered above existing for review */}
-            <CFODashboardV2 arFiltered={arFiltered} dnfbFiltered={dnfbFiltered} siteFilter={siteFilter} SITE_NPR={SITE_NPR} isCollectorActionable={isCollectorActionable} worklinks={worklinks} />
-            <div style={{ borderTop: "3px solid #e2e8f0", margin: "32px 0", paddingTop: 8, textAlign: "center", fontSize: 10, color: "#cbd5e1", letterSpacing: "0.1em", textTransform: "uppercase" }}>↓ Current dashboard below (for comparison) ↓</div>
+            {/* DASHBOARD TAB: risk briefing (AI summary added next chunk) */}
+            {tab === "metrics" && (
+              <CFODashboardV2 arFiltered={arFiltered} dnfbFiltered={dnfbFiltered} siteFilter={siteFilter} SITE_NPR={SITE_NPR} isCollectorActionable={isCollectorActionable} worklinks={worklinks} />
+            )}
+            {/* DETAIL TAB: full data dashboard */}
+            {tab === "detail" && (<>
+            <div id="detail-sites" style={{ scrollMarginTop: 80 }} />
             {/* Site filter */}
             {(() => {
               const sites = [...new Set([...dnfbForRole, ...arForRole].map(a => a.site))].sort((a,b) => parseInt(a.replace(/\D/g,"")) - parseInt(b.replace(/\D/g,"")));
@@ -4355,6 +4362,7 @@ Return JSON with:
             })()}
 
             <CFOCriticalHolds accounts={arFiltered} />
+            <div id="detail-kpis" style={{ scrollMarginTop: 80 }} />
             {/* Headline KPIs */}
             {(() => {
               const grossAR = arFiltered.reduce((s,a) => s+a.amount, 0);
@@ -4389,6 +4397,7 @@ Return JSON with:
               );
             })()}
 
+            <div id="detail-payers" style={{ scrollMarginTop: 80 }} />
             {(() => {
               const groups = {
                 Medicare:   { label: "Medicare",    accounts: arFiltered.filter(a => PAYER_CATEGORY[a.payer] === "medicare") },
@@ -4440,6 +4449,7 @@ Return JSON with:
               );
             })()}
 
+            <div id="detail-wip" style={{ scrollMarginTop: 80 }} />
             {/* Billing WIP + Billing Donut + Follow-up WIP + Follow-up Donut — all one row */}
             <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
               <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 16px" }}>
@@ -4740,6 +4750,7 @@ Return JSON with:
                 </div>
               );
             })()}
+            </>)}
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: cols("repeat(3, 1fr)", "repeat(3, 1fr)", "1fr"), gap: 12, marginBottom: 24 }}>
@@ -4924,9 +4935,9 @@ Return JSON with:
           </div>
         </div>
 
-        {role === "cfo" && tab === "metrics" && <WorkLinkReporting worklinks={worklinks} isMobile={isMobile} />}
-        {role === "cfo" && tab === "metrics" && <CFOEscalationSection />}
-        {role === "cfo" && tab === "metrics" && (
+        {role === "cfo" && tab === "detail" && <WorkLinkReporting worklinks={worklinks} isMobile={isMobile} />}
+        {role === "cfo" && tab === "detail" && <CFOEscalationSection />}
+        {role === "cfo" && tab === "detail" && (
           <div style={{ padding: isMobile ? "0 12px 80px" : "0 32px 40px" }}>
             <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 10, overflow: "hidden" }}>
               <div style={{ padding: "14px 20px", borderBottom: "1px solid #e9d5ff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
