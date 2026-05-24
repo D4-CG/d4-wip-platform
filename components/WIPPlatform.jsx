@@ -1926,16 +1926,16 @@ function WorkLinkReporting({ worklinks, isMobile }) {
   );
 
   return (
-    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 20px", marginBottom: 16 }}>
-      <div style={{ fontSize: 10, color: "#0369a1", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>⇄ WIP WorkLink — by area</div>
+    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px", marginBottom: 16 }}>
+      <div style={{ fontSize: 11, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>WIP WorkLink — by area</div>
       <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 14 }}>Internal rework in flight · AR shown as net/EV, DNFB as gross charges · the two are different currencies and never summed</div>
 
       {/* Summary row — currency-split: AR (EV) and DNFB (gross) shown separately */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(5,1fr)", gap: 10, marginBottom: 16 }}>
         {[
-          { label: "Open requests", value: open.length, color: "#0369a1" },
-          { label: "AR in flight (EV)", value: fmt(arInFlightEV), color: "#2563eb", sub: `${arInFlight.length} accts` },
-          { label: "DNFB in flight (gross)", value: fmt(dnfbInFlightGross), color: "#7c3aed", sub: `${dnfbInFlight.length} accts` },
+          { label: "Open requests", value: open.length, color: "#0f172a" },
+          { label: "AR in flight (EV)", value: fmt(arInFlightEV), color: "#0f172a", sub: `${arInFlight.length} accts` },
+          { label: "DNFB in flight (gross)", value: fmt(dnfbInFlightGross), color: "#0f172a", sub: `${dnfbInFlight.length} accts` },
           { label: "SLA breached", value: totalBreached, color: totalBreached > 0 ? "#dc2626" : "#16a34a" },
           { label: "Resolved this session", value: resolved.length, color: "#16a34a" },
         ].map(m => (
@@ -3668,7 +3668,7 @@ function CFOEscalationSection() {
   const writeOffTotal = ESCALATION_DATA.writeOffPending.reduce((s,w) => s + w.amount, 0);
   const pendingCount = ESCALATION_DATA.writeOffPending.filter(w => !approved[w.accountId]).length;
   return (
-    <div style={{ marginTop: 20, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
+    <div style={{ marginTop: 20, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, overflow: "hidden" }}>
       <div onClick={() => setOpen(o => !o)} style={{ padding: "14px 18px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>Escalation Summary</span>
@@ -4786,17 +4786,17 @@ Keep every item to one line. Limit pointers to 2-3.`;
               const arDaysLabel = arDays < 40 ? "Excellent" : arDays < 55 ? "Good" : arDays < 65 ? "Needs attention" : "Critical";
               return (
                 <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
-                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Net Patient Revenue</div>
                     <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(annualNPR)}</div>
                     <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Annual · from accounting system{siteFilter ? ` · ${siteFilter}` : ""}</div>
                   </div>
-                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Total AR</div>
                     <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(grossAR)}</div>
                     <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{arFiltered.length} billed accounts{siteFilter ? ` · ${siteFilter}` : ""}</div>
                   </div>
-                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>AR Days Outstanding</div>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                       <div style={{ fontSize: 28, fontWeight: 700, color: arDaysColor, letterSpacing: "-0.02em" }}>{arDays}</div>
@@ -4817,9 +4817,9 @@ Keep every item to one line. Limit pointers to 2-3.`;
                 "Worker Comp": { label: "Worker's Comp", accounts: arFiltered.filter(a => PAYER_CATEGORY[a.payer] === "workers_comp") },
               };
               return (
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px", marginBottom: 12 }}>
+                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px", marginBottom: 12 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase" }}>Expected recovery by payer group</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase" }}>Expected recovery by payer group</div>
                     {!isMobile && <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 10, color: "#64748b" }}>
                       <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />On target</span>
                       <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "#d97706", display: "inline-block" }} />&lt;10pp below</span>
@@ -4863,8 +4863,8 @@ Keep every item to one line. Limit pointers to 2-3.`;
             <div id="detail-wip" style={{ scrollMarginTop: 80 }} />
             {/* Billing WIP + Billing Donut + Follow-up WIP + Follow-up Donut — all one row */}
             <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
-              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 16px" }}>
-                <div style={{ fontSize: 10, color: "#1d4ed8", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>Billing WIP — DNFB</div>
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "14px 18px" }}>
+                <div style={{ fontSize: 11, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600, marginBottom: 10 }}>Billing WIP — DNFB</div>
                 {(() => {
                   const tiers = [
                     { label: "Normal (1–3 days)", key: "normal", accs: dnfbFiltered.filter(a => a.daysInDNFB <= 3), color: "#16a34a" },
@@ -4890,8 +4890,8 @@ Keep every item to one line. Limit pointers to 2-3.`;
                 <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 6, paddingTop: 6, borderTop: "1px solid #f1f5f9" }}>Total unbilled: {fmt(dnfbFiltered.reduce((s,a) => s+a.amount, 0))} · {dnfbFiltered.length} accounts{siteFilter ? " — " + siteFilter : ""}</div>
               </div>
               <DonutChartPanel accounts={dnfbFiltered} title="Billing WIP by responsible area" onFilter={(area) => { setTab("dnfb"); setAreaFilter(area); setSeverityFilter(null); setSearchQuery(""); window.scrollTo(0,0); }} activeFilter={null} />
-              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 16px" }}>
-                <div style={{ fontSize: 10, color: "#c2410c", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>Follow-up WIP — Collections</div>
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "14px 18px" }}>
+                <div style={{ fontSize: 11, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600, marginBottom: 10 }}>Follow-up WIP — Collections</div>
                 {(() => {
                   const pastDue = arFiltered.filter(isCollectorActionable); // unworked in platform
                   const tiers = [
@@ -4935,7 +4935,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
               const denialLabel = denialRate <= 5 ? "Excellent" : denialRate <= 10 ? "Acceptable" : "Needs attention";
               return (
                 <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
-                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Net Collection Rate</div>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
                       <div style={{ fontSize: 28, fontWeight: 700, color: ncrColor, letterSpacing: "-0.02em" }}>{ncr}%</div>
@@ -4948,7 +4948,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
                     </div>
                     <div style={{ fontSize: 9, color: "#94a3b8" }}>Benchmark: &gt;95% excellent · EV ÷ Net Patient Revenue</div>
                   </div>
-                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
                     <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>First-Pass Denial Rate</div>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
                       <div style={{ fontSize: 28, fontWeight: 700, color: denialColor, letterSpacing: "-0.02em" }}>{denialRate}%</div>
@@ -5351,46 +5351,46 @@ Keep every item to one line. Limit pointers to 2-3.`;
         {role === "cfo" && tab === "detail" && <CFOEscalationSection />}
         {role === "cfo" && tab === "detail" && (
           <div style={{ padding: isMobile ? "0 12px 80px" : "0 32px 40px" }}>
-            <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 10, overflow: "hidden" }}>
-              <div style={{ padding: "14px 20px", borderBottom: "1px solid #e9d5ff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, borderLeft: "3px solid #334155", overflow: "hidden" }}>
+              <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#7c3aed", marginBottom: 2 }}>✦ AI Executive Analysis</div>
-                  <div style={{ fontSize: 11, color: "#9333ea" }}>AI-generated · verify before acting · review after data, not before</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#94a3b8", marginBottom: 3 }}>Executive analysis</div>
+                  <div style={{ fontSize: 12, color: "#94a3b8" }}>AI-written · review the data first, then check your assessment</div>
                 </div>
-                <button onClick={runAI} disabled={aiLoading} style={{ padding: "8px 18px", background: aiLoading ? "#f3e8ff" : "#7c3aed", border: "none", borderRadius: 8, color: aiLoading ? "#9333ea" : "#fff", cursor: aiLoading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+                <button onClick={runAI} disabled={aiLoading} style={{ flexShrink: 0, padding: "8px 16px", background: aiLoading ? "#f1f5f9" : "#0f172a", border: "none", borderRadius: 8, color: aiLoading ? "#64748b" : "#fff", cursor: aiLoading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
                   {aiLoading ? (
-                    <><span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span> Analyzing...</>
-                  ) : "✦ Generate Summary"}
+                    <><span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span> Writing…</>
+                  ) : aiText ? "Regenerate" : "Generate summary"}
                 </button>
               </div>
               {aiText !== null && typeof aiText === "object" && (
                 <div style={{ padding: "18px 20px" }}>
-                  {aiText.status && <div style={{ fontSize: 13, color: "#4c1d95", lineHeight: 1.8, marginBottom: 16, padding: "12px 16px", background: "#f5f3ff", borderRadius: 8, borderLeft: "3px solid #7c3aed" }}>{aiText.status}</div>}
-                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
+                  {aiText.status && <div style={{ fontSize: 14, color: "#0f172a", lineHeight: 1.6, marginBottom: 18 }}>{aiText.status}</div>}
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: isMobile ? 14 : 22 }}>
                     {aiText.priorities?.length > 0 && (
-                      <div style={{ background: "#fff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "12px 14px" }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "#7c3aed", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Top Priorities</div>
-                        {aiText.priorities.map((p, i) => <div key={i} style={{ fontSize: 12, color: "#334155", lineHeight: 1.65, marginBottom: 6, paddingLeft: 10, borderLeft: "2px solid #c4b5fd" }}>{p}</div>)}
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#334155", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 8 }}>Priorities</div>
+                        {aiText.priorities.map((p, i) => <div key={i} style={{ fontSize: 12.5, color: "#475569", lineHeight: 1.5, marginBottom: 8, paddingLeft: 10, borderLeft: "2px solid #33415522" }}>{p}</div>)}
                       </div>
                     )}
                     {aiText.risks?.length > 0 && (
-                      <div style={{ background: "#fff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "12px 14px" }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "#b91c1c", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Risk Flags</div>
-                        {aiText.risks.map((r, i) => <div key={i} style={{ fontSize: 12, color: "#334155", lineHeight: 1.65, marginBottom: 6, paddingLeft: 10, borderLeft: "2px solid #fca5a5" }}>{r}</div>)}
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#d97706", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 8 }}>Risks</div>
+                        {aiText.risks.map((r, i) => <div key={i} style={{ fontSize: 12.5, color: "#475569", lineHeight: 1.5, marginBottom: 8, paddingLeft: 10, borderLeft: "2px solid #d9770622" }}>{r}</div>)}
                       </div>
                     )}
                     {aiText.decisions?.length > 0 && (
-                      <div style={{ background: "#fff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "12px 14px" }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "#b91c1c", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Decisions Required</div>
-                        {aiText.decisions.map((d, i) => <div key={i} style={{ fontSize: 12, color: "#334155", lineHeight: 1.65, marginBottom: 6, paddingLeft: 10, borderLeft: "2px solid #fca5a5" }}>{d}</div>)}
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#dc2626", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 8 }}>Decisions</div>
+                        {aiText.decisions.map((d, i) => <div key={i} style={{ fontSize: 12.5, color: "#475569", lineHeight: 1.5, marginBottom: 8, paddingLeft: 10, borderLeft: "2px solid #dc262622" }}>{d}</div>)}
                       </div>
                     )}
                   </div>
                 </div>
               )}
               {aiText === null && !aiLoading && (
-                <div style={{ padding: "24px 20px", textAlign: "center", color: "#9333ea", fontSize: 12 }}>
-                  Review the data above first, then generate the AI analysis to check your assessment.
+                <div style={{ padding: "24px 20px", textAlign: "center", color: "#94a3b8", fontSize: 12 }}>
+                  Review the data above first, then generate the analysis to check your assessment.
                 </div>
               )}
             </div>
