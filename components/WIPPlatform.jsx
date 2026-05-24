@@ -4692,17 +4692,19 @@ Keep every item to one line. Limit pointers to 2-3.`;
               const cols9 = "90px repeat(8, 1fr)";
 
               return (
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, marginBottom: 16, overflow: "hidden" }}>
-                  {/* Filter chip bar — always visible at top */}
-                  <div style={{ padding: "10px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", background: "#f8fafc" }}>
+                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, marginBottom: 16, overflow: "hidden" }}>
+                  {/* Calm section label */}
+                  <div style={{ padding: "16px 20px 0", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#94a3b8" }}>Site performance</div>
+                  {/* Filter chip bar */}
+                  <div style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0, marginRight: 2 }}>Site:</span>
                     <button onClick={() => setSiteFilter(null)}
-                      style={{ padding: "3px 10px", fontSize: 11, fontWeight: siteFilter===null ? 700 : 400, border: `1px solid ${siteFilter===null ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: siteFilter===null ? "#2563eb" : "#fff", color: siteFilter===null ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
+                      style={{ padding: "3px 10px", fontSize: 11, fontWeight: siteFilter===null ? 700 : 400, border: `1px solid ${siteFilter===null ? "#0f172a" : "#e2e8f0"}`, borderRadius: 20, background: siteFilter===null ? "#0f172a" : "#fff", color: siteFilter===null ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
                       All
                     </button>
                     {siteStats.map(s => (
                       <button key={s.site} onClick={() => setSiteFilter(siteFilter===s.site ? null : s.site)}
-                        style={{ padding: "3px 10px", fontSize: 11, fontWeight: siteFilter===s.site ? 700 : 400, border: `1px solid ${siteFilter===s.site ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: siteFilter===s.site ? "#2563eb" : "#fff", color: siteFilter===s.site ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
+                        style={{ padding: "3px 10px", fontSize: 11, fontWeight: siteFilter===s.site ? 700 : 400, border: `1px solid ${siteFilter===s.site ? "#0f172a" : "#e2e8f0"}`, borderRadius: 20, background: siteFilter===s.site ? "#0f172a" : "#fff", color: siteFilter===s.site ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
                         {s.site}
                       </button>
                     ))}
@@ -4714,7 +4716,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
                   {!siteFilter && !isMobile && (
                     <div style={{ overflowX: "auto" }}>
                       {/* Header */}
-                      <div style={{ display: "grid", gridTemplateColumns: cols9, minWidth: 820, fontSize: 9, color: "#94a3b8", letterSpacing: "0.07em", textTransform: "uppercase", padding: "7px 16px", background: "#f8fafc", borderTop: "1px solid #f1f5f9" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: cols9, minWidth: 820, fontSize: 9, color: "#94a3b8", letterSpacing: "0.07em", textTransform: "uppercase", padding: "9px 20px", borderTop: "1px solid #f1f5f9" }}>
                         <span>Site</span>
                         <span style={{ textAlign:"right" }}>NPR</span>
                         <span style={{ textAlign:"right" }}>Total AR</span>
@@ -4732,7 +4734,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
                         const denialColor = s.denialRate <= 5 ? "#16a34a" : s.denialRate <= 10 ? "#d97706" : "#dc2626";
                         return (
                           <div key={s.site} onClick={() => setSiteFilter(s.site)}
-                            style={{ display: "grid", gridTemplateColumns: cols9, minWidth: 820, padding: "7px 16px", cursor: "pointer", borderTop: "1px solid #f8fafc", background: "transparent", alignItems: "center" }}
+                            style={{ display: "grid", gridTemplateColumns: cols9, minWidth: 820, padding: "10px 20px", cursor: "pointer", borderTop: "1px solid #f8fafc", background: "transparent", alignItems: "center" }}
                             onMouseEnter={e => e.currentTarget.style.background="#f8fafc"}
                             onMouseLeave={e => e.currentTarget.style.background="transparent"}>
                             <span style={{ fontSize: 11, color: "#0f172a", fontWeight: 600 }}>{s.site}</span>
@@ -4740,7 +4742,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
                             <span style={{ fontSize: 11, color: "#475569", textAlign:"right" }}>{fmt(s.totalAR)}</span>
                             <span style={{ fontSize: 11, color: "#64748b", textAlign:"right" }}>{fmt(s.totalDNFB)}</span>
                             <span style={{ fontSize: 11, color: "#334155", fontWeight: 600, textAlign:"right" }}>{fmt(s.totalExposure)}</span>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: "#2563eb", textAlign:"right" }}>{fmt(s.totalEV)}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: "#0f172a", textAlign:"right" }}>{fmt(s.totalEV)}</span>
                             <span style={{ fontSize: 11, fontWeight: 600, color: daysColor, textAlign:"right" }}>{s.avgDays}d</span>
                             <span style={{ fontSize: 11, fontWeight: 600, color: ncrColor, textAlign:"right" }}>{s.ncr}%</span>
                             <span style={{ fontSize: 11, fontWeight: 600, color: denialColor, textAlign:"right" }}>{s.denialRate}%</span>
@@ -4751,8 +4753,8 @@ Keep every item to one line. Limit pointers to 2-3.`;
                   )}
                   {/* Active site context when filtered */}
                   {siteFilter && (
-                    <div style={{ padding: "7px 16px", fontSize: 11, color: "#2563eb", fontWeight: 600, display: "flex", alignItems: "center", gap: 6, borderTop: "1px solid #f1f5f9" }}>
-                      <span>📍 Showing: {siteFilter}</span>
+                    <div style={{ padding: "10px 20px", fontSize: 11, color: "#334155", fontWeight: 600, display: "flex", alignItems: "center", gap: 6, borderTop: "1px solid #f1f5f9" }}>
+                      <span>Showing: {siteFilter}</span>
                       {(() => {
                         const s = siteStats.find(x => x.site === siteFilter);
                         if (!s) return null;
@@ -4760,7 +4762,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
                         const ncrColor = s.ncr >= 95 ? "#16a34a" : s.ncr >= 85 ? "#d97706" : "#dc2626";
                         return (
                           <span style={{ fontWeight: 400, color: "#64748b", fontSize: 11 }}>
-                            · NPR {fmt(s.npr)} · AR {fmt(s.totalAR)} · DNFB {fmt(s.totalDNFB)} · EV <span style={{ color: "#2563eb", fontWeight: 600 }}>{fmt(s.totalEV)}</span> · AR Days <span style={{ color: daysColor, fontWeight: 600 }}>{s.avgDays}d</span> · NCR <span style={{ color: ncrColor, fontWeight: 600 }}>{s.ncr}%</span> · Denial <span style={{ color: s.denialRate <= 5 ? "#16a34a" : s.denialRate <= 10 ? "#d97706" : "#dc2626", fontWeight: 600 }}>{s.denialRate}%</span>
+                            · NPR {fmt(s.npr)} · AR {fmt(s.totalAR)} · DNFB {fmt(s.totalDNFB)} · EV <span style={{ color: "#0f172a", fontWeight: 600 }}>{fmt(s.totalEV)}</span> · AR Days <span style={{ color: daysColor, fontWeight: 600 }}>{s.avgDays}d</span> · NCR <span style={{ color: ncrColor, fontWeight: 600 }}>{s.ncr}%</span> · Denial <span style={{ color: s.denialRate <= 5 ? "#16a34a" : s.denialRate <= 10 ? "#d97706" : "#dc2626", fontWeight: 600 }}>{s.denialRate}%</span>
                           </span>
                         );
                       })()}
