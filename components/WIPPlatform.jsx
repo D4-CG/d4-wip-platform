@@ -1833,19 +1833,19 @@ function kpiStatusLabel(kpi, value) {
 
 function KpiCard({ kpi, computed, isMobile }) {
   const isPhase2 = kpi.status === "phase2";
-  const color = isPhase2 ? "#cbd5e1" : kpiColor(kpi, computed ? computed.value : null);
+  const color = isPhase2 ? "#94a3b8" : kpiColor(kpi, computed ? computed.value : null);
   const statusLabel = isPhase2 ? "" : kpiStatusLabel(kpi, computed ? computed.value : null);
   return (
-    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 18px", opacity: isPhase2 ? 0.85 : 1 }}>
+    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 18px", opacity: isPhase2 ? 0.92 : 1 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-        <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" }}>{kpi.label}</div>
-        {isPhase2 && <div style={{ fontSize: 9, fontWeight: 600, color: "#94a3b8", background: "#f1f5f9", borderRadius: 5, padding: "2px 7px", letterSpacing: "0.04em", textTransform: "uppercase", flexShrink: 0, marginLeft: 8 }}>Phase 2</div>}
+        <div style={{ fontSize: 10.5, fontWeight: 600, color: "#64748b", letterSpacing: "0.08em", textTransform: "uppercase" }}>{kpi.label}</div>
+        {isPhase2 && <div style={{ fontSize: 9, fontWeight: 600, color: "#64748b", background: "#f1f5f9", borderRadius: 5, padding: "2px 7px", letterSpacing: "0.04em", textTransform: "uppercase", flexShrink: 0, marginLeft: 8 }}>Phase 2</div>}
       </div>
       {isPhase2 ? (
         <>
           <div style={{ fontSize: 24, fontWeight: 700, color: "#cbd5e1", letterSpacing: "-0.02em" }}>—</div>
-          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>{kpi.dependency}</div>
-          <div style={{ fontSize: 9, color: "#cbd5e1", marginTop: 6 }}>Benchmark: {kpi.benchmark}</div>
+          <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 6 }}>{kpi.dependency}</div>
+          <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 6 }}>Benchmark: {kpi.benchmark}</div>
         </>
       ) : (
         <>
@@ -1853,8 +1853,8 @@ function KpiCard({ kpi, computed, isMobile }) {
             <div style={{ fontSize: 26, fontWeight: 700, color, letterSpacing: "-0.02em" }}>{computed.displayValue}</div>
             {statusLabel && <div style={{ fontSize: 12, color, fontWeight: 600 }}>{statusLabel}</div>}
           </div>
-          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>{computed.detail}</div>
-          <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 6 }}>Benchmark: {kpi.benchmark}</div>
+          <div style={{ fontSize: 11.5, color: "#475569", marginTop: 4 }}>{computed.detail}</div>
+          <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 6 }}>Benchmark: {kpi.benchmark}</div>
         </>
       )}
     </div>
@@ -1864,7 +1864,7 @@ function KpiCard({ kpi, computed, isMobile }) {
 function KpiGroup({ group, computeArgs, isMobile }) {
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#cbd5e1", margin: "8px 0 12px 4px" }}>{group.label}</div>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b", margin: "8px 0 12px 4px" }}>{group.label}</div>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
         {group.kpis.map(kpi => {
           const computed = kpi.status === "built" ? computeKpiValue(kpi.computeKey, computeArgs) : null;
@@ -4803,7 +4803,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
             {tab === "detail" && (<>
 
             {/* ── group: OVERVIEW ── */}
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#cbd5e1", margin: "0 0 12px 4px" }}>Overview</div>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b", margin: "0 0 12px 4px" }}>Overview</div>
             <div id="detail-kpis" style={{ scrollMarginTop: 80 }} />
             {/* Headline KPIs */}
             {(() => {
@@ -4886,7 +4886,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
             })()}
 
             {/* ── group: WHERE ── */}
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#cbd5e1", margin: "8px 0 12px 4px" }}>Where it's happening</div>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b", margin: "8px 0 12px 4px" }}>Where it's happening</div>
             <div id="detail-sites" style={{ scrollMarginTop: 80 }} />
             {/* Site filter */}
             {(() => {
@@ -4994,7 +4994,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
             <CFOCriticalHolds accounts={arFiltered} />
 
             {/* ── group: WHY / diagnostic breakdown (payer recovery + WIP stratification) ── */}
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#cbd5e1", margin: "8px 0 12px 4px" }}>Why it's happening</div>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b", margin: "8px 0 12px 4px" }}>Why it's happening</div>
             <div id="detail-payers" style={{ scrollMarginTop: 80 }} />
             {(() => {
               const groups = {
@@ -5110,7 +5110,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
                 Built KPIs compute live from AR data; Phase 2 render as designed placeholders. */}
             <div id="detail-kpi-groups" style={{ scrollMarginTop: 80 }} />
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8", margin: "20px 0 4px 4px" }}>KPI detail</div>
-            <div style={{ fontSize: 11, color: "#cbd5e1", margin: "0 0 14px 4px" }}>Complete financial picture · live metrics compute from current AR · Phase 2 metrics light up as data feeds connect</div>
+            <div style={{ fontSize: 11, color: "#64748b", margin: "0 0 14px 4px" }}>Complete financial picture · live metrics compute from current AR · Phase 2 metrics light up as data feeds connect</div>
             {CFO_KPIS.groups.map(group => (
               <KpiGroup key={group.id} group={group} isMobile={isMobile}
                 computeArgs={{ ar: arFiltered, siteNpr: SITE_NPR, siteFilter, fmtUSD: fmt }} />
@@ -5336,13 +5336,13 @@ Keep every item to one line. Limit pointers to 2-3.`;
 
         {role === "cfo" && tab === "detail" && (
           <div style={{ padding: isMobile ? "0 12px" : "0 32px", marginTop: 8 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#cbd5e1", marginBottom: 4 }}>In motion</div>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b", marginBottom: 4 }}>In motion</div>
           </div>
         )}
         {role === "cfo" && tab === "detail" && <WorkLinkReporting worklinks={worklinks} isMobile={isMobile} />}
         {role === "cfo" && tab === "detail" && (
           <div style={{ padding: isMobile ? "0 12px" : "0 32px", marginTop: 8 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#cbd5e1", marginBottom: 4 }}>Needs your decision</div>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b", marginBottom: 4 }}>Needs your decision</div>
           </div>
         )}
         {role === "cfo" && tab === "detail" && <CFOEscalationSection />}
