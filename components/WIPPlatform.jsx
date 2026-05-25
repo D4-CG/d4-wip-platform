@@ -4668,6 +4668,45 @@ Keep every item to one line. Limit pointers to 2-3.`;
             )}
             {/* DETAIL TAB: full data dashboard */}
             {tab === "detail" && (<>
+
+            {/* ── group: OVERVIEW ── */}
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#cbd5e1", margin: "0 0 12px 4px" }}>Overview</div>
+            <div id="detail-kpis" style={{ scrollMarginTop: 80 }} />
+            {/* Headline KPIs */}
+            {(() => {
+              const grossAR = arFiltered.reduce((s,a) => s+a.amount, 0);
+              const arDays = grossAR > 0 ? Math.round(arFiltered.reduce((s,a) => s + a.amount * a.daysOut, 0) / grossAR) : 0;
+              const annualNPR = siteFilter
+                ? (SITE_NPR[siteFilter] || 0)
+                : Object.values(SITE_NPR).reduce((s,v) => s+v, 0);
+              // Color discipline: neutral by default, signal only on exception. AR-days only colors when it crosses into watch/critical.
+              const arDaysColor = arDays < 55 ? "#0f172a" : arDays < 65 ? "#d97706" : "#dc2626";
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 20 }}>
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Net Patient Revenue</div>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(annualNPR)}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Annual · from accounting system{siteFilter ? ` · ${siteFilter}` : ""}</div>
+                  </div>
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Total AR</div>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(grossAR)}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{arFiltered.length} billed accounts{siteFilter ? ` · ${siteFilter}` : ""}</div>
+                  </div>
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>AR Days Outstanding</div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                      <div style={{ fontSize: 28, fontWeight: 700, color: arDaysColor, letterSpacing: "-0.02em" }}>{arDays}</div>
+                      <div style={{ fontSize: 13, color: arDaysColor, fontWeight: 600 }}>days</div>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Dollar-weighted average age · &lt;40 excellent, &lt;55 good, &lt;65 watch</div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── group: WHERE ── */}
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#cbd5e1", margin: "8px 0 12px 4px" }}>Where it's happening</div>
             <div id="detail-sites" style={{ scrollMarginTop: 80 }} />
             {/* Site filter */}
             {(() => {
@@ -4729,9 +4768,9 @@ Keep every item to one line. Limit pointers to 2-3.`;
                       </div>
                       {/* Rows */}
                       {siteStatsTableSorted.map(s => {
-                        const daysColor = s.avgDays < 55 ? "#16a34a" : s.avgDays < 65 ? "#d97706" : "#dc2626";
-                        const ncrColor = s.ncr >= 95 ? "#16a34a" : s.ncr >= 85 ? "#d97706" : "#dc2626";
-                        const denialColor = s.denialRate <= 5 ? "#16a34a" : s.denialRate <= 10 ? "#d97706" : "#dc2626";
+                        const daysColor = s.avgDays < 55 ? "#0f172a" : s.avgDays < 65 ? "#d97706" : "#dc2626";
+                        const ncrColor = s.ncr >= 95 ? "#0f172a" : s.ncr >= 85 ? "#d97706" : "#dc2626";
+                        const denialColor = s.denialRate <= 5 ? "#0f172a" : s.denialRate <= 10 ? "#d97706" : "#dc2626";
                         return (
                           <div key={s.site} onClick={() => setSiteFilter(s.site)}
                             style={{ display: "grid", gridTemplateColumns: cols9, minWidth: 820, padding: "10px 20px", cursor: "pointer", borderTop: "1px solid #f8fafc", background: "transparent", alignItems: "center" }}
@@ -4758,11 +4797,11 @@ Keep every item to one line. Limit pointers to 2-3.`;
                       {(() => {
                         const s = siteStats.find(x => x.site === siteFilter);
                         if (!s) return null;
-                        const daysColor = s.avgDays < 55 ? "#16a34a" : s.avgDays < 65 ? "#d97706" : "#dc2626";
-                        const ncrColor = s.ncr >= 95 ? "#16a34a" : s.ncr >= 85 ? "#d97706" : "#dc2626";
+                        const daysColor = s.avgDays < 55 ? "#0f172a" : s.avgDays < 65 ? "#d97706" : "#dc2626";
+                        const ncrColor = s.ncr >= 95 ? "#0f172a" : s.ncr >= 85 ? "#d97706" : "#dc2626";
                         return (
                           <span style={{ fontWeight: 400, color: "#64748b", fontSize: 11 }}>
-                            · NPR {fmt(s.npr)} · AR {fmt(s.totalAR)} · DNFB {fmt(s.totalDNFB)} · EV <span style={{ color: "#0f172a", fontWeight: 600 }}>{fmt(s.totalEV)}</span> · AR Days <span style={{ color: daysColor, fontWeight: 600 }}>{s.avgDays}d</span> · NCR <span style={{ color: ncrColor, fontWeight: 600 }}>{s.ncr}%</span> · Denial <span style={{ color: s.denialRate <= 5 ? "#16a34a" : s.denialRate <= 10 ? "#d97706" : "#dc2626", fontWeight: 600 }}>{s.denialRate}%</span>
+                            · NPR {fmt(s.npr)} · AR {fmt(s.totalAR)} · DNFB {fmt(s.totalDNFB)} · EV <span style={{ color: "#0f172a", fontWeight: 600 }}>{fmt(s.totalEV)}</span> · AR Days <span style={{ color: daysColor, fontWeight: 600 }}>{s.avgDays}d</span> · NCR <span style={{ color: ncrColor, fontWeight: 600 }}>{s.ncr}%</span> · Denial <span style={{ color: s.denialRate <= 5 ? "#0f172a" : s.denialRate <= 10 ? "#d97706" : "#dc2626", fontWeight: 600 }}>{s.denialRate}%</span>
                           </span>
                         );
                       })()}
@@ -4773,41 +4812,9 @@ Keep every item to one line. Limit pointers to 2-3.`;
             })()}
 
             <CFOCriticalHolds accounts={arFiltered} />
-            <div id="detail-kpis" style={{ scrollMarginTop: 80 }} />
-            {/* Headline KPIs */}
-            {(() => {
-              const grossAR = arFiltered.reduce((s,a) => s+a.amount, 0);
-              const arDays = grossAR > 0 ? Math.round(arFiltered.reduce((s,a) => s + a.amount * a.daysOut, 0) / grossAR) : 0;
-              // NPR is a fixed accounting given per site — sum the relevant sites (all, or the filtered one)
-              const annualNPR = siteFilter
-                ? (SITE_NPR[siteFilter] || 0)
-                : Object.values(SITE_NPR).reduce((s,v) => s+v, 0);
-              const arDaysColor = arDays < 55 ? "#16a34a" : arDays < 65 ? "#d97706" : "#dc2626";
-              const arDaysLabel = arDays < 40 ? "Excellent" : arDays < 55 ? "Good" : arDays < 65 ? "Needs attention" : "Critical";
-              return (
-                <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
-                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Net Patient Revenue</div>
-                    <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(annualNPR)}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Annual · from accounting system{siteFilter ? ` · ${siteFilter}` : ""}</div>
-                  </div>
-                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Total AR</div>
-                    <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(grossAR)}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{arFiltered.length} billed accounts{siteFilter ? ` · ${siteFilter}` : ""}</div>
-                  </div>
-                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>AR Days Outstanding</div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                      <div style={{ fontSize: 28, fontWeight: 700, color: arDaysColor, letterSpacing: "-0.02em" }}>{arDays}</div>
-                      <div style={{ fontSize: 13, color: arDaysColor, fontWeight: 600 }}>days</div>
-                    </div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Dollar-weighted average age · &lt;40 excellent, &lt;55 good, &lt;65 watch</div>
-                  </div>
-                </div>
-              );
-            })()}
 
+            {/* ── group: WHY ── */}
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#cbd5e1", margin: "8px 0 12px 4px" }}>Why it's happening</div>
             <div id="detail-payers" style={{ scrollMarginTop: 80 }} />
             {(() => {
               const groups = {
@@ -4834,7 +4841,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
                       const rate = bal > 0 ? Math.round(ev/bal*100) : 0;
                       const bm = PAYER_BENCHMARKS[key] || { min: 70, max: 85 };
                       const gap = bm.min - rate;
-                      const color = rate >= bm.min ? "#16a34a" : gap <= 10 ? "#d97706" : "#dc2626";
+                      const color = rate >= bm.min ? "#0f172a" : gap <= 10 ? "#d97706" : "#dc2626";
                       return (
                         <div key={key} style={{ padding: "12px 14px", background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0" }}>
                           <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>{g.label}</div>
@@ -4925,13 +4932,13 @@ Keep every item to one line. Limit pointers to 2-3.`;
               const totalEV = arFiltered.reduce((s,a) => s+a.expectedValue, 0);
               // Net collection rate = expected collections / net billable AR (both net-of-contractual)
               const ncr = totalGrossAR > 0 ? Math.round(totalEV / totalGrossAR * 100) : 0;
-              const ncrColor = ncr >= 95 ? "#16a34a" : ncr >= 85 ? "#d97706" : "#dc2626";
+              const ncrColor = ncr >= 95 ? "#0f172a" : ncr >= 85 ? "#d97706" : "#dc2626";
               const ncrLabel = ncr >= 95 ? "Excellent" : ncr >= 85 ? "Acceptable" : "Needs attention";
               const totalDenied = arFiltered.filter(a => a.denialCode !== null).length;
               const denialRate = arFiltered.length > 0 ? Math.round(totalDenied / arFiltered.length * 100) : 0;
               const deniedBalance = arFiltered.filter(a => a.denialCode !== null).reduce((s,a) => s+a.amount, 0);
               const denialBalanceRate = totalGrossAR > 0 ? Math.round(deniedBalance / totalGrossAR * 100) : 0;
-              const denialColor = denialRate <= 5 ? "#16a34a" : denialRate <= 10 ? "#d97706" : "#dc2626";
+              const denialColor = denialRate <= 5 ? "#0f172a" : denialRate <= 10 ? "#d97706" : "#dc2626";
               const denialLabel = denialRate <= 5 ? "Excellent" : denialRate <= 10 ? "Acceptable" : "Needs attention";
               return (
                 <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
@@ -4975,7 +4982,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
               const totalARBal = arFiltered.reduce((s,a) => s+a.amount, 0);
               const grossCharges = totalARBal / 0.45; // synthetic gross charges estimate
               const badDebtRate = grossCharges > 0 ? Math.round(woTotal / grossCharges * 100 * 10) / 10 : 0;
-              const bdColor = badDebtRate <= 2 ? "#16a34a" : badDebtRate <= 5 ? "#d97706" : "#dc2626";
+              const bdColor = badDebtRate <= 2 ? "#0f172a" : badDebtRate <= 5 ? "#d97706" : "#dc2626";
               const bdLabel = badDebtRate <= 2 ? "Well-managed" : badDebtRate <= 5 ? "Acceptable" : "Needs attention";
               return (
                 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 18px", marginBottom: 12 }}>
@@ -5347,7 +5354,17 @@ Keep every item to one line. Limit pointers to 2-3.`;
           </div>
         </div>
 
+        {role === "cfo" && tab === "detail" && (
+          <div style={{ padding: isMobile ? "0 12px" : "0 32px", marginTop: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#cbd5e1", marginBottom: 4 }}>In motion</div>
+          </div>
+        )}
         {role === "cfo" && tab === "detail" && <WorkLinkReporting worklinks={worklinks} isMobile={isMobile} />}
+        {role === "cfo" && tab === "detail" && (
+          <div style={{ padding: isMobile ? "0 12px" : "0 32px", marginTop: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#cbd5e1", marginBottom: 4 }}>Needs your decision</div>
+          </div>
+        )}
         {role === "cfo" && tab === "detail" && <CFOEscalationSection />}
         {role === "cfo" && tab === "detail" && (
           <div style={{ padding: isMobile ? "0 12px 80px" : "0 32px 40px" }}>
