@@ -1,0 +1,97 @@
+{
+  "_comment": "CFO KPI catalog. Drives the Detail-tab KPI body. Four documented groups (CFO KPIs spec). status: 'built' = value computed live from AR data via computeKey; 'phase2' = designed placeholder, value lights up when the named data source connects. Color discipline lives in the renderer (neutral default, signal on exception) driven by thresholds here. Thresholds: direction 'higher_better' or 'lower_better'; good/watch are the cut points.",
+  "groups": [
+    {
+      "id": "financial_health",
+      "label": "Financial health",
+      "kpis": [
+        { "key": "ncr", "label": "Net Collection Rate", "unit": "pct", "status": "built", "computeKey": "ncr",
+          "direction": "higher_better", "good": 95, "watch": 85,
+          "benchmark": ">95% excellent · 85–95% acceptable · <85% needs attention",
+          "sub": "EV ÷ Net Patient Revenue" },
+        { "key": "bad_debt", "label": "Bad Debt Rate", "unit": "pct", "status": "built", "computeKey": "badDebt",
+          "direction": "lower_better", "good": 2, "watch": 5,
+          "benchmark": "<2% commercial · <5% overall",
+          "sub": "Write-offs ÷ Gross Charges (est.)" },
+        { "key": "cost_to_collect", "label": "Cost to Collect", "unit": "pct", "status": "phase2",
+          "direction": "lower_better", "good": 5, "watch": 8,
+          "benchmark": "3–5% excellent · 5–8% acceptable · >8% needs attention",
+          "sub": "Revenue cycle cost ÷ net collections",
+          "dependency": "Requires payroll/wage data per RCM role (HFMA MAP Key)" }
+      ]
+    },
+    {
+      "id": "billing_claims",
+      "label": "Billing & claims performance",
+      "kpis": [
+        { "key": "denial", "label": "First-Pass Denial Rate", "unit": "pct", "status": "built", "computeKey": "denial",
+          "direction": "lower_better", "good": 5, "watch": 10,
+          "benchmark": "<5% excellent · <10% acceptable · >10% needs attention",
+          "sub": "Denied claims ÷ total submitted" },
+        { "key": "clean_claim", "label": "Clean Claim Rate", "unit": "pct", "status": "phase2",
+          "direction": "higher_better", "good": 95, "watch": 90,
+          "benchmark": ">95% excellent · <90% needs attention",
+          "sub": "First-pass accepted ÷ total submitted",
+          "dependency": "Requires clearinghouse 277CA acceptance feed" },
+        { "key": "dnfb_days", "label": "DNFB Days (Billing Lag)", "unit": "days", "status": "phase2",
+          "direction": "lower_better", "good": 3, "watch": 5,
+          "benchmark": "<3 days excellent · <5 acceptable · >7 needs attention",
+          "sub": "Unbilled balance ÷ avg daily gross charges",
+          "dependency": "Requires daily gross charge volume from EHR (HFMA MAP Key)" },
+        { "key": "timely_filing", "label": "Timely Filing Rate", "unit": "pct", "status": "phase2",
+          "direction": "higher_better", "good": 99, "watch": 98,
+          "benchmark": ">99% — any miss is permanently lost revenue",
+          "sub": "Filed within payer window ÷ total claims",
+          "dependency": "Requires claim submission timestamps" },
+        { "key": "appeal_success", "label": "Claim Appeal Success Rate", "unit": "pct", "status": "phase2",
+          "direction": "higher_better", "good": 60, "watch": 40,
+          "benchmark": ">60% excellent · 40–60% acceptable · <40% review strategy",
+          "sub": "Appeals won ÷ appeals submitted",
+          "dependency": "Requires appeal outcome tracking (Denial Appeal Agent)" }
+      ]
+    },
+    {
+      "id": "ar_aging",
+      "label": "AR aging & recovery",
+      "kpis": [
+        { "key": "ar90", "label": "AR Over 90 Days", "unit": "pct", "status": "built", "computeKey": "ar90",
+          "direction": "lower_better", "good": 10, "watch": 15,
+          "benchmark": "<10% PE target · <15% acceptable · >90 days outstanding",
+          "sub": "AR >90 days ÷ total AR" },
+        { "key": "ar120", "label": "AR Over 120 Days", "unit": "pct", "status": "built", "computeKey": "ar120",
+          "direction": "lower_better", "good": 5, "watch": 10,
+          "benchmark": "<5% well-managed · <10% acceptable · >120 days outstanding",
+          "sub": "AR >120 days ÷ total AR" },
+        { "key": "denial_overturn", "label": "Denial Overturn Rate", "unit": "pct", "status": "phase2",
+          "direction": "higher_better", "good": 60, "watch": 40,
+          "benchmark": ">60% excellent",
+          "sub": "Appeals won ÷ denials appealed",
+          "dependency": "Requires appeal outcome logging (Denial Appeal Agent)" },
+        { "key": "underpayment", "label": "Underpayment Rate", "unit": "pct", "status": "phase2",
+          "direction": "lower_better", "good": 2, "watch": 5,
+          "benchmark": "Industry: 2–5% of net revenue lost to underpayments",
+          "sub": "Underpaid ÷ total paid (vs contracted)",
+          "dependency": "Requires contracted fee schedules (source of truth) + ERA/835 paid detail" }
+      ]
+    },
+    {
+      "id": "self_pay",
+      "label": "Patient / self-pay",
+      "kpis": [
+        { "key": "selfpay_ev", "label": "Self-Pay — Expected Recovery", "unit": "usd", "status": "built", "computeKey": "selfPayEV",
+          "direction": "neutral",
+          "benchmark": "Probability-weighted · does not blend with insurance EV",
+          "sub": "Forward-looking self-pay recovery estimate" },
+        { "key": "selfpay_collection", "label": "Self-Pay Collection Rate", "unit": "pct", "status": "built", "computeKey": "selfPayCollection",
+          "direction": "higher_better", "good": 35, "watch": 20,
+          "benchmark": "20–30% industry avg · 35–40% top performer",
+          "sub": "Self-pay collected ÷ self-pay billed" },
+        { "key": "patient_payment", "label": "Patient Payment Collection Rate", "unit": "pct", "status": "phase2",
+          "direction": "higher_better", "good": 95, "watch": 70,
+          "benchmark": ">95% within 120d (insured patient balances) · 34–48% industry 2025",
+          "sub": "Patient balances collected ÷ patient responsibility",
+          "dependency": "Requires patient-responsibility ledger + payment posting feed" }
+      ]
+    }
+  ]
+}

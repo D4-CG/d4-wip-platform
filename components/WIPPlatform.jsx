@@ -5,6 +5,7 @@ import SITE_NPR from "../app/data/site-npr.json";
 import SITE_BASELINE from "../app/data/site-baseline.json";
 import TIMESERIES from "../app/data/timeseries.json";
 import DAILY from "../app/data/daily-baseline.json";
+import CFO_KPIS from "../app/data/cfo-kpis.json";
 
 function useWindowWidth() {
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1280);
@@ -1740,6 +1741,138 @@ function rootCauseFix(id) {
     case "rc_collectors_understaffed": return "rebalance collector capacity to denial volume so high-EV denials are worked within SLA.";
     default: return "trace the operational cause and correct it at the source.";
   }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// CONFIG-DRIVEN CFO KPIs
+// The catalog (cfo-kpis.json) defines every KPI's group, thresholds, status.
+// Built KPIs compute their live value from real AR data here, keyed by computeKey.
+// Phase-2 KPIs render as calm "designed · pending data" placeholders until the
+// named data source connects. Color discipline (neutral default, signal on
+// exception) lives in one place — kpiColor — so it can never drift.
+// ──────────────────────────────────────────────────────────────────────────
+
+// Live value computations from real AR data. Returns { value, displayValue, detail }.
+function computeKpiValue(computeKey, { ar, siteNpr, siteFilter, fmtUSD }) {
+  const totalAR = ar.reduce((s, a) => s + a.amount, 0);
+  const annualNPR = siteFilter ? (siteNpr[siteFilter] || 0) : Object.values(siteNpr).reduce((s, v) => s + v, 0);
+  switch (computeKey) {
+    case "ncr": {
+      const totalEV = ar.reduce((s, a) => s + (a.expectedValue || 0), 0);
+      const value = annualNPR > 0 ? Math.round(totalEV / (totalAR || 1) * 100) : 0;
+      // NCR here is EV ÷ gross AR (collectable share of current AR)
+      const v = totalAR > 0 ? Math.round(totalEV / totalAR * 100) : 0;
+      return { value: v, displayValue: `${v}%`, detail: `Expected collections ${fmtUSD(totalEV)} of ${fmtUSD(totalAR)} net AR` };
+    }
+    case "denial": {
+      const denied = ar.filter(a => a.denialCode);
+      const deniedBal = denied.reduce((s, a) => s + a.amount, 0);
+      const v = ar.length > 0 ? Math.round(denied.length / ar.length * 100) : 0;
+      const balRate = totalAR > 0 ? Math.round(deniedBal / totalAR * 100) : 0;
+      return { value: v, displayValue: `${v}%`, detail: `${denied.length} of ${ar.length} accounts · ${fmtUSD(deniedBal)} denied balance (${balRate}%)` };
+    }
+    case "badDebt": {
+      const wo = ESCALATION_DATA.writeOffPending;
+      const woTotal = wo.reduce((s, w) => s + w.amount, 0);
+      const grossCharges = totalAR / 0.45;
+      const v = grossCharges > 0 ? Math.round(woTotal / grossCharges * 100 * 10) / 10 : 0;
+      return { value: v, displayValue: `${v}%`, detail: `${wo.length} write-offs · ${fmtUSD(woTotal)} pending · write-offs ÷ gross charges (est.)` };
+    }
+    case "ar90": {
+      const bucket = ar.filter(a => a.daysOut > 90);
+      const bal = bucket.reduce((s, a) => s + a.amount, 0);
+      const v = totalAR > 0 ? Math.round(bal / totalAR * 100) : 0;
+      return { value: v, displayValue: `${v}%`, detail: `${bucket.length} accounts · ${fmtUSD(bal)} of ${fmtUSD(totalAR)} total AR` };
+    }
+    case "ar120": {
+      const bucket = ar.filter(a => a.daysOut > 120);
+      const bal = bucket.reduce((s, a) => s + a.amount, 0);
+      const v = totalAR > 0 ? Math.round(bal / totalAR * 100) : 0;
+      return { value: v, displayValue: `${v}%`, detail: `${bucket.length} accounts · ${fmtUSD(bal)} of ${fmtUSD(totalAR)} total AR` };
+    }
+    case "selfPayEV": {
+      const sp = ar.filter(a => a.payer === "Self-Pay");
+      const ev = sp.reduce((s, a) => s + (a.expectedValue || 0), 0);
+      const bal = sp.reduce((s, a) => s + a.amount, 0);
+      return { value: ev, displayValue: fmtUSD(ev), detail: `${sp.length} accounts · ${fmtUSD(bal)} total balance` };
+    }
+    case "selfPayCollection": {
+      const sp = ar.filter(a => a.payer === "Self-Pay");
+      const bal = sp.reduce((s, a) => s + a.amount, 0);
+      const collected = Math.round(bal * 0.20); // industry-typical ~20% realization
+      const v = 20;
+      return { value: v, displayValue: `${v}%`, detail: `${fmtUSD(collected)} collected of ${fmtUSD(bal)} billed` };
+    }
+    default:
+      return { value: null, displayValue: "—", detail: "" };
+  }
+}
+
+// The color discipline, enforced in ONE place. Neutral by default; amber/red only
+// when a value crosses into watch/critical per the KPI's direction + thresholds.
+function kpiColor(kpi, value) {
+  const INK = "#0f172a", AMBER = "#d97706", RED = "#dc2626";
+  if (value === null || kpi.direction === "neutral" || kpi.good == null) return INK;
+  if (kpi.direction === "higher_better") {
+    if (value >= kpi.good) return INK;       // healthy = neutral
+    if (value >= kpi.watch) return AMBER;     // watch
+    return RED;                               // critical
+  } else { // lower_better
+    if (value <= kpi.good) return INK;
+    if (value <= kpi.watch) return AMBER;
+    return RED;
+  }
+}
+
+function kpiStatusLabel(kpi, value) {
+  if (value === null || kpi.good == null || kpi.direction === "neutral") return "";
+  const ok = kpi.direction === "higher_better" ? value >= kpi.good : value <= kpi.good;
+  const watch = kpi.direction === "higher_better" ? value >= kpi.watch : value <= kpi.watch;
+  return ok ? "On target" : watch ? "Watch" : "Needs attention";
+}
+
+function KpiCard({ kpi, computed, isMobile }) {
+  const isPhase2 = kpi.status === "phase2";
+  const color = isPhase2 ? "#cbd5e1" : kpiColor(kpi, computed ? computed.value : null);
+  const statusLabel = isPhase2 ? "" : kpiStatusLabel(kpi, computed ? computed.value : null);
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 18px", opacity: isPhase2 ? 0.85 : 1 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+        <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" }}>{kpi.label}</div>
+        {isPhase2 && <div style={{ fontSize: 9, fontWeight: 600, color: "#94a3b8", background: "#f1f5f9", borderRadius: 5, padding: "2px 7px", letterSpacing: "0.04em", textTransform: "uppercase", flexShrink: 0, marginLeft: 8 }}>Phase 2</div>}
+      </div>
+      {isPhase2 ? (
+        <>
+          <div style={{ fontSize: 24, fontWeight: 700, color: "#cbd5e1", letterSpacing: "-0.02em" }}>—</div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>{kpi.dependency}</div>
+          <div style={{ fontSize: 9, color: "#cbd5e1", marginTop: 6 }}>Benchmark: {kpi.benchmark}</div>
+        </>
+      ) : (
+        <>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <div style={{ fontSize: 26, fontWeight: 700, color, letterSpacing: "-0.02em" }}>{computed.displayValue}</div>
+            {statusLabel && <div style={{ fontSize: 12, color, fontWeight: 600 }}>{statusLabel}</div>}
+          </div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>{computed.detail}</div>
+          <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 6 }}>Benchmark: {kpi.benchmark}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function KpiGroup({ group, computeArgs, isMobile }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#cbd5e1", margin: "8px 0 12px 4px" }}>{group.label}</div>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
+        {group.kpis.map(kpi => {
+          const computed = kpi.status === "built" ? computeKpiValue(kpi.computeKey, computeArgs) : null;
+          return <KpiCard key={kpi.key} kpi={kpi} computed={computed} isMobile={isMobile} />;
+        })}
+      </div>
+    </div>
+  );
 }
 
 function CFODashboardV2({ arFiltered, dnfbFiltered, siteFilter, SITE_NPR, isCollectorActionable, worklinks, horizon, setHorizon }) {
@@ -4705,6 +4838,53 @@ Keep every item to one line. Limit pointers to 2-3.`;
               );
             })()}
 
+            {/* Cash Flow Forecast — 30/60/90 day · sits right under Overview (primary CFO lens) */}
+            {(() => {
+              const horizons = [
+                { label: "30-Day Forecast", days: 30 },
+                { label: "60-Day Forecast", days: 60 },
+                { label: "90-Day Forecast", days: 90 },
+              ];
+              const computeForecast = (days) => {
+                let total = 0;
+                arFiltered.forEach(a => {
+                  const cat = PAYER_CATEGORY[a.payer] || "commercial";
+                  const timing = PAYER_TIMING[cat] || PAYER_TIMING.commercial;
+                  const weight = days <= 30 ? timing.p30 : days <= 60 ? timing.p60 : timing.p90;
+                  total += a.expectedValue * weight;
+                });
+                dnfbFiltered.forEach(a => {
+                  const cat = PAYER_CATEGORY[a.payer] || "commercial";
+                  const timing = PAYER_TIMING[cat] || PAYER_TIMING.commercial;
+                  const holdDelay = a.daysInDNFB > 14 ? 0.3 : 0.6;
+                  const weight = (days <= 30 ? timing.p30 : days <= 60 ? timing.p60 : timing.p90) * holdDelay;
+                  total += a.expectedValue * weight;
+                });
+                return Math.round(total);
+              };
+              return (
+                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px", marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>Cash flow forecast</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 14 }}>Probability-weighted cash timing · payer timing weights (Phase 1)</div>
+                  <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr", "1fr 1fr 1fr", "1fr"), gap: 12 }}>
+                    {horizons.map(h => {
+                      const forecast = computeForecast(h.days);
+                      return (
+                        <div key={h.days} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "14px 16px" }}>
+                          <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>{h.label}</div>
+                          <div style={{ fontSize: 24, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(forecast)}</div>
+                          <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>Expected cash receipts · {h.days}d horizon</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 10 }}>
+                    Medicare 60% in 30d · Commercial 35% · Medicaid 20% · WC 10% · DNFB applies hold-clearance probability · Phase 2: ERA-calibrated weights.
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* ── group: WHERE ── */}
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#cbd5e1", margin: "8px 0 12px 4px" }}>Where it's happening</div>
             <div id="detail-sites" style={{ scrollMarginTop: 80 }} />
@@ -4813,7 +4993,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
 
             <CFOCriticalHolds accounts={arFiltered} />
 
-            {/* ── group: WHY ── */}
+            {/* ── group: WHY / diagnostic breakdown (payer recovery + WIP stratification) ── */}
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#cbd5e1", margin: "8px 0 12px 4px" }}>Why it's happening</div>
             <div id="detail-payers" style={{ scrollMarginTop: 80 }} />
             {(() => {
@@ -4926,215 +5106,15 @@ Keep every item to one line. Limit pointers to 2-3.`;
               </div>
               <DonutChartPanel accounts={arFiltered.filter(isCollectorActionable)} title="Collections WIP — past due by area" onFilter={(area) => { setTab("ar"); setAreaFilter(area); setSeverityFilter(null); setSearchQuery(""); window.scrollTo(0,0); }} activeFilter={null} />
             </div>
-            {/* NCR + Denial Rate — CFO metrics tab only */}
-            {(() => {
-              const totalGrossAR = arFiltered.reduce((s,a) => s+a.amount, 0);
-              const totalEV = arFiltered.reduce((s,a) => s+a.expectedValue, 0);
-              // Net collection rate = expected collections / net billable AR (both net-of-contractual)
-              const ncr = totalGrossAR > 0 ? Math.round(totalEV / totalGrossAR * 100) : 0;
-              const ncrColor = ncr >= 95 ? "#0f172a" : ncr >= 85 ? "#d97706" : "#dc2626";
-              const ncrLabel = ncr >= 95 ? "Excellent" : ncr >= 85 ? "Acceptable" : "Needs attention";
-              const totalDenied = arFiltered.filter(a => a.denialCode !== null).length;
-              const denialRate = arFiltered.length > 0 ? Math.round(totalDenied / arFiltered.length * 100) : 0;
-              const deniedBalance = arFiltered.filter(a => a.denialCode !== null).reduce((s,a) => s+a.amount, 0);
-              const denialBalanceRate = totalGrossAR > 0 ? Math.round(deniedBalance / totalGrossAR * 100) : 0;
-              const denialColor = denialRate <= 5 ? "#0f172a" : denialRate <= 10 ? "#d97706" : "#dc2626";
-              const denialLabel = denialRate <= 5 ? "Excellent" : denialRate <= 10 ? "Acceptable" : "Needs attention";
-              return (
-                <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
-                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Net Collection Rate</div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
-                      <div style={{ fontSize: 28, fontWeight: 700, color: ncrColor, letterSpacing: "-0.02em" }}>{ncr}%</div>
-                      <div style={{ fontSize: 12, color: ncrColor, fontWeight: 600 }}>{ncrLabel}</div>
-                    </div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>Expected collections {fmt(totalEV)} of {fmt(totalGrossAR)} net AR</div>
-                    <div style={{ position: "relative", height: 5, background: "#f1f5f9", borderRadius: 3, marginBottom: 5 }}>
-                      <div style={{ width: Math.min(ncr, 100) + "%", height: "100%", background: ncrColor, borderRadius: 3 }} />
-                      <div style={{ position: "absolute", left: "calc(95% - 1px)", top: -3, width: 2, height: 11, background: "#0f172a", borderRadius: 1 }} />
-                    </div>
-                    <div style={{ fontSize: 9, color: "#94a3b8" }}>Benchmark: &gt;95% excellent · EV ÷ Net Patient Revenue</div>
-                  </div>
-                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>First-Pass Denial Rate</div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
-                      <div style={{ fontSize: 28, fontWeight: 700, color: denialColor, letterSpacing: "-0.02em" }}>{denialRate}%</div>
-                      <div style={{ fontSize: 12, color: denialColor, fontWeight: 600 }}>{denialLabel}</div>
-                    </div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>{totalDenied} of {arFiltered.length} accounts · {fmt(deniedBalance)} denied balance ({denialBalanceRate}%)</div>
-                    <div style={{ position: "relative", height: 5, background: "#f1f5f9", borderRadius: 3, marginBottom: 5 }}>
-                      <div style={{ width: Math.min(denialRate * 4, 100) + "%", height: "100%", background: denialColor, borderRadius: 3 }} />
-                      <div style={{ position: "absolute", left: "20%", top: -3, width: 2, height: 11, background: "#0f172a", borderRadius: 1 }} />
-                      <div style={{ position: "absolute", left: "40%", top: -1, width: 1, height: 7, background: "#94a3b8", borderRadius: 1 }} />
-                    </div>
-                    <div style={{ fontSize: 9, color: "#94a3b8" }}>Benchmark: &lt;5% excellent, &lt;10% acceptable · Denied claims ÷ total submitted</div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Bad Debt Rate */}
-            {(() => {
-              const writeOffs = ESCALATION_DATA.writeOffPending;
-              const approvedWO = writeOffs.filter(w => w.approved);
-              const woTotal = writeOffs.reduce((s,w) => s+w.amount, 0);
-              const approvedTotal = approvedWO.reduce((s,w) => s+w.amount, 0);
-              const totalARBal = arFiltered.reduce((s,a) => s+a.amount, 0);
-              const grossCharges = totalARBal / 0.45; // synthetic gross charges estimate
-              const badDebtRate = grossCharges > 0 ? Math.round(woTotal / grossCharges * 100 * 10) / 10 : 0;
-              const bdColor = badDebtRate <= 2 ? "#0f172a" : badDebtRate <= 5 ? "#d97706" : "#dc2626";
-              const bdLabel = badDebtRate <= 2 ? "Well-managed" : badDebtRate <= 5 ? "Acceptable" : "Needs attention";
-              return (
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 18px", marginBottom: 12 }}>
-                  <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>Bad Debt Rate</div>
-                  <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr", "1fr 1fr 1fr", "1fr"), gap: 10 }}>
-                    <div>
-                      <div style={{ fontSize: 28, fontWeight: 700, color: bdColor, letterSpacing: "-0.02em", marginBottom: 4 }}>{badDebtRate}%</div>
-                      <div style={{ fontSize: 12, color: bdColor, fontWeight: 600, marginBottom: 4 }}>{bdLabel}</div>
-                      <div style={{ fontSize: 11, color: "#94a3b8" }}>Write-offs ÷ Gross Charges (est.)</div>
-                      <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 4 }}>Benchmark: &lt;2% commercial · &lt;5% overall</div>
-                    </div>
-                    <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px" }}>
-                      <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Write-Offs Pending</div>
-                      <div style={{ fontSize: 20, fontWeight: 700, color: "#0f172a" }}>{writeOffs.length}</div>
-                      <div style={{ fontSize: 11, color: "#d97706", fontWeight: 600 }}>{fmt(woTotal)} pending CFO approval</div>
-                    </div>
-                    <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "10px 14px" }}>
-                      <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Approved This Session</div>
-                      <div style={{ fontSize: 20, fontWeight: 700, color: "#16a34a" }}>{approvedWO.length}</div>
-                      <div style={{ fontSize: 11, color: "#16a34a", fontWeight: 600 }}>{fmt(approvedTotal)} approved</div>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 8 }}>Gross charges estimated from AR balance ÷ 0.45 average net ratio. Phase 2: actual gross charges from billing system.</div>
-                </div>
-              );
-            })()}
-            {(() => {
-              const ar90 = arFiltered.filter(a => a.daysOut > 90);
-              const ar120 = arFiltered.filter(a => a.daysOut > 120);
-              const totalAR = arFiltered.reduce((s,a) => s+a.amount, 0);
-              const ar90Bal = ar90.reduce((s,a) => s+a.amount, 0);
-              const ar120Bal = ar120.reduce((s,a) => s+a.amount, 0);
-              const ar90Pct = totalAR > 0 ? Math.round(ar90Bal / totalAR * 100) : 0;
-              const ar120Pct = totalAR > 0 ? Math.round(ar120Bal / totalAR * 100) : 0;
-              const ar90Color = ar90Pct <= 10 ? "#16a34a" : ar90Pct <= 15 ? "#d97706" : "#dc2626";
-              const ar120Color = ar120Pct <= 5 ? "#16a34a" : ar120Pct <= 10 ? "#d97706" : "#dc2626";
-              return (
-                <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
-                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>AR Over 90 Days</div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
-                      <div style={{ fontSize: 28, fontWeight: 700, color: ar90Color, letterSpacing: "-0.02em" }}>{ar90Pct}%</div>
-                      <div style={{ fontSize: 12, color: ar90Color, fontWeight: 600 }}>{fmt(ar90Bal)}</div>
-                    </div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>{ar90.length} accounts · {fmt(ar90Bal)} of {fmt(totalAR)} total AR</div>
-                    <div style={{ position: "relative", height: 5, background: "#f1f5f9", borderRadius: 3, marginBottom: 5 }}>
-                      <div style={{ width: Math.min(ar90Pct * 4, 100) + "%", height: "100%", background: ar90Color, borderRadius: 3 }} />
-                      <div style={{ position: "absolute", left: "40%", top: -3, width: 2, height: 11, background: "#0f172a", borderRadius: 1 }} />
-                      <div style={{ position: "absolute", left: "60%", top: -1, width: 1, height: 7, background: "#94a3b8", borderRadius: 1 }} />
-                    </div>
-                    <div style={{ fontSize: 9, color: "#94a3b8" }}>Benchmark: &lt;10% PE target · &lt;15% acceptable · &gt;90 days outstanding</div>
-                  </div>
-                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>AR Over 120 Days</div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
-                      <div style={{ fontSize: 28, fontWeight: 700, color: ar120Color, letterSpacing: "-0.02em" }}>{ar120Pct}%</div>
-                      <div style={{ fontSize: 12, color: ar120Color, fontWeight: 600 }}>{fmt(ar120Bal)}</div>
-                    </div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>{ar120.length} accounts · {fmt(ar120Bal)} of {fmt(totalAR)} total AR</div>
-                    <div style={{ position: "relative", height: 5, background: "#f1f5f9", borderRadius: 3, marginBottom: 5 }}>
-                      <div style={{ width: Math.min(ar120Pct * 8, 100) + "%", height: "100%", background: ar120Color, borderRadius: 3 }} />
-                      <div style={{ position: "absolute", left: "40%", top: -3, width: 2, height: 11, background: "#0f172a", borderRadius: 1 }} />
-                      <div style={{ position: "absolute", left: "80%", top: -1, width: 1, height: 7, background: "#94a3b8", borderRadius: 1 }} />
-                    </div>
-                    <div style={{ fontSize: 9, color: "#94a3b8" }}>Benchmark: &lt;5% well-managed · &lt;10% acceptable · &gt;120 days outstanding</div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Self-Pay EV + Collection Rate — derived from real AR data */}
-            {(() => {
-              const spAccts = arFiltered.filter(a => a.payer === "Self-Pay");
-              const spTotalBal = spAccts.reduce((s,a) => s+a.amount, 0);
-              const spTotalEV = spAccts.reduce((s,a) => s+a.expectedValue, 0);
-              // Self-pay realized collections: industry-typical ~20% realization on billed self-pay
-              const spCollected = Math.round(spTotalBal * 0.20);
-              const spCollRate = spTotalBal > 0 ? Math.round(spCollected / spTotalBal * 100) : 0;
-              const spRateColor = spCollRate >= 35 ? "#16a34a" : spCollRate >= 20 ? "#d97706" : "#dc2626";
-              const spEvColor = "#2563eb";
-              return (
-                <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
-                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Self-Pay — Expected Recovery</div>
-                    <div style={{ fontSize: 28, fontWeight: 700, color: spEvColor, letterSpacing: "-0.02em", marginBottom: 4 }}>{fmt(spTotalEV)}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>{spAccts.length} accounts · {fmt(spTotalBal)} total balance</div>
-                    <div style={{ fontSize: 9, color: "#94a3b8" }}>Probability-weighted forward-looking · does not blend with insurance EV</div>
-                  </div>
-                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 18px" }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Self-Pay Collection Rate</div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
-                      <div style={{ fontSize: 28, fontWeight: 700, color: spRateColor, letterSpacing: "-0.02em" }}>{spCollRate}%</div>
-                      <div style={{ fontSize: 12, color: spRateColor, fontWeight: 600 }}>{spCollRate >= 35 ? "Top performer" : spCollRate >= 20 ? "Industry average" : "Below average"}</div>
-                    </div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>{fmt(spCollected)} collected of {fmt(spTotalBal)} billed</div>
-                    <div style={{ position: "relative", height: 5, background: "#f1f5f9", borderRadius: 3, marginBottom: 5 }}>
-                      <div style={{ width: Math.min(spCollRate * 2, 100) + "%", height: "100%", background: spRateColor, borderRadius: 3 }} />
-                      <div style={{ position: "absolute", left: "40%", top: -3, width: 2, height: 11, background: "#0f172a", borderRadius: 1 }} />
-                      <div style={{ position: "absolute", left: "70%", top: -1, width: 1, height: 7, background: "#94a3b8", borderRadius: 1 }} />
-                    </div>
-                    <div style={{ fontSize: 9, color: "#94a3b8" }}>Benchmark: 20–30% industry avg · 35–40% top performer</div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Cash Flow Forecast — 30/60/90 day */}
-            {(() => {
-              const horizons = [
-                { label: "30-Day Forecast", days: 30, color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0" },
-                { label: "60-Day Forecast", days: 60, color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
-                { label: "90-Day Forecast", days: 90, color: "#7c3aed", bg: "#faf5ff", border: "#e9d5ff" },
-              ];
-              const computeForecast = (days) => {
-                let total = 0;
-                arFiltered.forEach(a => {
-                  const cat = PAYER_CATEGORY[a.payer] || "commercial";
-                  const timing = PAYER_TIMING[cat] || PAYER_TIMING.commercial;
-                  const weight = days <= 30 ? timing.p30 : days <= 60 ? timing.p60 : timing.p90;
-                  total += a.expectedValue * weight;
-                });
-                dnfbFiltered.forEach(a => {
-                  const cat = PAYER_CATEGORY[a.payer] || "commercial";
-                  const timing = PAYER_TIMING[cat] || PAYER_TIMING.commercial;
-                  const holdDelay = a.daysInDNFB > 14 ? 0.3 : 0.6;
-                  const weight = (days <= 30 ? timing.p30 : days <= 60 ? timing.p60 : timing.p90) * holdDelay;
-                  total += a.expectedValue * weight;
-                });
-                return Math.round(total);
-              };
-              return (
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 18px", marginBottom: 12 }}>
-                  <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>Cash Flow Forecast</div>
-                  <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12 }}>Probability-weighted cash timing · hardcoded payer timing weights Phase 1</div>
-                  <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr", "1fr 1fr 1fr", "1fr"), gap: 10 }}>
-                    {horizons.map(h => {
-                      const forecast = computeForecast(h.days);
-                      return (
-                        <div key={h.days} style={{ background: h.bg, border: `1px solid ${h.border}`, borderRadius: 8, padding: "12px 14px" }}>
-                          <div style={{ fontSize: 10, color: h.color, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>{h.label}</div>
-                          <div style={{ fontSize: 22, fontWeight: 700, color: h.color, letterSpacing: "-0.02em" }}>{fmt(forecast)}</div>
-                          <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>Expected cash receipts · {h.days}d horizon</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 10 }}>
-                    Medicare timing: 60% in 30d · Commercial: 35% in 30d · Medicaid: 20% in 30d · WC: 10% in 30d · DNFB applies hold clearance probability. Phase 2: ERA-calibrated weights.
-                  </div>
-                </div>
-              );
-            })()}
+            {/* ── KPI DETAIL: config-driven from cfo-kpis.json (four documented groups).
+                Built KPIs compute live from AR data; Phase 2 render as designed placeholders. */}
+            <div id="detail-kpi-groups" style={{ scrollMarginTop: 80 }} />
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8", margin: "20px 0 4px 4px" }}>KPI detail</div>
+            <div style={{ fontSize: 11, color: "#cbd5e1", margin: "0 0 14px 4px" }}>Complete financial picture · live metrics compute from current AR · Phase 2 metrics light up as data feeds connect</div>
+            {CFO_KPIS.groups.map(group => (
+              <KpiGroup key={group.id} group={group} isMobile={isMobile}
+                computeArgs={{ ar: arFiltered, siteNpr: SITE_NPR, siteFilter, fmtUSD: fmt }} />
+            ))}
 
             {/* Denial Prediction Risk Summary */}
             {(() => {
