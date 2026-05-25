@@ -3794,104 +3794,100 @@ function DonutChartPanel({ accounts, title, onFilter, activeFilter }) {
 }
 
 function CFOEscalationSection() {
-  const [open, setOpen] = useState(false);
   const [approved, setApproved] = useState({});
   const [showOverrides, setShowOverrides] = useState(false);
   const [showEscalations, setShowEscalations] = useState(false);
-  const writeOffTotal = ESCALATION_DATA.writeOffPending.reduce((s,w) => s + w.amount, 0);
   const pendingCount = ESCALATION_DATA.writeOffPending.filter(w => !approved[w.accountId]).length;
+  const pendingTotal = ESCALATION_DATA.writeOffPending.filter(w => !approved[w.accountId]).reduce((s,w) => s + w.amount, 0);
   return (
-    <div style={{ marginTop: 20, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, overflow: "hidden" }}>
-      <div onClick={() => setOpen(o => !o)} style={{ padding: "14px 18px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>Escalation Summary</span>
-          {pendingCount > 0 && <span style={{ background: "#fee2e2", color: "#b91c1c", borderRadius: 10, padding: "1px 8px", fontSize: 10, fontWeight: 700 }}>{pendingCount} write-off{pendingCount > 1 ? "s" : ""} pending your approval</span>}
-        </div>
-        <span style={{ color: "#94a3b8", fontSize: 11 }}>{open ? "▲" : "▼"}</span>
+    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, overflow: "hidden", marginBottom: 8 }}>
+      {/* Decision queue — write-offs awaiting CFO sign-off */}
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#64748b" }}>Write-offs awaiting your sign-off</div>
+        {pendingCount > 0
+          ? <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 600 }}>{pendingCount} pending · {fmt(pendingTotal)}</div>
+          : <div style={{ fontSize: 12, color: "#64748b" }}>All cleared</div>}
       </div>
-      {open && (
-        <div style={{ borderTop: "1px solid #f1f5f9", padding: "16px 18px" }}>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#b91c1c", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Write-offs pending your approval</div>
-            {ESCALATION_DATA.writeOffPending.map(w => (
-              <div key={w.accountId} style={{ background: "#fafafa", border: "1px solid #e2e8f0", borderRadius: 8, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#0f172a", marginBottom: 2 }}>{w.patient}</div>
-                  <div style={{ fontSize: 11, color: "#64748b" }}>{w.accountId} · {w.payer} · Recommended by {w.recommendedBy} · {w.recommendedAt}</div>
-                  <div style={{ fontSize: 11, color: "#475569", marginTop: 5, fontStyle: "italic" }}>{w.rationale}</div>
+      <div style={{ padding: "12px 20px 16px" }}>
+        {ESCALATION_DATA.writeOffPending.map(w => {
+          const isApproved = approved[w.accountId];
+          return (
+            <div key={w.accountId} style={{ borderBottom: "1px solid #f1f5f9", padding: "14px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, opacity: isApproved ? 0.6 : 1 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 3 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{w.patient}</span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: isApproved ? "#64748b" : "#dc2626" }}>{fmt(w.amount)}</span>
                 </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", marginBottom: 6 }}>${w.amount.toLocaleString()}</div>
-                  {approved[w.accountId] ? (
-                    <div style={{ fontSize: 11, color: "#16a34a", fontWeight: 600 }}>✓ Write-off approved</div>
-                  ) : (
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button onClick={() => setApproved(p => ({...p, [w.accountId]: true}))} style={{ padding: "6px 12px", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 6, color: "#b91c1c", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}>Approve</button>
-                      <button style={{ padding: "6px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 6, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Return</button>
-                    </div>
-                  )}
-                </div>
+                <div style={{ fontSize: 11.5, color: "#64748b", marginBottom: 5 }}>{w.accountId} · {w.payer} · recommended by {w.recommendedBy} · {w.recommendedAt}</div>
+                <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.5 }}>{w.rationale}</div>
               </div>
-            ))}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            {/* Override rate — drill down */}
-            <div style={{ background: "#faf5ff", border: "1px solid #ede9fe", borderRadius: 8, overflow: "hidden" }}>
-              <div onClick={() => setShowOverrides(o => !o)} style={{ padding: "12px 14px", cursor: "pointer" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#7c3aed", letterSpacing: "0.08em", textTransform: "uppercase" }}>Override rate this period</div>
-                  <span style={{ fontSize: 10, color: "#94a3b8" }}>{showOverrides ? "▲" : "▼"}</span>
-                </div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "#6d28d9", marginTop: 4 }}>8%</div>
-                <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Within normal range — target under 15%</div>
+              <div style={{ flexShrink: 0, paddingTop: 2 }}>
+                {isApproved ? (
+                  <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>✓ Approved</span>
+                ) : (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setApproved(p => ({...p, [w.accountId]: true}))} style={{ padding: "7px 16px", background: "#0f172a", border: "none", borderRadius: 7, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>Approve</button>
+                    <button style={{ padding: "7px 14px", background: "#fff", border: "1px solid #cbd5e1", borderRadius: 7, color: "#475569", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>Return</button>
+                  </div>
+                )}
               </div>
-              {showOverrides && (
-                <div style={{ borderTop: "1px solid #ede9fe", padding: "10px 14px", background: "#fff" }}>
-                  <div style={{ fontSize: 10, color: "#7c3aed", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>{ESCALATION_DATA.overrideReview.length} overrides this period</div>
-                  {ESCALATION_DATA.overrideReview.map(o => (
-                    <div key={o.accountId} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #f5f3ff" }}>
-                      <div style={{ fontSize: 12, fontWeight: 500, color: "#0f172a" }}>{o.patient} · {o.accountId}</div>
-                      <div style={{ display: "flex", gap: 8, marginTop: 4, fontSize: 11 }}>
-                        <span style={{ color: "#64748b", background: "#f8fafc", padding: "1px 6px", borderRadius: 4 }}>AI: {o.aiRecommended}</span>
-                        <span style={{ color: "#6d28d9", background: "#faf5ff", padding: "1px 6px", borderRadius: 4 }}>Chose: {o.collectorChose}</span>
-                      </div>
-                      <div style={{ fontSize: 11, color: "#475569", marginTop: 3, fontStyle: "italic" }}>{o.collectorName}: "{o.note}"</div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-            {/* Open escalations — drill down */}
-            <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, overflow: "hidden" }}>
-              <div onClick={() => setShowEscalations(o => !o)} style={{ padding: "12px 14px", cursor: "pointer" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#c2410c", letterSpacing: "0.08em", textTransform: "uppercase" }}>Open escalations</div>
-                  <span style={{ fontSize: 10, color: "#94a3b8" }}>{showEscalations ? "▲" : "▼"}</span>
-                </div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "#c2410c", marginTop: 4 }}>{ESCALATION_DATA.escalated.length}</div>
-                <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Pending supervisor resolution</div>
-              </div>
-              {showEscalations && (
-                <div style={{ borderTop: "1px solid #fed7aa", padding: "10px 14px", background: "#fff" }}>
-                  <div style={{ fontSize: 10, color: "#c2410c", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Open escalations</div>
-                  {ESCALATION_DATA.escalated.map(e => (
-                    <div key={e.accountId} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #fff7ed" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 500, color: "#0f172a" }}>{e.patient} · {e.accountId}</div>
-                          <div style={{ fontSize: 11, color: "#64748b" }}>{e.payer} · Escalated by {e.escalatedBy} · {e.escalatedAt}</div>
-                        </div>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "#c2410c" }}>${(e.expectedValue/1000).toFixed(0)}K EV</span>
-                      </div>
-                      <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>{e.note}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
+          );
+        })}
+      </div>
+      {/* Supporting context — calm neutral metrics with drill-down */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, borderTop: "1px solid #f1f5f9" }}>
+        <div style={{ borderRight: "1px solid #f1f5f9" }}>
+          <div onClick={() => setShowOverrides(o => !o)} style={{ padding: "14px 20px", cursor: "pointer" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: "#64748b", letterSpacing: "0.06em", textTransform: "uppercase" }}>Override rate this period</div>
+              <span style={{ fontSize: 11, color: "#94a3b8" }}>{showOverrides ? "▲" : "▼"}</span>
             </div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", marginTop: 4 }}>8%</div>
+            <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2 }}>Within normal range — target under 15%</div>
           </div>
+          {showOverrides && (
+            <div style={{ borderTop: "1px solid #f1f5f9", padding: "12px 20px" }}>
+              {ESCALATION_DATA.overrideReview.map(o => (
+                <div key={o.accountId} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: "1px solid #f8fafc" }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: "#0f172a" }}>{o.patient} · {o.accountId}</div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 4, fontSize: 11 }}>
+                    <span style={{ color: "#64748b", background: "#f1f5f9", padding: "1px 6px", borderRadius: 4 }}>AI: {o.aiRecommended}</span>
+                    <span style={{ color: "#334155", background: "#f1f5f9", padding: "1px 6px", borderRadius: 4 }}>Chose: {o.collectorChose}</span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "#475569", marginTop: 4 }}>{o.collectorName}: "{o.note}"</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+        <div>
+          <div onClick={() => setShowEscalations(o => !o)} style={{ padding: "14px 20px", cursor: "pointer" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: "#64748b", letterSpacing: "0.06em", textTransform: "uppercase" }}>Open escalations</div>
+              <span style={{ fontSize: 11, color: "#94a3b8" }}>{showEscalations ? "▲" : "▼"}</span>
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", marginTop: 4 }}>{ESCALATION_DATA.escalated.length}</div>
+            <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2 }}>Pending supervisor resolution</div>
+          </div>
+          {showEscalations && (
+            <div style={{ borderTop: "1px solid #f1f5f9", padding: "12px 20px" }}>
+              {ESCALATION_DATA.escalated.map(e => (
+                <div key={e.accountId} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: "1px solid #f8fafc" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: "#0f172a" }}>{e.patient} · {e.accountId}</div>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>{e.payer} · escalated by {e.escalatedBy} · {e.escalatedAt}</div>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>${(e.expectedValue/1000).toFixed(0)}K EV</span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "#475569", marginTop: 4 }}>{e.note}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -3957,6 +3953,7 @@ export default function WIPPlatform() {
   const [areaFilter, setAreaFilter] = useState(null);
   const [severityFilter, setSeverityFilter] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [accountsExpanded, setAccountsExpanded] = useState(false); // CFO detail: account list collapsed by default
   const [aiText, setAiText] = useState(null);
   const [critFilter, setCritFilter] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -5311,7 +5308,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
         })()}
 
         {!(role === "cfo" && tab === "metrics") && (<>
-        <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Search by account ID, patient, payer, or site..." />
+        {!(role === "cfo" && tab === "detail") && <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Search by account ID, patient, payer, or site..." />}
 
         {(role === "biller" || role === "medicaid" || role === "wc") && (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
@@ -5328,6 +5325,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
           </div>
         )}
 
+        {!(role === "cfo" && tab === "detail") && (
         <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? 8 : 0, marginBottom: 12 }}>
           <div style={{ fontSize: 11, color: "#94a3b8" }}>{filtered.length} account{filtered.length !== 1 ? "s" : ""}{searchQuery ? ` matching "${searchQuery}"` : ""} · click to expand</div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -5338,6 +5336,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
             </button>
           </div>
         </div>
+        )}
 
         {role === "cfo" && tab === "detail" && (
           <div style={{ padding: isMobile ? "0 12px" : "0 32px", marginTop: 8 }}>
@@ -5405,11 +5404,35 @@ Keep every item to one line. Limit pointers to 2-3.`;
           </div>
         )}
 
-        {filtered.slice(0, 100).map(acc => (
+        {role === "cfo" && tab === "detail" && (
+          <div style={{ padding: isMobile ? "0 12px" : "0 32px", marginTop: 28 }}>
+            <div onClick={() => setAccountsExpanded(e => !e)}
+              style={{ borderTop: "2px solid #e2e8f0", paddingTop: 18, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b" }}>Account detail</div>
+                <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>
+                  {filtered.length.toLocaleString()} accounts · {fmt(filtered.reduce((s,a) => s + a.expectedValue, 0))} expected recovery · the underlying evidence
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                {accountsExpanded && (
+                  <button onClick={(e) => { e.stopPropagation(); exportToExcel(); }} disabled={filtered.length === 0}
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", fontSize: 11, fontWeight: 600, fontFamily: "inherit", background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, color: "#334155", cursor: filtered.length === 0 ? "not-allowed" : "pointer" }}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5l3 3 3-3M1 9v1.5A.5.5 0 001.5 11h9a.5.5 0 00.5-.5V9" stroke="#334155" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    Export {filtered.length > 0 ? `(${filtered.length})` : ""}
+                  </button>
+                )}
+                <span style={{ fontSize: 13, color: "#64748b", fontWeight: 600 }}>{accountsExpanded ? "Hide ▲" : "Show ▼"}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {(!(role === "cfo" && tab === "detail") || accountsExpanded) && filtered.slice(0, 100).map(acc => (
           (role === "cfo" && tab === "dnfb") ? null :
           <BillerAccountCard key={acc.id} acc={acc} onSeverityFilter={setSeverityFilter} onWorkLink={handleSendWorklink} />
         ))}
-        {(role !== "cfo" || tab !== "dnfb") && filtered.length > 100 && (
+        {(!(role === "cfo" && tab === "detail") || accountsExpanded) && (role !== "cfo" || tab !== "dnfb") && filtered.length > 100 && (
           <div style={{ textAlign: "center", padding: "16px", fontSize: 12, color: "#94a3b8" }}>
             Showing top 100 of {filtered.length.toLocaleString()} accounts by expected value · refine with search or filters
           </div>
