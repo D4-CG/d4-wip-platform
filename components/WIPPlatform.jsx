@@ -4817,22 +4817,22 @@ Keep every item to one line. Limit pointers to 2-3.`;
               return (
                 <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 20 }}>
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Net Patient Revenue</div>
+                    <div style={{ fontSize: 10.5, fontWeight: 600, color: "#64748b", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 5 }}>Net Patient Revenue</div>
                     <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(annualNPR)}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Annual · from accounting system{siteFilter ? ` · ${siteFilter}` : ""}</div>
+                    <div style={{ fontSize: 11.5, color: "#475569", marginTop: 3 }}>Annual · from accounting system{siteFilter ? ` · ${siteFilter}` : ""}</div>
                   </div>
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Total AR</div>
+                    <div style={{ fontSize: 10.5, fontWeight: 600, color: "#64748b", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 5 }}>Total AR</div>
                     <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(grossAR)}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{arFiltered.length} billed accounts{siteFilter ? ` · ${siteFilter}` : ""}</div>
+                    <div style={{ fontSize: 11.5, color: "#475569", marginTop: 3 }}>{arFiltered.length} billed accounts{siteFilter ? ` · ${siteFilter}` : ""}</div>
                   </div>
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px" }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>AR Days Outstanding</div>
+                    <div style={{ fontSize: 10.5, fontWeight: 600, color: "#64748b", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 5 }}>AR Days Outstanding</div>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                       <div style={{ fontSize: 28, fontWeight: 700, color: arDaysColor, letterSpacing: "-0.02em" }}>{arDays}</div>
                       <div style={{ fontSize: 13, color: arDaysColor, fontWeight: 600 }}>days</div>
                     </div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>Dollar-weighted average age · &lt;40 excellent, &lt;55 good, &lt;65 watch</div>
+                    <div style={{ fontSize: 11.5, color: "#475569", marginTop: 3 }}>Dollar-weighted average age · &lt;40 excellent, &lt;55 good, &lt;65 watch</div>
                   </div>
                 </div>
               );
@@ -4871,15 +4871,48 @@ Keep every item to one line. Limit pointers to 2-3.`;
                       const forecast = computeForecast(h.days);
                       return (
                         <div key={h.days} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "14px 16px" }}>
-                          <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>{h.label}</div>
+                          <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>{h.label}</div>
                           <div style={{ fontSize: 24, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.02em" }}>{fmt(forecast)}</div>
-                          <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>Expected cash receipts · {h.days}d horizon</div>
+                          <div style={{ fontSize: 10, color: "#64748b", marginTop: 4 }}>Expected cash receipts · {h.days}d horizon</div>
                         </div>
                       );
                     })}
                   </div>
                   <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 10 }}>
                     Medicare 60% in 30d · Commercial 35% · Medicaid 20% · WC 10% · DNFB applies hold-clearance probability · Phase 2: ERA-calibrated weights.
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Pre-Submission Denial Risk — forward-looking, pairs with cashflow */}
+            {(() => {
+              const highRisk = dnfbFiltered.filter(a => DENIAL_RISK_MAP[a.holdCode]?.risk === "high");
+              const medRisk = dnfbFiltered.filter(a => DENIAL_RISK_MAP[a.holdCode]?.risk === "medium");
+              const highEV = highRisk.reduce((s,a) => s+a.expectedValue, 0);
+              const medEV = medRisk.reduce((s,a) => s+a.expectedValue, 0);
+              const reworkCost = Math.round((highRisk.length * 118) + (medRisk.length * 65));
+              if (highRisk.length === 0 && medRisk.length === 0) return null;
+              return (
+                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px", marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, color: "#64748b", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>Pre-submission denial risk</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 14 }}>Rule-based prediction · accounts at risk before submission · Phase 1</div>
+                  <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr", "1fr 1fr 1fr", "1fr"), gap: 12 }}>
+                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 14px" }}>
+                      <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>High Risk</div>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: "#dc2626" }}>{highRisk.length}</div>
+                      <div style={{ fontSize: 11, color: "#dc2626", marginTop: 2, fontWeight: 600 }}>{fmt(highEV)} EV at risk</div>
+                    </div>
+                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 14px" }}>
+                      <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Medium Risk</div>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: "#d97706" }}>{medRisk.length}</div>
+                      <div style={{ fontSize: 11, color: "#d97706", marginTop: 2, fontWeight: 600 }}>{fmt(medEV)} EV at risk</div>
+                    </div>
+                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 14px" }}>
+                      <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Projected Rework Cost</div>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: "#0f172a" }}>{fmt(reworkCost)}</div>
+                      <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>If denied · $65–118/claim to rework</div>
+                    </div>
                   </div>
                 </div>
               );
@@ -5047,9 +5080,11 @@ Keep every item to one line. Limit pointers to 2-3.`;
               );
             })()}
 
+            {/* ── group: IN MOTION (WIP inventory + WorkLink rework) ── */}
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b", margin: "8px 0 12px 4px" }}>In motion</div>
             <div id="detail-wip" style={{ scrollMarginTop: 80 }} />
-            {/* Billing WIP + Billing Donut + Follow-up WIP + Follow-up Donut — all one row */}
-            <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
+            {/* Billing WIP + its donut on row 1; Follow-up WIP + its donut on row 2 — each lever its own band */}
+            <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr", "1fr 1fr", "1fr"), gap: 12, marginBottom: 12 }}>
               <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "14px 18px" }}>
                 <div style={{ fontSize: 11, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600, marginBottom: 10 }}>Billing WIP — DNFB</div>
                 {(() => {
@@ -5106,6 +5141,8 @@ Keep every item to one line. Limit pointers to 2-3.`;
               </div>
               <DonutChartPanel accounts={arFiltered.filter(isCollectorActionable)} title="Collections WIP — past due by area" onFilter={(area) => { setTab("ar"); setAreaFilter(area); setSeverityFilter(null); setSearchQuery(""); window.scrollTo(0,0); }} activeFilter={null} />
             </div>
+            {/* WorkLink — rework in flight on the WIP inventory above (same In motion group) */}
+            <WorkLinkReporting worklinks={worklinks} isMobile={isMobile} />
             {/* ── KPI DETAIL: config-driven from cfo-kpis.json (four documented groups).
                 Built KPIs compute live from AR data; Phase 2 render as designed placeholders. */}
             <div id="detail-kpi-groups" style={{ scrollMarginTop: 80 }} />
@@ -5116,38 +5153,6 @@ Keep every item to one line. Limit pointers to 2-3.`;
                 computeArgs={{ ar: arFiltered, siteNpr: SITE_NPR, siteFilter, fmtUSD: fmt }} />
             ))}
 
-            {/* Denial Prediction Risk Summary */}
-            {(() => {
-              const highRisk = dnfbFiltered.filter(a => DENIAL_RISK_MAP[a.holdCode]?.risk === "high");
-              const medRisk = dnfbFiltered.filter(a => DENIAL_RISK_MAP[a.holdCode]?.risk === "medium");
-              const highEV = highRisk.reduce((s,a) => s+a.expectedValue, 0);
-              const medEV = medRisk.reduce((s,a) => s+a.expectedValue, 0);
-              const reworkCost = Math.round((highRisk.length * 118) + (medRisk.length * 65));
-              if (highRisk.length === 0 && medRisk.length === 0) return null;
-              return (
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 18px", marginBottom: 12 }}>
-                  <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>Pre-Submission Denial Risk</div>
-                  <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12 }}>Rule-based prediction · accounts at risk before submission · Phase 1</div>
-                  <div style={{ display: "grid", gridTemplateColumns: cols("1fr 1fr 1fr", "1fr 1fr 1fr", "1fr"), gap: 10 }}>
-                    <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "12px 14px" }}>
-                      <div style={{ fontSize: 10, color: "#b91c1c", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>High Risk</div>
-                      <div style={{ fontSize: 22, fontWeight: 700, color: "#dc2626" }}>{highRisk.length}</div>
-                      <div style={{ fontSize: 11, color: "#dc2626", marginTop: 2, fontWeight: 600 }}>{fmt(highEV)} EV at risk</div>
-                    </div>
-                    <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, padding: "12px 14px" }}>
-                      <div style={{ fontSize: 10, color: "#c2410c", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Medium Risk</div>
-                      <div style={{ fontSize: 22, fontWeight: 700, color: "#d97706" }}>{medRisk.length}</div>
-                      <div style={{ fontSize: 11, color: "#d97706", marginTop: 2, fontWeight: 600 }}>{fmt(medEV)} EV at risk</div>
-                    </div>
-                    <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "12px 14px" }}>
-                      <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Projected Rework Cost</div>
-                      <div style={{ fontSize: 22, fontWeight: 700, color: "#0f172a" }}>{fmt(reworkCost)}</div>
-                      <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>If denied · $65–118/claim to rework</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
             </>)}
           </div>
         ) : (
@@ -5334,12 +5339,6 @@ Keep every item to one line. Limit pointers to 2-3.`;
           </div>
         </div>
 
-        {role === "cfo" && tab === "detail" && (
-          <div style={{ padding: isMobile ? "0 12px" : "0 32px", marginTop: 8 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b", marginBottom: 4 }}>In motion</div>
-          </div>
-        )}
-        {role === "cfo" && tab === "detail" && <WorkLinkReporting worklinks={worklinks} isMobile={isMobile} />}
         {role === "cfo" && tab === "detail" && (
           <div style={{ padding: isMobile ? "0 12px" : "0 32px", marginTop: 8 }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b", marginBottom: 4 }}>Needs your decision</div>
