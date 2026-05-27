@@ -1343,10 +1343,8 @@ function AuthWorklist({ dnfbScored, arScored, worklinks, onResolve, onReturn, on
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
   const [activeTab, setActiveTab] = useState("dnfb");
-  const [sortBy, setSortBy] = useState("ev"); // "ev" | "aging" | "risk"
+  const [sortBy, setSortBy] = useState("ev"); // "ev" | "aging"
   const [atRiskOnly, setAtRiskOnly] = useState(false);
-  const [siteFilter, setSiteFilter] = useState(null);
-  const [payerFilter, setPayerFilter] = useState(null);
   const [worked, setWorked] = useState(new Set());
 
   // Thresholds (fixed defaults; payer-aware logic deferred per spec)
@@ -1362,7 +1360,7 @@ function AuthWorklist({ dnfbScored, arScored, worklinks, onResolve, onReturn, on
 
   const dnfbHolds = dnfbScored
     .filter(a => a.area === "Authorization" && !worked.has(a.id) && !inboundWlAccountIds.has(a.id))
-    .map(a => ({ ...a, _kind: "hold", _holdType: holdTypeLabel(a.holdCode), _ev: a.expectedValue, _aging: a.daysInDNFB || 0 }));
+    .map(a => ({ ...a, _kind: "hold", _holdType: holdTypeLabel(a.holdCode), _ev: Number(a.expectedValue || a.amount || 0), _aging: a.daysInDNFB || 0 }));
 
   // Inbound WorkLinks shown in DNFB tab badged "WorkLink in"
   // Cross-reference each WorkLink to its source account (could be from DNFB or AR side)
@@ -1376,15 +1374,16 @@ function AuthWorklist({ dnfbScored, arScored, worklinks, onResolve, onReturn, on
       _wlId: w.id,
       _wlNote: w.note,
       _wlSlaDue: w.slaDue,
-      _ev: src.expectedValue || src.amount || 0,
+      _ev: Number(src.expectedValue || src.amount || 0),
       _aging: Math.floor((Date.now() - new Date(w.createdAt || Date.now()).getTime()) / 86400000),
     };
   }).filter(Boolean);
 
   const dnfbAccounts = [...dnfbHolds, ...inboundCards];
 
-  // Denials tab: auth-related denials from AR
-  const authDenialCodes = ["CO-15", "CO-197", "CO-B7"];
+  // Denials tab: auth-related denials from AR.
+  // CO-4 is the auth denial code in this data model (maps to chase_auth → Authorization).
+  const authDenialCodes = ["CO-4"];
   const denialAccounts = (arScored || [])
     .filter(a => a.denialCode && authDenialCodes.includes(a.denialCode) && !worked.has(a.id))
     .map(a => ({
@@ -1392,7 +1391,7 @@ function AuthWorklist({ dnfbScored, arScored, worklinks, onResolve, onReturn, on
       _kind: "denial",
       _denialLabel: denialTypeLabel(a.denialCode),
       _appealStage: a.appealStage || "Initial review",
-      _ev: a.expectedValue || a.amount * (a.prob || 0.5),
+      _ev: Number(a.expectedValue || a.amount * (a.prob || 0.5) || 0),
       _aging: a.daysOut || 0,
     }));
 
@@ -1443,18 +1442,12 @@ function AuthWorklist({ dnfbScored, arScored, worklinks, onResolve, onReturn, on
       const threshold = activeTab === "dnfb" ? TF_PROXY_THRESHOLD : APPEAL_PROXY_THRESHOLD;
       out = out.filter(a => a._aging >= threshold);
     }
-    if (siteFilter) out = out.filter(a => a.site === siteFilter);
-    if (payerFilter) out = out.filter(a => a.payer === payerFilter);
     return out;
   };
 
   const applySort = (accounts) => {
-    if (sortBy === "ev") return [...accounts].sort((a, b) => b._ev - a._ev);
-    if (sortBy === "aging") return [...accounts].sort((a, b) => b._aging - a._aging);
-    if (sortBy === "risk") {
-      // closest to breach first — for in-flight, use SLA due
-      return [...accounts].sort((a, b) => b._aging - a._aging);
-    }
+    if (sortBy === "ev") return [...accounts].sort((a, b) => (b._ev || 0) - (a._ev || 0));
+    if (sortBy === "aging") return [...accounts].sort((a, b) => (b._aging || 0) - (a._aging || 0));
     return accounts;
   };
 
@@ -1463,10 +1456,6 @@ function AuthWorklist({ dnfbScored, arScored, worklinks, onResolve, onReturn, on
     activeTab === "denials" ? denialAccounts :
     inFlightAccounts
   ));
-
-  // ── Available filter options (derived from visible data) ──
-  const allSites = [...new Set([...dnfbAccounts, ...denialAccounts].map(a => a.site).filter(Boolean))].sort();
-  const allPayers = [...new Set([...dnfbAccounts, ...denialAccounts].map(a => a.payer).filter(Boolean))].sort();
 
   // ── Resolution event handlers ──
   // Wired in step 4. For scaffold: mark worked + close any related WorkLink.
@@ -1596,7 +1585,6 @@ function AuthWorklist({ dnfbScored, arScored, worklinks, onResolve, onReturn, on
         {[
           { id: "ev", label: "EV" },
           { id: "aging", label: "Aging" },
-          { id: "risk", label: "Risk" },
         ].map(s => (
           <button
             key={s.id}
@@ -1631,26 +1619,6 @@ function AuthWorklist({ dnfbScored, arScored, worklinks, onResolve, onReturn, on
         >
           At-risk only
         </button>
-        {allSites.length > 1 && (
-          <select
-            value={siteFilter || ""}
-            onChange={e => setSiteFilter(e.target.value || null)}
-            style={{ padding: "4px 8px", borderRadius: 6, border: `1px solid ${BORDER}`, fontSize: 12, color: MUTE }}
-          >
-            <option value="">All sites</option>
-            {allSites.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        )}
-        {allPayers.length > 1 && (
-          <select
-            value={payerFilter || ""}
-            onChange={e => setPayerFilter(e.target.value || null)}
-            style={{ padding: "4px 8px", borderRadius: 6, border: `1px solid ${BORDER}`, fontSize: 12, color: MUTE }}
-          >
-            <option value="">All payers</option>
-            {allPayers.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-        )}
       </div>
 
       {/* ── Card list ── */}
@@ -1698,9 +1666,7 @@ function holdTypeLabel(code) {
 // Map a denialCode to a plain-English denial-type badge for Diane's Denial cards
 function denialTypeLabel(code) {
   if (!code) return "Denial";
-  if (code === "CO-15") return "CO-15 No auth";
-  if (code === "CO-197") return "CO-197 Auth absent";
-  if (code === "CO-B7") return "CO-B7 Provider not eligible";
+  if (code === "CO-4") return "CO-4 Authorization required";
   return code;
 }
 
