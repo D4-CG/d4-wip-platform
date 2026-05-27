@@ -1021,8 +1021,8 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
 
   const tabStyle = (t) => ({
     padding: "10px 16px", cursor: "pointer", fontSize: 12, fontWeight: activeTab === t ? 600 : 400,
-    border: "none", borderBottom: activeTab === t ? "2px solid #2563eb" : "2px solid transparent",
-    background: "transparent", color: activeTab === t ? "#2563eb" : "#64748b", fontFamily: "inherit",
+    border: "none", borderBottom: activeTab === t ? "2px solid #0f172a" : "2px solid transparent",
+    background: "transparent", color: activeTab === t ? "#0f172a" : "#64748b", fontFamily: "inherit",
   });
 
   const NativeCard = ({ a }) => (
@@ -1106,24 +1106,28 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
     </div>
   );
 
-  const WorkLinkCard = ({ w }) => (
-    <div style={{ background: w.isServiceDateSLA && w.slaHrs < 4 ? "#fff1f2" : "#f0f9ff", border: `1px solid ${w.isServiceDateSLA && w.slaHrs < 4 ? "#fca5a5" : new Date() > w.slaDue ? "#fca5a5" : "#bae6fd"}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
-      {w.isServiceDateSLA && w.slaHrs < 4 && (
-        <div style={{ background: "#dc2626", color: "#fff", padding: "5px 18px", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em" }}>
-          🚨 SERVICE DATE URGENT — Patient service {w.serviceDate} · Deadline in {w.slaHrs === 0 ? "&lt;1hr" : `${w.slaHrs}hr`}
+  const WorkLinkCard = ({ w }) => {
+    const isBreached = new Date() > w.slaDue;
+    const isUrgent = w.isServiceDateSLA && w.slaHrs < 4;
+    const exceptionBorder = isUrgent || isBreached ? "#fca5a5" : "#e2e8f0";
+    return (
+    <div style={{ background: "#fff", border: `1px solid ${exceptionBorder}`, borderRadius: 14, marginBottom: 10, overflow: "hidden" }}>
+      {isUrgent && (
+        <div style={{ background: "#fef2f2", color: "#dc2626", padding: "6px 18px", fontSize: 12, fontWeight: 600, borderBottom: "1px solid #fecaca" }}>
+          Service date urgent — patient service {w.serviceDate} · deadline in {w.slaHrs === 0 ? "<1hr" : `${w.slaHrs}hr`}
         </div>
       )}
-      <div style={{ padding: "12px 18px", borderBottom: "1px solid #e0f2fe", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+      <div style={{ padding: "12px 18px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontSize: 10, fontWeight: 700, background: "#0369a1", color: "#fff", padding: "2px 8px", borderRadius: 4 }}>⇄ WORKLINK</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#0369a1" }}>{w.requestIcon} {w.requestLabel}</span>
-            <span style={{ fontSize: 10, fontWeight: 600, color: slaColor(w), background: slaColor(w) + "14", padding: "2px 8px", borderRadius: 4 }}>⏱ {slaRemaining(w)}{w.isServiceDateSLA ? " (service date)" : ""}</span>
+            <span style={{ fontSize: 10, fontWeight: 600, background: "#f1f5f9", color: "#475569", padding: "2px 8px", borderRadius: 4 }}>WorkLink</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>{w.requestLabel}</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: isBreached ? "#dc2626" : "#64748b", background: isBreached ? "#fef2f2" : "#f8fafc", padding: "2px 8px", borderRadius: 4 }}>{slaRemaining(w)}{w.isServiceDateSLA ? " (service date)" : ""}</span>
             {w.serviceDate && !w.isServiceDateSLA && <span style={{ fontSize: 10, color: "#64748b" }}>Service: {w.serviceDate}</span>}
           </div>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 2 }}>{w.patient}</div>
           <div style={{ fontSize: 11, color: "#64748b" }}>{w.accountId} · {w.payer} · {w.vertical}</div>
-          <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.6, marginTop: 8, padding: "8px 12px", background: "#fff", borderRadius: 6, border: "1px solid #e0f2fe" }}>{w.note}</div>
+          <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.6, marginTop: 8, padding: "8px 12px", background: "#f8fafc", borderRadius: 6, border: "1px solid #f1f5f9" }}>{w.note}</div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 2 }}>Expected value</div>
@@ -1139,7 +1143,7 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => { if (resolutionNote.trim()) { onResolve(w.id, resolutionNote); setResolving(null); setResolutionNote(""); } }}
                 disabled={!resolutionNote.trim()}
-                style={{ flex: 1, padding: "8px", background: resolutionNote.trim() ? "#16a34a" : "#f1f5f9", border: "none", borderRadius: 8, color: resolutionNote.trim() ? "#fff" : "#94a3b8", cursor: resolutionNote.trim() ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>✓ Mark resolved</button>
+                style={{ flex: 1, padding: "8px", background: resolutionNote.trim() ? "#0f172a" : "#f1f5f9", border: "none", borderRadius: 8, color: resolutionNote.trim() ? "#fff" : "#94a3b8", cursor: resolutionNote.trim() ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>Mark resolved</button>
               <button onClick={() => { setResolving(null); setResolutionNote(""); }} style={{ padding: "8px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Cancel</button>
             </div>
           </>
@@ -1163,13 +1167,14 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
           </>
         ) : (
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => setResolving(w.id)} style={{ flex: 1, padding: "8px", background: "#0369a1", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>Resolve</button>
+            <button onClick={() => setResolving(w.id)} style={{ flex: 1, padding: "8px", background: "#0f172a", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>Resolve</button>
             <button onClick={() => { setResolving(`return-${w.id}`); setResolutionNote(""); }} style={{ padding: "8px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>Return</button>
           </div>
         )}
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div style={{ padding: isMobile ? "16px 12px 80px" : "24px 32px" }}>
@@ -1180,18 +1185,17 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
         if (sites.length <= 1) return null;
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px" }}>
-            <span style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0 }}>My sites:</span>
+            <span style={{ fontSize: 11, color: "#64748b", flexShrink: 0 }}>My sites:</span>
             <button onClick={() => setAreaSiteFilter(null)}
-              style={{ padding: "3px 10px", fontSize: 11, fontWeight: !areaSiteFilter ? 600 : 400, border: `1px solid ${!areaSiteFilter ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: !areaSiteFilter ? "#2563eb" : "#fff", color: !areaSiteFilter ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
+              style={{ padding: "3px 10px", fontSize: 11, fontWeight: !areaSiteFilter ? 600 : 400, border: `1px solid ${!areaSiteFilter ? "#0f172a" : "#e2e8f0"}`, borderRadius: 20, background: !areaSiteFilter ? "#0f172a" : "#fff", color: !areaSiteFilter ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
               All
             </button>
             {sites.map(s => (
               <button key={s} onClick={() => setAreaSiteFilter(areaSiteFilter === s ? null : s)}
-                style={{ padding: "3px 10px", fontSize: 11, fontWeight: areaSiteFilter === s ? 600 : 400, border: `1px solid ${areaSiteFilter === s ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: areaSiteFilter === s ? "#2563eb" : "#fff", color: areaSiteFilter === s ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
+                style={{ padding: "3px 10px", fontSize: 11, fontWeight: areaSiteFilter === s ? 600 : 400, border: `1px solid ${areaSiteFilter === s ? "#0f172a" : "#e2e8f0"}`, borderRadius: 20, background: areaSiteFilter === s ? "#0f172a" : "#fff", color: areaSiteFilter === s ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
                 {s}
               </button>
             ))}
-            {areaSiteFilter && <span style={{ fontSize: 10, color: "#2563eb", marginLeft: 4 }}>— your assigned accounts</span>}
           </div>
         );
       })()}
@@ -1199,7 +1203,7 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
       {/* Settings panel */}
       {showSettings && (
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 20px", marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#0f172a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>⚙ Goals — {area}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", marginBottom: 14 }}>Goals — {area}</div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
             {[
               { label: "Work ASAP max accounts", key: "workAsapMaxCount", type: "number" },
@@ -1210,7 +1214,7 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
               { label: "WorkLink avg resolution (hrs)", key: "worklinkAvgResolutionHrs", type: "number" },
             ].map(f => (
               <div key={f.key}>
-                <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{f.label}</div>
+                <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>{f.label}</div>
                 <input type={f.type} value={goals[f.key] ?? ""} onChange={e => setGoals(g => ({ ...g, [f.key]: e.target.value === "" ? null : Number(e.target.value) }))}
                   style={{ width: "100%", boxSizing: "border-box", padding: "7px 10px", fontSize: 13, border: "1px solid #e2e8f0", borderRadius: 6, background: "#f8fafc", color: "#0f172a", fontFamily: "inherit", outline: "none" }} />
               </div>
@@ -1245,7 +1249,7 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
           <div style={{ fontSize: 11, marginTop: 3 }}>
             {asapCountVariance !== null && asapCountVariance > 0
               ? <span style={{ color: isWorst("asap") ? "#dc2626" : "#475569" }}>+{asapCountVariance} over goal · {fmt(asapEV)} EV at risk</span>
-              : <span style={{ color: "#64748b" }}>Within goal · {fmt(asapEV)} EV</span>}
+              : <span style={{ color: "#64748b" }}>{fmt(asapEV)} EV · within goal</span>}
           </div>
         </div>
         <div style={{ background: "#fff", border: `1px solid ${isWorst("wl") ? "#fca5a5" : "#e2e8f0"}`, borderRadius: 14, padding: "14px 16px" }}>
@@ -1272,13 +1276,13 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
             Work ASAP
             <span style={{ background: workAsap.length > 0 ? "#fee2e2" : "#f1f5f9", color: workAsap.length > 0 ? "#dc2626" : "#64748b", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 600, marginLeft: 4 }}>{workAsap.length}</span>
           </button>
-          <button style={{ ...tabStyle("worklink"), color: activeTab === "worklink" ? "#0369a1" : "#64748b", borderBottomColor: activeTab === "worklink" ? "#0369a1" : "transparent" }} onClick={() => setActiveTab("worklink")}>
+          <button style={tabStyle("worklink")} onClick={() => setActiveTab("worklink")}>
             WorkLink
-            <span style={{ background: wlOpen.length > 0 ? "#e0f2fe" : "#f1f5f9", color: wlOpen.length > 0 ? "#0369a1" : "#64748b", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 600, marginLeft: 4 }}>{wlOpen.length}</span>
+            <span style={{ background: wlOpen.length > 0 ? "#f1f5f9" : "#f1f5f9", color: wlOpen.length > 0 ? "#475569" : "#64748b", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 600, marginLeft: 4 }}>{wlOpen.length}</span>
           </button>
         </div>
         <button onClick={() => setShowSettings(s => !s)} style={{ padding: "6px 12px", background: showSettings ? "#f1f5f9" : "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
-          ⚙ Goals
+          Goals
         </button>
       </div>
 
@@ -1287,9 +1291,8 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
         <>
           <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 12 }}>Accounts in normal hold window (0–3 days) · sorted by EV · {monitor.length} accounts · {fmt(monitor.reduce((s,a)=>s+a.expectedValue,0))} EV</div>
           {monitor.length === 0 ? (
-            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "32px 24px", textAlign: "center" }}>
-              <div style={{ fontSize: 24, marginBottom: 8 }}>✓</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#16a34a" }}>No accounts in monitor bucket</div>
+            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: "32px 24px", textAlign: "center" }}>
+              <div style={{ fontSize: 14, fontWeight: 500, color: "#475569" }}>No accounts in monitor bucket</div>
             </div>
           ) : monitor.slice(0,100).map(a => <NativeCard key={a.id} a={a} />)}
         </>
@@ -1303,10 +1306,9 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
             {asapEVVariance > 0 && <div style={{ fontSize: 11, fontWeight: 600, color: "#dc2626" }}>{fmt(asapEVVariance)} EV over goal</div>}
           </div>
           {workAsap.length === 0 ? (
-            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "32px 24px", textAlign: "center" }}>
-              <div style={{ fontSize: 24, marginBottom: 8 }}>✓</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#16a34a" }}>Queue clear — at goal</div>
-              <div style={{ fontSize: 12, color: "#166534", marginTop: 4 }}>
+            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: "32px 24px", textAlign: "center" }}>
+              <div style={{ fontSize: 14, fontWeight: 500, color: "#475569" }}>Queue clear — at goal</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
                 No accounts beyond normal hold period.{worked.size > 0 ? ` ${worked.size} account${worked.size > 1 ? "s" : ""} worked this session.` : ""}
               </div>
             </div>
@@ -1319,9 +1321,8 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
         <>
           <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 12 }}>Sorted by SLA deadline · most urgent first · SLA goal: {goals.worklinkSLATarget}% compliance</div>
           {wlOpen.length === 0 ? (
-            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "32px 24px", textAlign: "center" }}>
-              <div style={{ fontSize: 24, marginBottom: 8 }}>✓</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#16a34a" }}>No open WorkLink requests</div>
+            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: "32px 24px", textAlign: "center" }}>
+              <div style={{ fontSize: 14, fontWeight: 500, color: "#475569" }}>No open WorkLink requests</div>
             </div>
           ) : wlOpen.map(w => <WorkLinkCard key={w.id} w={w} />)}
         </>
