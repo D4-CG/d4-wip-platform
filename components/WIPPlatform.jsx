@@ -1262,7 +1262,7 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
             <span style={{ background: workAsap.length > 0 ? "#fee2e2" : "#f1f5f9", color: workAsap.length > 0 ? "#dc2626" : "#64748b", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 600, marginLeft: 4 }}>{workAsap.length}</span>
           </button>
           <button style={{ ...tabStyle("worklink"), color: activeTab === "worklink" ? "#0369a1" : "#64748b", borderBottomColor: activeTab === "worklink" ? "#0369a1" : "transparent" }} onClick={() => setActiveTab("worklink")}>
-            WorkLink — SLA
+            WorkLink
             <span style={{ background: wlOpen.length > 0 ? "#e0f2fe" : "#f1f5f9", color: wlOpen.length > 0 ? "#0369a1" : "#64748b", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 600, marginLeft: 4 }}>{wlOpen.length}</span>
           </button>
         </div>
