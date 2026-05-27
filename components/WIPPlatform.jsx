@@ -1319,6 +1319,543 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
   );
 }
 
+// ─── Auth Worklist ────────────────────────────────────────────────────────────
+// Persona-specific worker screen for Diane (Authorization Specialist).
+// Built against the Auth Worklist UX/UI Design Spec (post-discharge).
+//
+// Replaces the generic AreaWorklist for area="Authorization" only.
+// Other areas keep the generic AreaWorklist until/unless they earn their own persona.
+//
+// Structural decisions (from spec):
+//   - 3 tabs by phase: DNFB · Denials · In Flight (domain vocabulary)
+//   - Default sort: EV descending (post-discharge recovery best-practice)
+//   - Two dollar tallies (DNFB gross, Denials net/EV), never summed
+//   - Resolution-visibility row (factual, not celebratory)
+//   - Inbound WorkLinks (chase_auth from collectors) land in DNFB tab badged "WorkLink in"
+//   - Outbound WorkLinks (Diane → physician/nurse/collector) land in In Flight
+//
+// Honest degradations (data model gaps):
+//   - No dateOfDischarge field → TF countdown not calculable; show days-in-DNFB (real data)
+//   - No denialDate field → appeal-window countdown not calculable; show days-since-action
+//   - No payer-rules table → fixed defaults (14d, 7d) for at-risk thresholds
+//   These are flagged in the spec as deferred to a follow-up.
+function AuthWorklist({ dnfbScored, arScored, worklinks, onResolve, onReturn, onWorkLink, fmtUSD }) {
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 768;
+  const [activeTab, setActiveTab] = useState("dnfb");
+  const [sortBy, setSortBy] = useState("ev"); // "ev" | "aging" | "risk"
+  const [atRiskOnly, setAtRiskOnly] = useState(false);
+  const [siteFilter, setSiteFilter] = useState(null);
+  const [payerFilter, setPayerFilter] = useState(null);
+  const [worked, setWorked] = useState(new Set());
+
+  // Thresholds (fixed defaults; payer-aware logic deferred per spec)
+  const TF_RISK_DAYS = 14;
+  const APPEAL_RISK_DAYS = 7;
+
+  // ── Buckets ──
+  // DNFB tab: native auth holds + inbound WorkLinks targeting Authorization
+  const openInboundWorklinks = worklinks.filter(w =>
+    w.status === "open" && w.targetArea === "Authorization"
+  );
+  const inboundWlAccountIds = new Set(openInboundWorklinks.map(w => w.accountId));
+
+  const dnfbHolds = dnfbScored
+    .filter(a => a.area === "Authorization" && !worked.has(a.id) && !inboundWlAccountIds.has(a.id))
+    .map(a => ({ ...a, _kind: "hold", _holdType: holdTypeLabel(a.holdCode), _ev: a.expectedValue, _aging: a.daysInDNFB || 0 }));
+
+  // Inbound WorkLinks shown in DNFB tab badged "WorkLink in"
+  // Cross-reference each WorkLink to its source account (could be from DNFB or AR side)
+  const inboundCards = openInboundWorklinks.map(w => {
+    const src = dnfbScored.find(a => a.id === w.accountId) || (arScored && arScored.find(a => a.id === w.accountId));
+    if (!src) return null;
+    return {
+      ...src,
+      _kind: "hold",
+      _holdType: "WorkLink in",
+      _wlId: w.id,
+      _wlNote: w.note,
+      _wlSlaDue: w.slaDue,
+      _ev: src.expectedValue || src.amount || 0,
+      _aging: Math.floor((Date.now() - new Date(w.createdAt || Date.now()).getTime()) / 86400000),
+    };
+  }).filter(Boolean);
+
+  const dnfbAccounts = [...dnfbHolds, ...inboundCards];
+
+  // Denials tab: auth-related denials from AR
+  const authDenialCodes = ["CO-15", "CO-197", "CO-B7"];
+  const denialAccounts = (arScored || [])
+    .filter(a => a.denialCode && authDenialCodes.includes(a.denialCode) && !worked.has(a.id))
+    .map(a => ({
+      ...a,
+      _kind: "denial",
+      _denialLabel: denialTypeLabel(a.denialCode),
+      _appealStage: a.appealStage || "Initial review",
+      _ev: a.expectedValue || a.amount * (a.prob || 0.5),
+      _aging: a.daysOut || 0,
+    }));
+
+  // In Flight tab: outbound WorkLinks (sent by anyone, originated by Auth folks)
+  // Plus any items routed away and waiting (peer-to-peer, appeals pending, payer review).
+  // For v1 scaffold, In Flight = outbound WorkLinks from Authorization area + auth accounts that are open WorkLink sources.
+  const outboundWl = worklinks.filter(w =>
+    w.status === "open" && w.sourceArea === "Authorization"
+  );
+  const inFlightAccounts = outboundWl.map(w => {
+    const src = dnfbScored.find(a => a.id === w.accountId) || (arScored && arScored.find(a => a.id === w.accountId));
+    if (!src) return null;
+    return {
+      ...src,
+      _kind: "inflight",
+      _wlId: w.id,
+      _wlTarget: w.targetArea,
+      _wlNote: w.note,
+      _wlSlaDue: w.slaDue,
+      _ev: src.expectedValue || src.amount || 0,
+      _aging: Math.floor((Date.now() - new Date(w.createdAt || Date.now()).getTime()) / 86400000),
+    };
+  }).filter(Boolean);
+
+  // ── At-risk subcounts (TF/appeal) — honest about data gaps ──
+  // Without dateOfDischarge we use days-in-DNFB as a proxy proximity signal.
+  // "At TF risk" here means: aged more than (typical commercial TF window 90d) - TF_RISK_DAYS = 76d.
+  // This is an approximation flagged in the spec; payer-rules table is the real fix.
+  const TF_PROXY_THRESHOLD = 76;
+  const APPEAL_PROXY_THRESHOLD = 30; // commercial appeal window often ~30-60d; warn at 30
+  const dnfbAtRisk = dnfbAccounts.filter(a => a._aging >= TF_PROXY_THRESHOLD).length;
+  const denialAtRisk = denialAccounts.filter(a => a._aging >= APPEAL_PROXY_THRESHOLD).length;
+
+  // ── Dollar tallies ──
+  const dnfbTotal = dnfbAccounts.reduce((s, a) => s + (a.amount || 0), 0);
+  const denialsEV = denialAccounts.reduce((s, a) => s + a._ev, 0);
+
+  // ── Resolution this week (derived from existing worked-state) ──
+  // Real implementation will read state-transition events from the data layer.
+  // For v1 scaffold this is wired to count from the local `worked` Set.
+  const resolvedCount = worked.size;
+  const resolvedDollars = 0; // wired in step 4 (resolution events)
+
+  // ── Filtering ──
+  const applyFilters = (accounts) => {
+    let out = accounts;
+    if (atRiskOnly) {
+      const threshold = activeTab === "dnfb" ? TF_PROXY_THRESHOLD : APPEAL_PROXY_THRESHOLD;
+      out = out.filter(a => a._aging >= threshold);
+    }
+    if (siteFilter) out = out.filter(a => a.site === siteFilter);
+    if (payerFilter) out = out.filter(a => a.payer === payerFilter);
+    return out;
+  };
+
+  const applySort = (accounts) => {
+    if (sortBy === "ev") return [...accounts].sort((a, b) => b._ev - a._ev);
+    if (sortBy === "aging") return [...accounts].sort((a, b) => b._aging - a._aging);
+    if (sortBy === "risk") {
+      // closest to breach first — for in-flight, use SLA due
+      return [...accounts].sort((a, b) => b._aging - a._aging);
+    }
+    return accounts;
+  };
+
+  const visibleAccounts = applySort(applyFilters(
+    activeTab === "dnfb" ? dnfbAccounts :
+    activeTab === "denials" ? denialAccounts :
+    inFlightAccounts
+  ));
+
+  // ── Available filter options (derived from visible data) ──
+  const allSites = [...new Set([...dnfbAccounts, ...denialAccounts].map(a => a.site).filter(Boolean))].sort();
+  const allPayers = [...new Set([...dnfbAccounts, ...denialAccounts].map(a => a.payer).filter(Boolean))].sort();
+
+  // ── Resolution event handlers ──
+  // Wired in step 4. For scaffold: mark worked + close any related WorkLink.
+  const handleResolve = (acc, resolutionType) => {
+    setWorked(prev => new Set([...prev, acc.id]));
+    if (acc._wlId && onResolve) onResolve(acc._wlId);
+  };
+
+  // ── Visual constants (inherit from Design Principles) ──
+  const INK = "#0f172a", MUTE = "#64748b", FAINT = "#94a3b8";
+  const BORDER = "#e2e8f0", DIVIDER = "#f1f5f9";
+  const RED = "#dc2626", AMBER = "#d97706";
+  const RADIUS = 14;
+  const fmt = fmtUSD || ((n) => `$${(n / 1000).toFixed(0)}K`);
+
+  return (
+    <div style={{ maxWidth: 1180, margin: "0 auto", padding: isMobile ? 12 : 20 }}>
+      {/* ── Header strip ── */}
+      <div style={{
+        background: "#fff",
+        border: `1px solid ${BORDER}`,
+        borderRadius: RADIUS,
+        padding: isMobile ? 14 : 18,
+        marginBottom: 16,
+      }}>
+        {/* Top row: title + freshness */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+          <div style={{ fontSize: 18, fontWeight: 600, color: INK }}>Authorization</div>
+          <div style={{ fontSize: 12, color: FAINT }}>as of {new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div>
+        </div>
+
+        {/* Two tallies, never summed */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "1fr auto 1fr",
+          gap: isMobile ? 14 : 0,
+          alignItems: "stretch",
+          marginBottom: 14,
+        }}>
+          {/* DNFB tally */}
+          <div style={{ paddingRight: isMobile ? 0 : 24 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: MUTE, letterSpacing: 0.4, textTransform: "uppercase", marginBottom: 6 }}>DNFB</div>
+            <div style={{ fontSize: 26, fontWeight: 600, color: INK, lineHeight: 1.1 }}>{fmt(dnfbTotal)}</div>
+            <div style={{ fontSize: 13, color: MUTE, marginTop: 4 }}>
+              {dnfbAccounts.length} accounts
+              {dnfbAtRisk > 0 && (
+                <span style={{ color: RED, marginLeft: 8, fontWeight: 500 }}>
+                  · {dnfbAtRisk} at TF risk
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Divider */}
+          {!isMobile && <div style={{ width: 1, background: BORDER }} />}
+
+          {/* Denials tally */}
+          <div style={{ paddingLeft: isMobile ? 0 : 24 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: MUTE, letterSpacing: 0.4, textTransform: "uppercase", marginBottom: 6 }}>Denials (AR)</div>
+            <div style={{ fontSize: 26, fontWeight: 600, color: INK, lineHeight: 1.1 }}>{fmt(denialsEV)}</div>
+            <div style={{ fontSize: 13, color: MUTE, marginTop: 4 }}>
+              {denialAccounts.length} accounts
+              {denialAtRisk > 0 && (
+                <span style={{ color: RED, marginLeft: 8, fontWeight: 500 }}>
+                  · {denialAtRisk} at appeal risk
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Resolution-visibility row (factual, not celebratory) */}
+        <div style={{
+          borderTop: `1px solid ${DIVIDER}`,
+          paddingTop: 12,
+          fontSize: 13,
+          color: MUTE,
+        }}>
+          Resolved this week: <span style={{ color: INK, fontWeight: 500 }}>{resolvedCount}</span> accounts
+          {resolvedDollars > 0 && <span> · <span style={{ color: INK, fontWeight: 500 }}>{fmt(resolvedDollars)}</span> recovered</span>}
+        </div>
+      </div>
+
+      {/* ── Tab strip ── */}
+      <div style={{
+        display: "flex",
+        gap: 4,
+        marginBottom: 16,
+        borderBottom: `1px solid ${BORDER}`,
+      }}>
+        {[
+          { id: "dnfb", label: "DNFB", count: dnfbAccounts.length },
+          { id: "denials", label: "Denials", count: denialAccounts.length },
+          { id: "inflight", label: "In Flight", count: inFlightAccounts.length },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: "10px 16px",
+              background: "none",
+              border: "none",
+              borderBottom: activeTab === tab.id ? `2px solid ${INK}` : "2px solid transparent",
+              color: activeTab === tab.id ? INK : MUTE,
+              fontSize: 14,
+              fontWeight: activeTab === tab.id ? 600 : 500,
+              cursor: "pointer",
+              marginBottom: -1,
+            }}
+          >
+            {tab.label}
+            <span style={{ marginLeft: 6, color: FAINT, fontWeight: 400 }}>{tab.count}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ── Sort + filter controls ── */}
+      <div style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 10,
+        alignItems: "center",
+        marginBottom: 14,
+        fontSize: 13,
+      }}>
+        <span style={{ color: MUTE }}>Sort:</span>
+        {[
+          { id: "ev", label: "EV" },
+          { id: "aging", label: "Aging" },
+          { id: "risk", label: "Risk" },
+        ].map(s => (
+          <button
+            key={s.id}
+            onClick={() => setSortBy(s.id)}
+            style={{
+              padding: "4px 10px",
+              borderRadius: 999,
+              border: `1px solid ${sortBy === s.id ? INK : BORDER}`,
+              background: sortBy === s.id ? INK : "#fff",
+              color: sortBy === s.id ? "#fff" : MUTE,
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: "pointer",
+            }}
+          >
+            {s.label}
+          </button>
+        ))}
+        <span style={{ color: FAINT, margin: "0 6px" }}>·</span>
+        <button
+          onClick={() => setAtRiskOnly(!atRiskOnly)}
+          style={{
+            padding: "4px 10px",
+            borderRadius: 999,
+            border: `1px solid ${atRiskOnly ? RED : BORDER}`,
+            background: atRiskOnly ? RED : "#fff",
+            color: atRiskOnly ? "#fff" : MUTE,
+            fontSize: 12,
+            fontWeight: 500,
+            cursor: "pointer",
+          }}
+        >
+          At-risk only
+        </button>
+        {allSites.length > 1 && (
+          <select
+            value={siteFilter || ""}
+            onChange={e => setSiteFilter(e.target.value || null)}
+            style={{ padding: "4px 8px", borderRadius: 6, border: `1px solid ${BORDER}`, fontSize: 12, color: MUTE }}
+          >
+            <option value="">All sites</option>
+            {allSites.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        )}
+        {allPayers.length > 1 && (
+          <select
+            value={payerFilter || ""}
+            onChange={e => setPayerFilter(e.target.value || null)}
+            style={{ padding: "4px 8px", borderRadius: 6, border: `1px solid ${BORDER}`, fontSize: 12, color: MUTE }}
+          >
+            <option value="">All payers</option>
+            {allPayers.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        )}
+      </div>
+
+      {/* ── Card list ── */}
+      {visibleAccounts.length === 0 ? (
+        <div style={{
+          background: "#fff",
+          border: `1px solid ${BORDER}`,
+          borderRadius: RADIUS,
+          padding: 32,
+          textAlign: "center",
+          color: MUTE,
+        }}>
+          No accounts in this view. Last checked {new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {visibleAccounts.map(acc => (
+            <AuthCard
+              key={acc.id + (acc._wlId || "")}
+              acc={acc}
+              kind={activeTab}
+              onResolve={handleResolve}
+              onWorkLink={onWorkLink}
+              fmt={fmt}
+              tfThreshold={TF_PROXY_THRESHOLD}
+              appealThreshold={APPEAL_PROXY_THRESHOLD}
+              INK={INK} MUTE={MUTE} FAINT={FAINT} BORDER={BORDER} DIVIDER={DIVIDER} RED={RED} AMBER={AMBER} RADIUS={RADIUS}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Map a holdCode to a plain-English hold-type badge for Diane's DNFB cards
+function holdTypeLabel(code) {
+  if (!code) return "Hold";
+  if (code === "AUTH_MISSING") return "Missing auth";
+  if (code === "AUTH_EXPIRED") return "Auth expired";
+  if (code === "AUTH_WRONG") return "Auth-wrong";
+  return code.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Map a denialCode to a plain-English denial-type badge for Diane's Denial cards
+function denialTypeLabel(code) {
+  if (!code) return "Denial";
+  if (code === "CO-15") return "CO-15 No auth";
+  if (code === "CO-197") return "CO-197 Auth absent";
+  if (code === "CO-B7") return "CO-B7 Provider not eligible";
+  return code;
+}
+
+// AuthCard — single card; renders the variant for its tab kind.
+function AuthCard({ acc, kind, onResolve, onWorkLink, fmt, tfThreshold, appealThreshold, INK, MUTE, FAINT, BORDER, DIVIDER, RED, AMBER, RADIUS }) {
+  const isDenial = kind === "denials";
+  const isInflight = kind === "inflight";
+
+  // Aging risk flag
+  const threshold = isDenial ? appealThreshold : tfThreshold;
+  const atRisk = !isInflight && acc._aging >= threshold;
+
+  // Top-right field — different per card variant
+  const topRight = isInflight ? (
+    <div style={{ textAlign: "right" }}>
+      <div style={{ fontSize: 12, color: MUTE }}>Routed to: <span style={{ color: INK, fontWeight: 500 }}>{acc._wlTarget}</span></div>
+      <div style={{ fontSize: 11, color: FAINT, marginTop: 2 }}>{acc._aging}d ago</div>
+    </div>
+  ) : isDenial ? (
+    <div style={{ textAlign: "right" }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: atRisk ? RED : INK }}>
+        {acc._aging}d since action
+      </div>
+      <div style={{ fontSize: 11, color: FAINT, marginTop: 2 }}>Aging proxy · DOD/denial date pending</div>
+    </div>
+  ) : (
+    <div style={{ textAlign: "right" }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: atRisk ? RED : INK }}>
+        {acc._aging}d in DNFB
+      </div>
+      <div style={{ fontSize: 11, color: FAINT, marginTop: 2 }}>Aging proxy · DOD pending</div>
+    </div>
+  );
+
+  // Badge label (top-left)
+  const badgeLabel = isDenial ? acc._denialLabel : acc._holdType || "Auth hold";
+  const badgeColor = atRisk ? RED : MUTE;
+
+  // Next-action line
+  const nextAction = isInflight ? acc._wlNote :
+    isDenial ? `${acc._appealStage} — file appeal with retro-auth + clinical packet` :
+    acc._wlNote || acc.recommendedAction || "Review and submit auth";
+
+  // Primary button label
+  const primaryLabel = isInflight ? "View status" :
+    isDenial ? "File appeal" :
+    acc._holdType === "WorkLink in" ? "Work request" : "Submit auth";
+
+  return (
+    <div style={{
+      background: "#fff",
+      border: `1px solid ${BORDER}`,
+      borderRadius: RADIUS,
+      padding: 16,
+    }}>
+      {/* Region 1: badge + identity (left) — top-right field */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{
+            display: "inline-block",
+            padding: "3px 8px",
+            background: atRisk ? "#fef2f2" : "#f8fafc",
+            color: badgeColor,
+            border: `1px solid ${atRisk ? "#fecaca" : BORDER}`,
+            borderRadius: 6,
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: 0.2,
+            textTransform: "uppercase",
+          }}>{badgeLabel}</span>
+        </div>
+        {topRight}
+      </div>
+
+      {/* Identity row */}
+      <div style={{ fontSize: 14, color: INK, marginTop: 8, fontWeight: 500 }}>
+        {acc.patient || acc.patientName || "Patient"} <span style={{ color: FAINT, fontWeight: 400 }}>· {acc.id}</span>
+      </div>
+      <div style={{ fontSize: 12, color: MUTE, marginTop: 2 }}>
+        {acc.site} · {acc.vertical}
+        {acc.payer && (
+          <span> · Payer: <span style={{ color: INK, fontWeight: 500 }}>{acc.payer}</span></span>
+        )}
+      </div>
+
+      {/* Region 3: state + next action */}
+      <div style={{
+        borderTop: `1px solid ${DIVIDER}`,
+        marginTop: 12,
+        paddingTop: 10,
+        fontSize: 13,
+        color: INK,
+      }}>
+        <span style={{ color: MUTE, fontWeight: 500 }}>Next: </span>
+        {nextAction}
+      </div>
+
+      {/* Region 4: value + currency + action */}
+      <div style={{
+        borderTop: `1px solid ${DIVIDER}`,
+        marginTop: 12,
+        paddingTop: 10,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: 8,
+      }}>
+        <div style={{ fontSize: 12, color: MUTE }}>
+          <span style={{ fontWeight: 600, color: INK }}>{fmt(acc._ev || acc.amount || 0)}</span>
+          {" "}
+          <span style={{
+            display: "inline-block",
+            marginLeft: 6,
+            padding: "1px 6px",
+            background: "#f1f5f9",
+            color: MUTE,
+            borderRadius: 4,
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: 0.4,
+          }}>{isDenial ? "AR" : "DNFB"}</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {!isInflight && (
+            <button
+              onClick={() => onResolve(acc, "primary")}
+              style={{
+                padding: "6px 14px",
+                background: INK,
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: "pointer",
+              }}
+            >{primaryLabel}</button>
+          )}
+          <button
+            style={{
+              padding: "6px 10px",
+              background: "none",
+              color: MUTE,
+              border: "none",
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >More ↓</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Light Recipient View ─────────────────────────────────────────────────────
 // Low-frequency recipients (physicians, credentialing) get NO work-generating queue —
 // just a lightweight "WorkLinks waiting on you" list with one-tap status. Easier than email.
@@ -4536,16 +5073,30 @@ Keep every item to one line. Limit pointers to 2-3.`;
             )}
           </div>
         </div>
-        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "8px 16px" : "10px 32px", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>{roleConfig.label}</span>
-          <span style={{ fontSize: 11, color: "#94a3b8" }}>DNFB holds + WorkLink requests · sorted by expected value</span>
-          {worklinks.filter(w => w.targetArea === roleConfig.area && w.status === "open").length > 0 && (
-            <span style={{ background: "#0369a1", color: "#fff", borderRadius: 10, padding: "1px 8px", fontSize: 10, fontWeight: 700 }}>
-              {worklinks.filter(w => w.targetArea === roleConfig.area && w.status === "open").length} WorkLink
-            </span>
-          )}
-        </div>
-        <AreaWorklist area={roleConfig.area} dnfbScored={dnfbForRole} worklinks={worklinks} onResolve={handleResolveWorklink} onReturn={handleReturnWorklink} onWorkLink={handleSendWorklink} />
+        {roleConfig.area !== "Authorization" && (
+          <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "8px 16px" : "10px 32px", display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>{roleConfig.label}</span>
+            <span style={{ fontSize: 11, color: "#94a3b8" }}>DNFB holds + WorkLink requests · sorted by expected value</span>
+            {worklinks.filter(w => w.targetArea === roleConfig.area && w.status === "open").length > 0 && (
+              <span style={{ background: "#0369a1", color: "#fff", borderRadius: 10, padding: "1px 8px", fontSize: 10, fontWeight: 700 }}>
+                {worklinks.filter(w => w.targetArea === roleConfig.area && w.status === "open").length} WorkLink
+              </span>
+            )}
+          </div>
+        )}
+        {roleConfig.area === "Authorization" ? (
+          <AuthWorklist
+            dnfbScored={dnfbForRole}
+            arScored={arForRole}
+            worklinks={worklinks}
+            onResolve={handleResolveWorklink}
+            onReturn={handleReturnWorklink}
+            onWorkLink={handleSendWorklink}
+            fmtUSD={fmt}
+          />
+        ) : (
+          <AreaWorklist area={roleConfig.area} dnfbScored={dnfbForRole} worklinks={worklinks} onResolve={handleResolveWorklink} onReturn={handleReturnWorklink} onWorkLink={handleSendWorklink} />
+        )}
         <div style={{ borderTop: "1px solid #e2e8f0", padding: isMobile ? "12px 16px" : "14px 32px", display: "flex", justifyContent: "space-between", fontSize: 10, color: "#cbd5e1" }}>
           <span>D4 Consulting Group — Proprietary</span>
           {!isMobile && <span>WIP Intelligence Platform v2.1 · Human-in-the-loop · Phase 1 Internal</span>}
