@@ -5077,6 +5077,15 @@ Keep every item to one line. Limit pointers to 2-3.`;
               );
             })()}
 
+            {/* ── KPI DETAIL: config-driven from cfo-kpis.json (four documented groups).
+                Built KPIs compute live from AR data; Phase 2 render as designed placeholders. */}
+            <div id="detail-kpi-groups" style={{ scrollMarginTop: 80 }} />
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8", margin: "20px 0 4px 4px" }}>KPI detail</div>
+            <div style={{ fontSize: 11, color: "#64748b", margin: "0 0 14px 4px" }}>Complete financial picture · live metrics compute from current AR · Phase 2 metrics light up as data feeds connect</div>
+            {CFO_KPIS.groups.map(group => (
+              <KpiGroup key={group.id} group={group} isMobile={isMobile}
+                computeArgs={{ ar: arFiltered, siteNpr: SITE_NPR, siteFilter, fmtUSD: fmt }} />
+            ))}
             {/* ── group: IN MOTION (WIP inventory + WorkLink rework) ── */}
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b", margin: "8px 0 12px 4px" }}>In motion</div>
             <div id="detail-wip" style={{ scrollMarginTop: 80 }} />
@@ -5140,15 +5149,6 @@ Keep every item to one line. Limit pointers to 2-3.`;
             </div>
             {/* WorkLink — rework in flight on the WIP inventory above (same In motion group) */}
             <WorkLinkReporting worklinks={worklinks} isMobile={isMobile} />
-            {/* ── KPI DETAIL: config-driven from cfo-kpis.json (four documented groups).
-                Built KPIs compute live from AR data; Phase 2 render as designed placeholders. */}
-            <div id="detail-kpi-groups" style={{ scrollMarginTop: 80 }} />
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8", margin: "20px 0 4px 4px" }}>KPI detail</div>
-            <div style={{ fontSize: 11, color: "#64748b", margin: "0 0 14px 4px" }}>Complete financial picture · live metrics compute from current AR · Phase 2 metrics light up as data feeds connect</div>
-            {CFO_KPIS.groups.map(group => (
-              <KpiGroup key={group.id} group={group} isMobile={isMobile}
-                computeArgs={{ ar: arFiltered, siteNpr: SITE_NPR, siteFilter, fmtUSD: fmt }} />
-            ))}
 
             </>)}
           </div>
