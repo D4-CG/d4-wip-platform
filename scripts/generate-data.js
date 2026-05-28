@@ -31,6 +31,21 @@ const weightedPick = (entries) => {
 const SITES = Array.from({ length: 12 }, (_, i) => `Site ${i + 1}`);
 const VERTICALS = ["Behavioral Health","Cardiology","Dental","Emergency","Home Health","Hospice","Infusion","Laboratory","Ophthalmology","Orthopedics","Outpatient Surgery","Primary Care","Radiology","Urology"];
 
+// Verticals whose claims are facility/stay-based, where DISCHARGE is later than the
+// first service date. For these, the timely-filing clock legally starts at discharge.
+// Encounter-based verticals (everything else) discharge same-day => discharge == service date.
+const STAY_VERTICALS = new Set(["Behavioral Health","Emergency","Home Health","Hospice","Infusion","Outpatient Surgery"]);
+// Length-of-stay (days from service/admit to discharge) for stay verticals.
+function stayLengthDays(vertical) {
+  if (!STAY_VERTICALS.has(vertical)) return 0;            // encounter-based: discharge == service
+  if (vertical === "Emergency") return randint(0, 2);     // ED: same-day to short obs
+  if (vertical === "Outpatient Surgery") return randint(0, 1);
+  if (vertical === "Infusion") return randint(0, 1);
+  if (vertical === "Home Health" || vertical === "Hospice") return randint(5, 30); // episodic
+  if (vertical === "Behavioral Health") return randint(2, 10);
+  return randint(1, 4);
+}
+
 // payer => contractual haircut range [min,max] off gross to get expected allowed (net)
 const PAYERS = [
   ["Medicare", 0.55, 0.62, 14],
@@ -141,6 +156,20 @@ for (let i = 1; i <= AR_COUNT; i++) {
   const contractual = gross - net;
   const daysOut = daysOutForSite(profile);
   const denial = denialForSite(profile);
+  const vertical = pick(VERTICALS);
+  // serviceDate: first date of service (claim clock anchor for encounter claims).
+  const serviceDaysAgo = daysOut + randint(2, 10);
+  const serviceDate = isoDaysAgo(serviceDaysAgo);
+  // dischargeDate: for stay verticals, later than service by the length of stay;
+  // for encounter verticals, identical to service date. This is the timely-filing
+  // clock anchor for INITIAL SUBMISSION (facility claims file from discharge).
+  const los = stayLengthDays(vertical);
+  const dischargeDate = los > 0 ? isoDaysAgo(Math.max(1, serviceDaysAgo - los)) : serviceDate;
+  // denialDate: only present when the claim was actually denied. The claim is
+  // submitted, sits at the payer, then is adjudicated-denied somewhere between
+  // service and today. This is the timely-filing clock anchor for the APPEAL window.
+  // Placed in the back half of the time the account has been outstanding.
+  const denialDate = denial ? isoDaysAgo(randint(1, Math.max(1, Math.floor(daysOut * 0.6)))) : null;
   ar.push({
     id: `AR-${String(i).padStart(5, "0")}`,
     patient: name(),
@@ -149,11 +178,13 @@ for (let i = 1; i <= AR_COUNT; i++) {
     contractualAdjustment: contractual,
     amount: net,                       // net = expected reimbursement / balance
     daysOut,
-    serviceDate: isoDaysAgo(daysOut + randint(2, 10)),
+    serviceDate,
+    dischargeDate,                     // initial-submission TF clock anchor
     lastContact: isoDaysAgo(randint(0, Math.min(daysOut, 60))),
     denialCode: denial,
+    denialDate,                        // appeal-window TF clock anchor (null if not denied)
     site,
-    vertical: pick(VERTICALS),
+    vertical,
     claimStatus: denial ? "Adjudicated — Denied" : pick(AR_CLAIM_STATUS),
   });
 }
@@ -167,17 +198,23 @@ for (let i = 1; i <= DNFB_COUNT; i++) {
   const gross = bimodalNet();
   const grossInflated = Math.round(gross * (1 + rand() * 0.8)); // gross is higher than net-equivalent
   const daysInDNFB = weightedPick([[randint(1, 3), 38], [randint(4, 5), 18], [randint(6, 12), 28], [randint(13, 30), 16]]);
+  const vertical = pick(VERTICALS);
+  const serviceDaysAgo = daysInDNFB + randint(1, 5);
+  const serviceDate = isoDaysAgo(serviceDaysAgo);
+  const los = stayLengthDays(vertical);
+  const dischargeDate = los > 0 ? isoDaysAgo(Math.max(1, serviceDaysAgo - los)) : serviceDate;
   dnfb.push({
     id: `DNFB-${String(i).padStart(5, "0")}`,
     patient: name(),
     payer,
     amount: grossInflated,             // DNFB amount = gross charges
     daysInDNFB,
-    serviceDate: isoDaysAgo(daysInDNFB + randint(1, 5)),
+    serviceDate,
+    dischargeDate,                     // initial-submission TF clock anchor (pre-bill; no denialDate yet)
     lastContact: isoDaysAgo(randint(0, daysInDNFB)),
     holdCode: pick(DNFB_HOLDS),
     site: pickSite(),
-    vertical: pick(VERTICALS),
+    vertical,
   });
 }
 
@@ -238,3 +275,18 @@ console.log("=== DNFB ===");
 console.log("Count:", dnfb.length);
 console.log("Gross charges: $" + dnfbGross.toLocaleString());
 console.log("Avg days in DNFB:", avgDaysDNFB);
+
+// ---- New date-field checks ----
+const arDenied = ar.filter(a => a.denialCode);
+const arDeniedWithDate = arDenied.filter(a => a.denialDate);
+const arNoDenialNoDate = ar.filter(a => !a.denialCode && a.denialDate === null);
+const arDischargeAfterService = ar.filter(a => a.dischargeDate > a.serviceDate).length;
+const arDischargeEqService = ar.filter(a => a.dischargeDate === a.serviceDate).length;
+console.log("");
+console.log("=== DATE FIELDS ===");
+console.log("AR denied accounts:", arDenied.length, "| of those with denialDate:", arDeniedWithDate.length, arDenied.length === arDeniedWithDate.length ? "(all denied have a denialDate ✓)" : "(MISMATCH)");
+console.log("AR non-denied with null denialDate:", arNoDenialNoDate.length, "of", ar.length - arDenied.length, "non-denied", (arNoDenialNoDate.length === ar.length - arDenied.length) ? "✓" : "(MISMATCH)");
+console.log("AR dischargeDate > serviceDate (stay verticals):", arDischargeAfterService);
+console.log("AR dischargeDate == serviceDate (encounter verticals):", arDischargeEqService);
+console.log("Sample denied AR:", JSON.stringify((arDeniedWithDate[0] && { id: arDeniedWithDate[0].id, vertical: arDeniedWithDate[0].vertical, serviceDate: arDeniedWithDate[0].serviceDate, dischargeDate: arDeniedWithDate[0].dischargeDate, denialCode: arDeniedWithDate[0].denialCode, denialDate: arDeniedWithDate[0].denialDate })));
+console.log("Sample DNFB:", JSON.stringify((dnfb[0] && { id: dnfb[0].id, vertical: dnfb[0].vertical, serviceDate: dnfb[0].serviceDate, dischargeDate: dnfb[0].dischargeDate })));
