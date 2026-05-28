@@ -34,16 +34,21 @@ const VERTICALS = ["Behavioral Health","Cardiology","Dental","Emergency","Home H
 // Verticals whose claims are facility/stay-based, where DISCHARGE is later than the
 // first service date. For these, the timely-filing clock legally starts at discharge.
 // Encounter-based verticals (everything else) discharge same-day => discharge == service date.
-const STAY_VERTICALS = new Set(["Behavioral Health","Emergency","Home Health","Hospice","Infusion","Outpatient Surgery"]);
-// Length-of-stay (days from service/admit to discharge) for stay verticals.
+//
+// DETERMINISTIC: length-of-stay is a FIXED value per vertical, not a random draw.
+// This is intentional — the dates must be reproducible and must NOT perturb the
+// seeded RNG stream that generates payer/site/amount/aging. Adding rand() calls here
+// would shift every subsequent draw and change the whole dataset. So: no rand() below.
+const STAY_LOS = {
+  "Emergency": 1,           // ED: short obs
+  "Outpatient Surgery": 1,
+  "Infusion": 1,
+  "Home Health": 14,        // episodic
+  "Hospice": 14,            // episodic
+  "Behavioral Health": 5,
+};
 function stayLengthDays(vertical) {
-  if (!STAY_VERTICALS.has(vertical)) return 0;            // encounter-based: discharge == service
-  if (vertical === "Emergency") return randint(0, 2);     // ED: same-day to short obs
-  if (vertical === "Outpatient Surgery") return randint(0, 1);
-  if (vertical === "Infusion") return randint(0, 1);
-  if (vertical === "Home Health" || vertical === "Hospice") return randint(5, 30); // episodic
-  if (vertical === "Behavioral Health") return randint(2, 10);
-  return randint(1, 4);
+  return STAY_LOS[vertical] || 0;   // 0 => encounter-based, discharge == service date
 }
 
 // payer => contractual haircut range [min,max] off gross to get expected allowed (net)
@@ -156,37 +161,32 @@ for (let i = 1; i <= AR_COUNT; i++) {
   const contractual = gross - net;
   const daysOut = daysOutForSite(profile);
   const denial = denialForSite(profile);
-  const vertical = pick(VERTICALS);
-  // serviceDate: first date of service (claim clock anchor for encounter claims).
-  const serviceDaysAgo = daysOut + randint(2, 10);
-  const serviceDate = isoDaysAgo(serviceDaysAgo);
-  // dischargeDate: for stay verticals, later than service by the length of stay;
-  // for encounter verticals, identical to service date. This is the timely-filing
-  // clock anchor for INITIAL SUBMISSION (facility claims file from discharge).
-  const los = stayLengthDays(vertical);
-  const dischargeDate = los > 0 ? isoDaysAgo(Math.max(1, serviceDaysAgo - los)) : serviceDate;
-  // denialDate: only present when the claim was actually denied. The claim is
-  // submitted, sits at the payer, then is adjudicated-denied somewhere between
-  // service and today. This is the timely-filing clock anchor for the APPEAL window.
-  // Placed in the back half of the time the account has been outstanding.
-  const denialDate = denial ? isoDaysAgo(randint(1, Math.max(1, Math.floor(daysOut * 0.6)))) : null;
-  ar.push({
+  // Build the account with all RANDOM draws in their ORIGINAL order/positions, so the
+  // seeded stream is byte-for-byte identical to the pre-date-fields generator.
+  // CRITICAL: property expressions evaluate top-to-bottom, so patient:name() must draw
+  // BEFORE serviceDate's randint, exactly as in the original.
+  let serviceDaysAgo;
+  const acc = {
     id: `AR-${String(i).padStart(5, "0")}`,
-    patient: name(),
+    patient: name(),                                 // ORIGINAL draw (1st in push)
     payer,
     grossCharges: gross,
     contractualAdjustment: contractual,
-    amount: net,                       // net = expected reimbursement / balance
+    amount: net,
     daysOut,
-    serviceDate,
-    dischargeDate,                     // initial-submission TF clock anchor
-    lastContact: isoDaysAgo(randint(0, Math.min(daysOut, 60))),
+    serviceDate: isoDaysAgo(serviceDaysAgo = daysOut + randint(2, 10)),  // ORIGINAL draw (2nd)
+    lastContact: isoDaysAgo(randint(0, Math.min(daysOut, 60))),          // ORIGINAL draw (3rd)
     denialCode: denial,
-    denialDate,                        // appeal-window TF clock anchor (null if not denied)
     site,
-    vertical,
-    claimStatus: denial ? "Adjudicated — Denied" : pick(AR_CLAIM_STATUS),
-  });
+    vertical: pick(VERTICALS),                       // ORIGINAL draw (4th)
+    claimStatus: denial ? "Adjudicated — Denied" : pick(AR_CLAIM_STATUS),  // ORIGINAL draw (5th, denied only)
+  };
+  // DETERMINISTIC date fields — computed from already-drawn values, NO rand() calls,
+  // so the stream is untouched and the original dataset reproduces exactly.
+  const los = stayLengthDays(acc.vertical);
+  acc.dischargeDate = los > 0 ? isoDaysAgo(Math.max(1, serviceDaysAgo - los)) : acc.serviceDate;  // initial-submission TF anchor
+  acc.denialDate = denial ? isoDaysAgo(Math.max(1, Math.floor(daysOut * 0.4))) : null;            // appeal-window TF anchor
+  ar.push(acc);
 }
 
 function pickPayer2() { /* unused */ }
@@ -198,24 +198,23 @@ for (let i = 1; i <= DNFB_COUNT; i++) {
   const gross = bimodalNet();
   const grossInflated = Math.round(gross * (1 + rand() * 0.8)); // gross is higher than net-equivalent
   const daysInDNFB = weightedPick([[randint(1, 3), 38], [randint(4, 5), 18], [randint(6, 12), 28], [randint(13, 30), 16]]);
-  const vertical = pick(VERTICALS);
-  const serviceDaysAgo = daysInDNFB + randint(1, 5);
-  const serviceDate = isoDaysAgo(serviceDaysAgo);
-  const los = stayLengthDays(vertical);
-  const dischargeDate = los > 0 ? isoDaysAgo(Math.max(1, serviceDaysAgo - los)) : serviceDate;
-  dnfb.push({
+  let dnfbServiceDaysAgo;
+  const d = {
     id: `DNFB-${String(i).padStart(5, "0")}`,
-    patient: name(),
+    patient: name(),                                              // ORIGINAL draw
     payer,
-    amount: grossInflated,             // DNFB amount = gross charges
+    amount: grossInflated,                                        // DNFB amount = gross charges
     daysInDNFB,
-    serviceDate,
-    dischargeDate,                     // initial-submission TF clock anchor (pre-bill; no denialDate yet)
-    lastContact: isoDaysAgo(randint(0, daysInDNFB)),
-    holdCode: pick(DNFB_HOLDS),
-    site: pickSite(),
-    vertical,
-  });
+    serviceDate: isoDaysAgo(dnfbServiceDaysAgo = daysInDNFB + randint(1, 5)),  // ORIGINAL draw
+    lastContact: isoDaysAgo(randint(0, daysInDNFB)),              // ORIGINAL draw
+    holdCode: pick(DNFB_HOLDS),                                   // ORIGINAL draw
+    site: pickSite(),                                             // ORIGINAL draw
+    vertical: pick(VERTICALS),                                    // ORIGINAL draw
+  };
+  // DETERMINISTIC discharge date — no rand(), stream untouched. Pre-bill: no denialDate.
+  const dlos = stayLengthDays(d.vertical);
+  d.dischargeDate = dlos > 0 ? isoDaysAgo(Math.max(1, dnfbServiceDaysAgo - dlos)) : d.serviceDate;
+  dnfb.push(d);
 }
 
 // ---- Fixed annual NPR per site (as if pulled from the accounting system) ----
