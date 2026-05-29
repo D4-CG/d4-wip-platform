@@ -45,6 +45,73 @@ const PAYER_BASELINES = {
   "Worker Comp": 40, "Workers Comp": 40, "Workers Compensation": 40,
 };
 
+// ─── Payer Rules Table: TF + Appeal windows ───────────────────────────────────
+// Replaces the prior hardcoded 120d TF assumption (CollectorView urgencyFactor).
+// Drives the binding clock on every account: AR uses Appeal TF (post-denial),
+// DNFB uses Submission TF (pre-billing). When neither rule exists for a payer,
+// _default applies (conservative 180d submission / 90d appeal).
+//
+// BCBS federation note: BCBS plans vary 60-730d depending on the regional
+// licensee (Anthem, Highmark, Independence BC, Carefirst, Regence, Premera,
+// Federal, etc.). The values below use a single representative window for the
+// catch-all "Blue Cross" / "Blue Shield" / "BCBS" strings. Production should
+// override per-account from the eligibility/cards source of truth.
+//
+// Aetna appeal 60d and UHC appeal 90d reflect current code state. Canon docs
+// the audit findings (some Aetna plans use 180d; some UHC plans use 65d) but
+// values stay as-is pending payer-by-payer verification with the source data.
+// Refs: Payer Rules Table module (Notion canon).
+const PAYER_RULES = {
+  "Aetna":              { submissionTfDays: 120, appealTfDays: 60,  label: "Aetna" },
+  "Aetna Better Health":{ submissionTfDays: 120, appealTfDays: 60,  label: "Aetna" },
+  "CVS Aetna":          { submissionTfDays: 120, appealTfDays: 60,  label: "Aetna" },
+  "Blue Cross":         { submissionTfDays: 180, appealTfDays: 180, label: "BCBS" },
+  "Blue Shield":        { submissionTfDays: 180, appealTfDays: 180, label: "BCBS" },
+  "BCBS":               { submissionTfDays: 180, appealTfDays: 180, label: "BCBS" },
+  "Blue Cross Blue Shield": { submissionTfDays: 180, appealTfDays: 180, label: "BCBS" },
+  "Anthem":             { submissionTfDays: 180, appealTfDays: 180, label: "Anthem" },
+  "Anthem BCBS":        { submissionTfDays: 180, appealTfDays: 180, label: "Anthem" },
+  "Highmark":           { submissionTfDays: 180, appealTfDays: 180, label: "Highmark" },
+  "Carefirst":          { submissionTfDays: 180, appealTfDays: 180, label: "Carefirst" },
+  "Independence Blue Cross": { submissionTfDays: 180, appealTfDays: 180, label: "Independence BC" },
+  "Regence":            { submissionTfDays: 180, appealTfDays: 180, label: "Regence" },
+  "Premera":            { submissionTfDays: 180, appealTfDays: 180, label: "Premera" },
+  "Cigna":              { submissionTfDays: 90,  appealTfDays: 180, label: "Cigna" },
+  "Cigna Behavioral":   { submissionTfDays: 90,  appealTfDays: 180, label: "Cigna" },
+  "Evernorth":          { submissionTfDays: 90,  appealTfDays: 180, label: "Cigna" },
+  "Humana":             { submissionTfDays: 180, appealTfDays: 180, label: "Humana" },
+  "Humana Medicare":    { submissionTfDays: 365, appealTfDays: 60,  label: "Humana MA" },
+  "United Health":      { submissionTfDays: 90,  appealTfDays: 90,  label: "UnitedHealthcare" },
+  "UnitedHealthcare":   { submissionTfDays: 90,  appealTfDays: 90,  label: "UnitedHealthcare" },
+  "UHC":                { submissionTfDays: 90,  appealTfDays: 90,  label: "UnitedHealthcare" },
+  "United Healthcare":  { submissionTfDays: 90,  appealTfDays: 90,  label: "UnitedHealthcare" },
+  "United Community Plan": { submissionTfDays: 90, appealTfDays: 90, label: "UHC Community" },
+  "Optum":              { submissionTfDays: 90,  appealTfDays: 90,  label: "Optum/UHC" },
+  "Medicare":           { submissionTfDays: 365, appealTfDays: 120, label: "Medicare" },
+  "Medicare Part B":    { submissionTfDays: 365, appealTfDays: 120, label: "Medicare Part B" },
+  "Medicare Advantage": { submissionTfDays: 365, appealTfDays: 60,  label: "Medicare Advantage" },
+  "Medicaid":           { submissionTfDays: 95,  appealTfDays: 90,  label: "Medicaid" },
+  "Molina Healthcare":  { submissionTfDays: 95,  appealTfDays: 90,  label: "Molina Medicaid" },
+  "Centene":            { submissionTfDays: 95,  appealTfDays: 90,  label: "Centene Medicaid" },
+  "WellCare":           { submissionTfDays: 95,  appealTfDays: 90,  label: "WellCare Medicaid" },
+  "Centene / WellCare": { submissionTfDays: 95,  appealTfDays: 90,  label: "Centene Medicaid" },
+  "AmeriHealth Caritas":{ submissionTfDays: 95,  appealTfDays: 90,  label: "AmeriHealth Medicaid" },
+  "Buckeye Health Plan":{ submissionTfDays: 95,  appealTfDays: 90,  label: "Buckeye Medicaid" },
+  "Magellan":           { submissionTfDays: 90,  appealTfDays: 90,  label: "Magellan" },
+  "Beacon Health":      { submissionTfDays: 90,  appealTfDays: 90,  label: "Beacon" },
+  "Worker Comp":        { submissionTfDays: 180, appealTfDays: 180, label: "Worker Comp" },
+  "Workers Comp":       { submissionTfDays: 180, appealTfDays: 180, label: "Worker Comp" },
+  "Workers Compensation":{ submissionTfDays: 180, appealTfDays: 180, label: "Worker Comp" },
+  "Tricare":            { submissionTfDays: 365, appealTfDays: 90,  label: "Tricare" },
+  "VA":                 { submissionTfDays: 365, appealTfDays: 90,  label: "VA" },
+  "CHAMPVA":            { submissionTfDays: 365, appealTfDays: 90,  label: "CHAMPVA" },
+  "_default":           { submissionTfDays: 180, appealTfDays: 90,  label: "Default" },
+};
+
+function getPayerRule(payer) {
+  return PAYER_RULES[payer] || PAYER_RULES._default;
+}
+
 const HOLD_CONFIG = {
   CODING_UNASSIGNED:  { area: "Coding",           color: "#6d28d9", label: "Coding — unassigned",          adj: -8,  severity: "URGENT" },
   CODING_COMPLEX:     { area: "Coding",           color: "#6d28d9", label: "Coding — complex hold",         adj: -12, severity: "MODERATE" },
@@ -546,7 +613,47 @@ function score(acc, type) {
   prob = Math.max(5, Math.min(98, prob));
   const expectedValue = Math.round(prob / 100 * acc.amount);
   const daysOut = type === "dnfb" ? acc.daysInDNFB : acc.daysOut;
-  return { ...acc, type, prob, expectedValue, cfg, area: cfg.area, action: getAction({ ...acc, holdCode, prob, daysOut }), daysOut };
+
+  // ─── Session 2: Derived TF clock + canonical Carlos-shape fields ───────────
+  // AR (post-denial): Appeal TF is the binding clock. Submission TF doesn't
+  // apply — claim was already submitted (that's why it's in AR). denialDate
+  // derived from daysOut (which measures days since the denial event for AR).
+  // DNFB (pre-billing): Submission TF is the binding clock. dateOfService
+  // derived from daysInDNFB (which measures days since service for unbilled).
+  // Both clocks use the payer-driven PAYER_RULES table.
+  const rule = getPayerRule(acc.payer);
+  const todayMs = Date.now();
+  let derived = { payerRule: rule };
+  if (type === "ar") {
+    const denialMs = todayMs - daysOut * 86400000;
+    const appealCloseMs = denialMs + rule.appealTfDays * 86400000;
+    derived = {
+      ...derived,
+      denialDate: new Date(denialMs).toISOString().slice(0, 10),
+      issues: [{ code: acc.denialCode || "PENDING", label: cfg.label, primary: true }],
+      notes: [],
+      bindingClock: "appeal_tf",
+      bindingLabel: `${rule.label} appeal TF`,
+      bindingCloseDate: new Date(appealCloseMs).toISOString().slice(0, 10),
+      appealTfRemaining: rule.appealTfDays - daysOut,
+      appealTfCloseDate: new Date(appealCloseMs).toISOString().slice(0, 10),
+    };
+  } else if (type === "dnfb") {
+    const dosMs = todayMs - (acc.daysInDNFB || 0) * 86400000;
+    const subCloseMs = dosMs + rule.submissionTfDays * 86400000;
+    derived = {
+      ...derived,
+      dateOfService: new Date(dosMs).toISOString().slice(0, 10),
+      notes: [],
+      bindingClock: "submission_tf",
+      bindingLabel: `${rule.label} submission TF`,
+      bindingCloseDate: new Date(subCloseMs).toISOString().slice(0, 10),
+      submissionTfRemaining: rule.submissionTfDays - (acc.daysInDNFB || 0),
+      submissionTfCloseDate: new Date(subCloseMs).toISOString().slice(0, 10),
+    };
+  }
+
+  return { ...acc, type, prob, expectedValue, cfg, area: cfg.area, action: getAction({ ...acc, holdCode, prob, daysOut }), daysOut, ...derived };
 }
 
 function ProbCircle({ prob, payer }) {
@@ -2855,9 +2962,11 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
   const openWorklinkIds = new Set(worklinks.filter(w => w.status === "open").map(w => w.accountId));
   const workedIds = new Set(workedAccounts.map(w => w.id));
 
-  // Triage urgency factor — exponential as timely filing approaches
+  // Triage urgency factor — exponential as the binding clock (Appeal TF for AR)
+  // approaches close. Uses the payer-driven appealTfRemaining derived in
+  // score() (Session 2). Falls back to 120d assumption defensively.
   const urgencyFactor = (acc) => {
-    const daysToFiling = 120 - (acc.daysOut || 0); // assume 120d timely filing window
+    const daysToFiling = acc.appealTfRemaining ?? (120 - (acc.daysOut || 0));
     if (daysToFiling < 0) return 0.1; // past filing — de-prioritize
     if (daysToFiling < 3) return 10.0;
     if (daysToFiling < 7) return 5.0;
@@ -2865,7 +2974,7 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
     return 1.0;
   };
 
-  const hasFiling = arScored.some(a => (120 - (a.daysOut || 0)) < 14);
+  const hasFiling = arScored.some(a => (a.appealTfRemaining ?? (120 - (a.daysOut || 0))) < 14);
 
   const [collectorSiteFilter, setCollectorSiteFilter] = useState(null);
 
