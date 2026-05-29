@@ -2850,28 +2850,67 @@ function WorkLinkSuppressedPanel({ suppressed }) {
   );
 }
 
-function CollectorAccountCard({ acc, onLog, onWorkLink }) {
+function CollectorAccountCard({ acc, onLog, onWorkLink, sentWorklinks = [] }) {
   const [approved, setApproved] = useState(false);
   const [outcome, setOutcome] = useState("");
   const [overriding, setOverriding] = useState(false);
   const [overrideAction, setOverrideAction] = useState(null);
+  const [otherActionText, setOtherActionText] = useState("");
+  const [otherMode, setOtherMode] = useState(false);
+  const [fieldValue, setFieldValue] = useState("");
+  const [noteReady, setNoteReady] = useState(null);
   const [showWorkLink, setShowWorkLink] = useState(false);
   const [worklinkSent, setWorklinkSent] = useState(false);
-  const sev = SEV[acc.cfg.severity];
 
-  const [noteReady, setNoteReady] = useState(null);
+  const sev = SEV[acc.cfg.severity];
+  const tf = acc.appealTfRemaining;
+  const tfColor = tf == null ? "#64748b" : tf < 0 ? "#64748b" : tf < 3 ? "#dc2626" : tf < 14 ? "#d97706" : tf < 30 ? "#0369a1" : "#16a34a";
+  const tfText = tf == null ? null : tf < 0 ? `${acc.bindingLabel}: CLOSED (${Math.abs(tf)}d past)` : `${acc.bindingLabel}: ${tf}d remaining`;
+
+  const os = outcome ? OUTCOME_STATUSES.find(o => o.value === outcome) : null;
+  const fieldRequired = !!os?.requiresField;
+  const fieldValid = !fieldRequired || fieldValue.trim().length > 0;
+  const noteCharsRequired = os?.requiresNoteChars || 0;
+  const noteCharsCount = noteReady && noteReady !== "__SKIPPED__" ? noteReady.length : 0;
+  const noteCharsValid = noteCharsCount >= noteCharsRequired;
+  const canLog = outcome && noteReady !== null && fieldValid && noteCharsValid;
 
   const handleLog = () => {
-    if (!outcome) return;
-    const os = OUTCOME_STATUSES.find(o => o.value === outcome);
+    if (!canLog || !os) return;
     onLog({
       id: acc.id, patient: acc.patient, amount: acc.amount,
       expectedValue: acc.expectedValue, outcome, outcomeLabel: os.label,
       followUpDate: os.pending ? "Pending CFO" : addBusinessDays(os.followUpDays),
       workNote: noteReady === "__SKIPPED__" ? null : noteReady,
-      overrideAction: overrideAction,
+      overrideAction: otherMode ? `Other: ${otherActionText}` : overrideAction,
+      structuredField: fieldRequired ? { name: os.requiresField, label: os.requiresFieldLabel, value: fieldValue.trim() } : null,
       timestamp: new Date(),
     });
+    // Outcomes with triggersWL → emit outbound WL
+    if (os.triggersWL && onWorkLink) {
+      const reqType = os.triggersWL === "escalate_lead" ? "escalate_collections_lead" : os.triggersWL;
+      const reqDef = WORKLINK_REQUEST_TYPES.find(t => t.value === reqType);
+      if (reqDef) {
+        onWorkLink({
+          id: `WL-OUT-${Date.now()}-${acc.id}`,
+          accountId: acc.id, patient: acc.patient, payer: acc.payer,
+          vertical: acc.vertical, site: acc.site,
+          amount: acc.amount, expectedValue: acc.expectedValue,
+          originType: "AR", sourceArea: "Collections", sourceRole: "commercial_collector",
+          from: { name: "Collector", role: "Collector" },
+          requestType: reqType, requestLabel: reqDef.label, requestIcon: reqDef.icon,
+          targetRole: reqDef.targetRole || null, targetArea: reqDef.targetArea || null,
+          note: noteReady === "__SKIPPED__" ? `${os.label} via outcome log` : noteReady,
+          status: "open",
+          sentAt: new Date(),
+          slaHrs: WORKLINK_REQUEST_SLA_HRS[reqType] || 48,
+          slaDue: new Date(Date.now() + (WORKLINK_REQUEST_SLA_HRS[reqType] || 48) * 3600 * 1000),
+          slaSeverity: "MODERATE", slaTier: "medium",
+          slaLabel: `${WORKLINK_REQUEST_SLA_HRS[reqType] || 48}h`,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
   };
 
   return (
@@ -2883,10 +2922,11 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
             <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
               <span style={{ fontSize: 10, fontWeight: 600, background: sev.bg, color: sev.text, border: `1px solid ${sev.border}`, padding: "2px 8px", borderRadius: 4 }}>{acc.cfg.severity}</span>
               <span style={{ fontSize: 10, fontWeight: 600, background: acc.cfg.color + "12", color: acc.cfg.color, border: `1px solid ${acc.cfg.color}30`, padding: "2px 8px", borderRadius: 4 }}>{acc.area === 'Collections' ? acc.cfg.label.split(' — ')[0].toUpperCase() : acc.area.toUpperCase()}</span>
+              {tfText && (
+                <span style={{ fontSize: 10, fontWeight: 600, background: tfColor + "12", color: tfColor, border: `1px solid ${tfColor}40`, padding: "2px 8px", borderRadius: 4 }}>⏱ {tfText}</span>
+              )}
             </div>
-            {/* Patient name — heavy anchor */}
             <div style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", marginBottom: 4, letterSpacing: "-0.01em" }}>{acc.patient}</div>
-            {/* Account metadata — lighter, smaller */}
             <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6 }}>{acc.id} · {acc.site} · {acc.vertical}</div>
             <div style={{ fontSize: 12, color: "#475569", fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}>
               {acc.payer}{acc.subPayer ? <span style={{ color: "#94a3b8", fontWeight: 400 }}> — {acc.subPayer}</span> : ""}
@@ -2896,44 +2936,53 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
               )}
             </div>
             <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{acc.cfg.label}</div>
-            {/* Claim status */}
-            {acc.claimStatus && (
-              <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4,
-                  background: acc.claimStatus === "Adjudicated — Paid" ? "#f0fdf4" : acc.claimStatus === "Adjudicated — Denied" || acc.claimStatus === "Rejected by Clearinghouse" ? "#fee2e2" : acc.claimStatus === "At Payer" ? "#fffbeb" : "#f1f5f9",
-                  color: acc.claimStatus === "Adjudicated — Paid" ? "#16a34a" : acc.claimStatus === "Adjudicated — Denied" || acc.claimStatus === "Rejected by Clearinghouse" ? "#dc2626" : acc.claimStatus === "At Payer" ? "#d97706" : "#64748b",
-                  border: `1px solid ${acc.claimStatus === "Adjudicated — Paid" ? "#bbf7d0" : acc.claimStatus === "Adjudicated — Denied" || acc.claimStatus === "Rejected by Clearinghouse" ? "#fca5a5" : acc.claimStatus === "At Payer" ? "#fed7aa" : "#e2e8f0"}`
-                }}>
-                  {acc.claimStatus}
-                </span>
-              </div>
-            )}
-            {/* Scrubber edit code */}
-            {acc.scrubberEdit && (
-              <div style={{ marginTop: 6, fontSize: 11, color: "#dc2626", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 6, padding: "4px 8px" }}>
-                ⚠ {acc.scrubberEdit}
+            {/* Issue chips (Session 2 issues[] array) */}
+            {acc.issues && acc.issues.length > 0 && (
+              <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
+                {acc.issues.map((iss, ix) => (
+                  <span key={ix} style={{ fontSize: 10, fontWeight: 600, background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", padding: "1px 7px", borderRadius: 4 }}>
+                    {iss.code} · {iss.label}
+                  </span>
+                ))}
               </div>
             )}
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
             <ProbCircle prob={acc.prob} payer={acc.payer} />
             <div style={{ textAlign: "right" }}>
-              {/* EV — dominant visual element */}
               <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 2, letterSpacing: "0.06em", textTransform: "uppercase" }}>Expected value</div>
               <div style={{ fontSize: 30, fontWeight: 800, color: "#2563eb", letterSpacing: "-0.03em", lineHeight: 1 }}>{fmt(acc.expectedValue)}</div>
-              {/* Balance and days — muted reference info */}
               <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>{fmt(acc.amount)} balance · {acc.daysOut}d out</div>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Sent WL inline visibility — this account has open outbound WLs */}
+      {sentWorklinks && sentWorklinks.length > 0 && (
+        <div style={{ padding: "10px 22px", background: "#fffbeb", borderBottom: "1px solid #fde68a" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: "#92400e", textTransform: "uppercase", marginBottom: 6 }}>⇄ {sentWorklinks.length} WorkLink{sentWorklinks.length > 1 ? "s" : ""} in flight</div>
+          {sentWorklinks.map((w, ix) => {
+            const hrsOut = Math.round((Date.now() - new Date(w.sentAt).getTime()) / 3600000);
+            const slaBreached = hrsOut > w.slaHrs;
+            return (
+              <div key={ix} style={{ fontSize: 11, color: "#78350f", marginTop: 4, display: "flex", justifyContent: "space-between" }}>
+                <span>{w.requestIcon} {w.requestLabel} → {w.targetRole || w.targetArea}</span>
+                <span style={{ color: slaBreached ? "#dc2626" : "#92400e", fontWeight: slaBreached ? 700 : 400 }}>
+                  {slaBreached ? "SLA BREACHED" : `${hrsOut}h of ${w.slaHrs}h`}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Account Summary */}
       <div style={{ padding: "12px 22px 0" }}><AccountSummary acc={acc} /></div>
 
-      {/* Action */}
+      {/* Recommended Action card — Approve / Override / Other */}
       <div style={{ padding: "16px 22px", background: "#fafbfc", borderBottom: "1px solid #f1f5f9" }}>
-        {!overriding ? (
+        {!overriding && !otherMode ? (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
               <span style={{ fontSize: 15 }}>{acc.action.icon}</span>
@@ -2946,76 +2995,87 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
                 <button onClick={() => setApproved(true)} style={{ width: "100%", padding: "9px 20px", background: "#2563eb", border: "1px solid #2563eb", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", marginBottom: 8 }}>
                   Approve action
                 </button>
-                <button onClick={() => setOverriding(true)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, fontFamily: "inherit", textDecoration: "underline", padding: 0 }}>
-                  ↺ Override recommended action
-                </button>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <button onClick={() => setOverriding(true)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, fontFamily: "inherit", textDecoration: "underline", padding: 0 }}>
+                    ↺ Override with a canonical action
+                  </button>
+                  <span style={{ color: "#cbd5e1" }}>·</span>
+                  <button onClick={() => setOtherMode(true)} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: 12, fontFamily: "inherit", textDecoration: "underline", padding: 0 }}>
+                    Other — log something else
+                  </button>
+                </div>
               </>
             )}
             {approved && (
               <div style={{ padding: "9px 20px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, color: "#16a34a", fontSize: 13, fontWeight: 600, textAlign: "center" }}>
-                ✓ Action approved
+                ✓ Action approved {overrideAction ? `(${overrideAction})` : ""}
               </div>
             )}
           </>
-        ) : (
+        ) : overriding ? (
           <>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "#64748b", textTransform: "uppercase", marginBottom: 10 }}>Select action taken</div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "#64748b", textTransform: "uppercase", marginBottom: 10 }}>Select canonical action taken</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
               {[
-                { icon: "📞", label: "Outbound call", value: "call" },
-                { icon: "📋", label: "Appeal submission", value: "appeal" },
-                { icon: "⚡", label: "Internal escalation", value: "escalation" },
-                { icon: "📝", label: "Physician query", value: "query" },
-                { icon: "✕", label: "Write-off recommendation", value: "writeoff" },
+                { icon: "📞", label: "Outbound call" },
+                { icon: "📋", label: "Appeal submission" },
+                { icon: "⚡", label: "Internal escalation" },
+                { icon: "📝", label: "Physician query" },
+                { icon: "🔄", label: "Resubmit claim" },
+                { icon: "✕", label: "Write-off recommendation" },
               ].map(at => (
-                <button key={at.value} onClick={() => { setOverrideAction(at.label); setApproved(true); setOverriding(false); }} style={{ padding: "8px 10px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#334155", cursor: "pointer", fontSize: 12, fontFamily: "inherit", textAlign: "left", display: "flex", alignItems: "center", gap: 8 }}>
+                <button key={at.label} onClick={() => { setOverrideAction(at.label); setApproved(true); setOverriding(false); }} style={{ padding: "8px 10px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#334155", cursor: "pointer", fontSize: 12, fontFamily: "inherit", textAlign: "left", display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 14 }}>{at.icon}</span> {at.label}
                 </button>
               ))}
             </div>
             <button onClick={() => setOverriding(false)} style={{ fontSize: 11, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>Cancel — go back</button>
           </>
+        ) : (
+          // Other escape valve — non-canonical action capture
+          <>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "#64748b", textTransform: "uppercase", marginBottom: 8 }}>Describe what you did</div>
+            <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 10, lineHeight: 1.5 }}>The canonical actions above didn't fit. Describe what you actually did in 1-2 sentences — this gets flagged for review so we can extend the canon if it's a recurring pattern.</div>
+            <textarea
+              value={otherActionText}
+              onChange={e => setOtherActionText(e.target.value)}
+              placeholder="e.g. Called payer 3-way with patient on the line to verify benefits..."
+              style={{ width: "100%", boxSizing: "border-box", padding: "9px 12px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff", color: "#334155", fontFamily: "inherit", resize: "vertical", minHeight: 60, outline: "none", lineHeight: 1.6, marginBottom: 8 }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => { if (otherActionText.trim().length >= 10) { setApproved(true); setOtherMode(false); } }} disabled={otherActionText.trim().length < 10}
+                style={{ flex: 1, padding: "8px 16px", background: otherActionText.trim().length >= 10 ? "#0f172a" : "#e2e8f0", border: "none", borderRadius: 6, color: otherActionText.trim().length >= 10 ? "#fff" : "#94a3b8", cursor: otherActionText.trim().length >= 10 ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
+                Continue — log outcome
+              </button>
+              <button onClick={() => { setOtherMode(false); setOtherActionText(""); }} style={{ padding: "8px 12px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 6, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>
+                Cancel
+              </button>
+            </div>
+            {otherActionText.trim().length > 0 && otherActionText.trim().length < 10 && (
+              <div style={{ fontSize: 10, color: "#dc2626", marginTop: 6 }}>Minimum 10 characters — describe what you did.</div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Agentic WorkLink — auto-draft when action maps to a cross-area request */}
-      {(() => {
-        const actionKey = acc.action.value;
-        const isCall = actionKey === "call" || actionKey === "outbound_call";
-        const draft = WORKLINK_ACTION_MAP[actionKey];
-        // Suppress draft if account area already matches the draft's target area
+      {/* Agentic WorkLink draft (Carlos preserves this from prior CollectorView pattern) */}
+      {approved && !worklinkSent && (() => {
+        const actionKey = otherMode ? null : (overrideAction || acc.action.value);
+        const draft = actionKey ? WORKLINK_ACTION_MAP[actionKey] : null;
         const draftActive = draft && draft.targetArea !== acc.area;
-
-        if (worklinkSent) return (
-          <div style={{ margin: "10px 22px 0", padding: "10px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 12, color: "#0369a1", fontWeight: 600 }}>⇄ WorkLink sent — account suppressed from queue</span>
-          </div>
-        );
-
+        if (!draftActive && !showWorkLink) return null;
         return (
           <div style={{ padding: "10px 22px 0" }}>
             {draftActive && !showWorkLink && (
               <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
                 <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 700, marginBottom: 6 }}>
-                  ✦ AI WorkLink draft ready — {draftActive.requestIcon} {draftActive.requestLabel} → {draftActive.targetArea}
+                  ✦ AI WorkLink draft — {draftActive.requestIcon} {draftActive.requestLabel} → {draftActive.targetArea}
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => setShowWorkLink(true)}
-                    style={{ flex: 1, padding: "7px 14px", background: "#2563eb", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
-                    Review & Send
-                  </button>
-                  <button onClick={() => setShowWorkLink(false)}
-                    style={{ padding: "7px 12px", background: "#fff", border: "1px solid #bfdbfe", borderRadius: 6, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>
-                    Dismiss
-                  </button>
+                  <button onClick={() => setShowWorkLink(true)} style={{ flex: 1, padding: "7px 14px", background: "#2563eb", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>Review & Send</button>
+                  <button onClick={() => setShowWorkLink(false)} style={{ padding: "7px 12px", background: "#fff", border: "1px solid #bfdbfe", borderRadius: 6, color: "#64748b", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Dismiss</button>
                 </div>
               </div>
-            )}
-            {!showWorkLink && (
-              <button onClick={() => setShowWorkLink(true)}
-                style={{ background: "#fff", border: "1.5px solid #2563eb", borderRadius: 20, color: "#2563eb", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", padding: "6px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                ⇄ {draft ? "Send different WorkLink" : "Send WorkLink Request"}
-              </button>
             )}
             {showWorkLink && (
               <WorkLinkForm acc={acc}
@@ -3028,28 +3088,37 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
           </div>
         );
       })()}
+      {worklinkSent && (
+        <div style={{ margin: "10px 22px 0", padding: "10px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8 }}>
+          <span style={{ fontSize: 12, color: "#0369a1", fontWeight: 600 }}>⇄ WorkLink sent — account suppressed from queue</span>
+        </div>
+      )}
 
-      {/* Outcome selector — appears after approval */}
+      {/* Log outcome flow — appears after approval */}
       {approved && (
         <div style={{ padding: "16px 22px" }}>
-          <OutcomeSelector onSelect={setOutcome} selectedOutcome={outcome} />
-          {outcome && <ScratchNoteGenerator acc={acc} outcome={outcome} onNoteReady={setNoteReady} />}
-          {outcome && (noteReady !== null) && (
+          <LogOutcomeFlow
+            acc={acc}
+            outcome={outcome}
+            setOutcome={(v) => { setOutcome(v); setFieldValue(""); setNoteReady(null); }}
+            fieldValue={fieldValue}
+            setFieldValue={setFieldValue}
+            noteReady={noteReady}
+            setNoteReady={setNoteReady}
+          />
+          {outcome && canLog && (
             <button
               onClick={handleLog}
-              style={{
-                marginTop: 12, padding: "10px 20px", width: "100%",
-                background: "#0f172a", border: "none", borderRadius: 8,
-                color: "#fff", cursor: "pointer", fontSize: 13,
-                fontWeight: 600, fontFamily: "inherit",
-              }}
+              style={{ marginTop: 12, padding: "10px 20px", width: "100%", background: "#0f172a", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}
             >
               Log outcome &amp; advance to next account →
             </button>
           )}
-          {outcome && (noteReady === null) && (
+          {outcome && !canLog && (
             <div style={{ marginTop: 10, fontSize: 11, color: "#94a3b8", textAlign: "center" }}>
-              Add a work note or skip to enable logging
+              {!fieldValid && `${os?.requiresFieldLabel || os?.requiresField} required · `}
+              {!noteCharsValid && noteReady !== null && `Note must be at least ${noteCharsRequired} characters (currently ${noteCharsCount}) · `}
+              {noteReady === null && "Add a work note or skip to enable logging"}
             </div>
           )}
         </div>
@@ -3057,6 +3126,68 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
     </div>
   );
 }
+
+// Carlos's LogOutcomeFlow — 5-group outcome picker (OUTCOME_GROUPS), structured
+// field gates per outcome (e.g., appeal_filed → appealRef), then scratch→polish
+// note via ScratchNoteGenerator. Replaces the old flat OutcomeSelector for the
+// collector path; biller still uses the simpler OutcomeSelector.
+function LogOutcomeFlow({ acc, outcome, setOutcome, fieldValue, setFieldValue, noteReady, setNoteReady }) {
+  const os = outcome ? OUTCOME_STATUSES.find(o => o.value === outcome) : null;
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: "#64748b", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8, fontWeight: 600 }}>Log outcome</div>
+      <select
+        value={outcome || ""}
+        onChange={e => setOutcome(e.target.value)}
+        style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff", color: outcome ? "#0f172a" : "#94a3b8", fontFamily: "inherit", cursor: "pointer", outline: "none" }}
+      >
+        <option value="" disabled>Select outcome...</option>
+        {OUTCOME_GROUPS.map(g => (
+          <optgroup key={g.label} label={g.label}>
+            {g.ids.map(id => {
+              const o = OUTCOME_STATUSES.find(x => x.value === id);
+              if (!o) return null;
+              return <option key={id} value={id}>{o.label}</option>;
+            })}
+          </optgroup>
+        ))}
+      </select>
+
+      {/* Follow-up preview — canon-aligned (pending CFO / payment_expected / standard) */}
+      {os && <FollowUpPreview outcome={outcome} />}
+
+      {/* Structured field gate — outcomes with requiresField reveal an input */}
+      {os?.requiresField && (
+        <div style={{ marginTop: 10, padding: "10px 14px", background: "#fefce8", border: "1px solid #fde68a", borderRadius: 8 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", color: "#854d0e", display: "block", marginBottom: 6 }}>
+            {os.requiresFieldLabel} (required)
+          </label>
+          <input
+            type="text"
+            value={fieldValue}
+            onChange={e => setFieldValue(e.target.value)}
+            placeholder={os.requiresField === "appealRef" ? "e.g. APL-2026-44218" : os.requiresField === "aljDocket" ? "e.g. ALJ-3-2026-0098" : "e.g. CLM-RESUB-99412"}
+            style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", fontSize: 12, border: `1px solid ${fieldValue.trim() ? "#fde68a" : "#fca5a5"}`, borderRadius: 6, background: "#fff", color: "#0f172a", fontFamily: "inherit", outline: "none" }}
+          />
+          <div style={{ fontSize: 10, color: "#854d0e", marginTop: 4 }}>This number is recorded on the account and used to track the appeal/resubmission downstream.</div>
+        </div>
+      )}
+
+      {/* Scratch → polish note (uses existing ScratchNoteGenerator with canon-aware prompt) */}
+      {outcome && <ScratchNoteGenerator acc={acc} outcome={outcome} onNoteReady={setNoteReady} />}
+
+      {/* 20-char note gate notice for escalations */}
+      {os?.requiresNoteChars && noteReady && noteReady !== "__SKIPPED__" && noteReady.length < os.requiresNoteChars && (
+        <div style={{ marginTop: 8, fontSize: 11, color: "#dc2626", padding: "6px 10px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6 }}>
+          Escalation note must be at least {os.requiresNoteChars} characters — currently {noteReady.length}. Add context about why this needs lead review.
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 
 function WorkedList({ worked }) {
   const [expanded, setExpanded] = useState(null);
@@ -3111,6 +3242,49 @@ function WorkedList({ worked }) {
   );
 }
 
+// ─── Bucket classification (mixed priority: TF + WL SLA) ─────────────────────
+// Account bucket is the WORSE of:
+//   - native TF urgency (appealTfRemaining)
+//   - any sent open WorkLink's SLA burning
+// Past-TF accounts (tf<0) stay in routine with a "TF CLOSED" badge that
+// prompts write-off review rather than work.
+function classifyCollectorBucket(acc, openWlsForAccount) {
+  const tf = acc.appealTfRemaining;
+  const wlBreached = openWlsForAccount.some(w => {
+    const hrsOut = (Date.now() - new Date(w.sentAt).getTime()) / 3600000;
+    return hrsOut > w.slaHrs;
+  });
+  const wlNearBreach = openWlsForAccount.some(w => {
+    const hrsOut = (Date.now() - new Date(w.sentAt).getTime()) / 3600000;
+    return hrsOut > w.slaHrs * 0.75 && hrsOut <= w.slaHrs;
+  });
+  if (tf != null && tf < 0) return "routine"; // past TF — surfaces with badge in routine, not critical
+  if ((tf != null && tf >= 0 && tf < 3) || wlBreached) return "critical";
+  if ((tf != null && tf < 14) || wlNearBreach) return "urgent";
+  if (tf != null && tf < 30) return "watch";
+  return "routine";
+}
+
+function bucketReason(acc, openWlsForAccount) {
+  const tf = acc.appealTfRemaining;
+  const wlBreached = openWlsForAccount.some(w => {
+    const hrsOut = (Date.now() - new Date(w.sentAt).getTime()) / 3600000;
+    return hrsOut > w.slaHrs;
+  });
+  if (tf != null && tf < 0) return "TF CLOSED";
+  if (wlBreached) return "WL breached";
+  if (tf != null && tf >= 0 && tf < 30) return `TF ${tf}d`;
+  return null;
+}
+
+const BUCKET_META = {
+  critical: { label: "CRITICAL", color: "#dc2626", bg: "#fef2f2", border: "#fecaca", desc: "TF closing in ≤3d or sent WorkLink SLA-breached — work these first" },
+  urgent:   { label: "URGENT",   color: "#d97706", bg: "#fffbeb", border: "#fde68a", desc: "TF closing in ≤14d or WorkLink near SLA — work soon" },
+  watch:    { label: "WATCH",    color: "#0369a1", bg: "#eff6ff", border: "#bfdbfe", desc: "TF closing in ≤30d — monitor" },
+  routine:  { label: "ROUTINE",  color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", desc: "Sufficient runway — work by expected value" },
+};
+const BUCKET_ORDER = ["critical", "urgent", "watch", "routine"];
+
 function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLink }) {
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
@@ -3120,40 +3294,54 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
   const [sessionStart] = useState(() => Date.now());
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResult, setSearchResult] = useState(null);
-  const [sortMode, setSortMode] = useState("ev"); // "ev" | "triage"
   const [viewMode, setViewMode] = useState("worklist"); // "worklist" | "focus"
   const [expandedId, setExpandedId] = useState(null);
-
-  const openWorklinkIds = new Set(worklinks.filter(w => w.status === "open").map(w => w.accountId));
-  const workedIds = new Set(workedAccounts.map(w => w.id));
-
-  // Triage urgency factor — exponential as the binding clock (Appeal TF for AR)
-  // approaches close. Uses the payer-driven appealTfRemaining derived in
-  // score() (Session 2). Falls back to 120d assumption defensively.
-  const urgencyFactor = (acc) => {
-    const daysToFiling = acc.appealTfRemaining ?? (120 - (acc.daysOut || 0));
-    if (daysToFiling < 0) return 0.1; // past filing — de-prioritize
-    if (daysToFiling < 3) return 10.0;
-    if (daysToFiling < 7) return 5.0;
-    if (daysToFiling < 14) return 2.0;
-    return 1.0;
-  };
-
-  const hasFiling = arScored.some(a => (a.appealTfRemaining ?? (120 - (a.daysOut || 0))) < 14);
-
   const [collectorSiteFilter, setCollectorSiteFilter] = useState(null);
+  const [collapsedBuckets, setCollapsedBuckets] = useState(new Set(["routine"])); // routine collapsed by default
 
-  const sortedQueue = arScored
+  // Index open outbound WLs by account
+  const openWlsByAccount = useMemo(() => {
+    const idx = {};
+    for (const w of worklinks) {
+      if (w.status !== "open") continue;
+      if (w.requestType === "inbound_resolution" || w.requestType === "inbound_decline") continue;
+      if (!w.accountId) continue;
+      (idx[w.accountId] = idx[w.accountId] || []).push(w);
+    }
+    return idx;
+  }, [worklinks]);
+
+  // Inbound WLs targeting this collector role (resolutions/declines coming back)
+  const inboundWls = useMemo(() => worklinks.filter(w =>
+    w.status === "open" &&
+    (w.requestType === "inbound_resolution" || w.requestType === "inbound_decline") &&
+    w.targetRole === "commercial_collector"
+  ), [worklinks]);
+
+  // Account IDs with open outbound WLs are suppressed from the main worklist
+  // (collector is blocked on an internal dependency — work returns via inbound)
+  const openWorklinkIds = new Set(Object.keys(openWlsByAccount));
+
+  // Actionable queue, filtered by site, classified by bucket
+  const actionableQueue = useMemo(() => arScored
     .filter(a => !openWorklinkIds.has(a.id) && isAccountActionable(a.id))
-    .filter(a => !collectorSiteFilter || a.site === collectorSiteFilter)
-    .sort((a, b) => {
-      if (sortMode === "triage") return (b.expectedValue * urgencyFactor(b)) - (a.expectedValue * urgencyFactor(a));
-      return b.expectedValue - a.expectedValue;
-    });
+    .filter(a => !collectorSiteFilter || a.site === collectorSiteFilter),
+    [arScored, openWorklinkIds, collectorSiteFilter]
+  );
 
-  const queue = sortedQueue;
-  const suppressed = worklinks.filter(w => w.status === "open");
-  const currentAccount = searchResult || queue[0] || null;
+  const buckets = useMemo(() => {
+    const out = { critical: [], urgent: [], watch: [], routine: [] };
+    for (const acc of actionableQueue) {
+      const wlsForAcc = openWlsByAccount[acc.id] || [];
+      const b = classifyCollectorBucket(acc, wlsForAcc);
+      out[b].push(acc);
+    }
+    // Sort within each bucket by EV desc
+    for (const k of BUCKET_ORDER) out[k].sort((a, b) => b.expectedValue - a.expectedValue);
+    return out;
+  }, [actionableQueue, openWlsByAccount]);
+
+  const currentAccount = searchResult || buckets.critical[0] || buckets.urgent[0] || buckets.watch[0] || buckets.routine[0] || null;
 
   const handleSearch = useCallback(q => {
     setSearchQuery(q);
@@ -3167,39 +3355,35 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
   }, [arScored]);
 
   const handleLog = useCallback(entry => {
-    // Persist follow-up date so queue suppression survives page reload.
-    // Worker UI never closes accounts — cash posting (backend) does. paid_full
-    // and paid_partial advance to payment_expected with 7d sleep via the
-    // standard followUpDays branch; if cash hasn't posted by then, account
-    // resurfaces in the queue.
     const os = OUTCOME_STATUSES.find(o => o.value === entry.outcome);
     if (os) {
       const storeValue = os.pending ? "pending_cfo" : addBusinessDaysISO(os.followUpDays);
       setFollowUpDate(entry.id, storeValue);
-      // Notify main component so CFO donuts re-render
       window.dispatchEvent(new CustomEvent("d4_account_logged", { detail: { id: entry.id } }));
     }
     setWorkedAccounts(prev => [...prev, entry]);
     setSearchResult(null);
     setSearchQuery("");
+    setExpandedId(null);
   }, []);
 
+  const toggleBucket = (b) => setCollapsedBuckets(prev => {
+    const next = new Set(prev);
+    if (next.has(b)) next.delete(b); else next.add(b);
+    return next;
+  });
+
   const totalEV = workedAccounts.reduce((s, w) => s + w.expectedValue, 0);
-  const avgEV = workedAccounts.length ? Math.round(totalEV / workedAccounts.length) : 0;
-  const mostCommon = workedAccounts.length ? (() => {
-    const counts = {};
-    workedAccounts.forEach(w => { counts[w.outcomeLabel] = (counts[w.outcomeLabel] || 0) + 1; });
-    return Object.entries(counts).sort((a,b) => b[1]-a[1])[0]?.[0] || "—";
-  })() : "—";
+  const totalQueueEV = actionableQueue.reduce((s, a) => s + a.expectedValue, 0);
 
   return (
     <div style={{ padding: isMobile ? "16px 12px 80px" : isTablet ? "20px 20px" : "24px 32px" }}>
-      {/* Productivity metrics */}
+      {/* Productivity metrics — preserved from prior CollectorView */}
       <div style={{ display: "grid", gridTemplateColumns: cols("repeat(4, 1fr)", "repeat(2, 1fr)", "repeat(2, 1fr)"), gap: 12, marginBottom: 24 }}>
         {[
           { label: "Accounts worked today", value: workedAccounts.length, sub: `${Math.max(0, DAILY_GOAL - workedAccounts.length)} remaining to goal (${DAILY_GOAL}/day)`, color: "#0f172a" },
           { label: "EV worked", value: fmt(totalEV), sub: "expected recovery logged", color: "#2563eb" },
-          { label: "Payment commitments", value: workedAccounts.filter(w => w.outcomeLabel && (w.outcomeLabel.toLowerCase().includes("promis") || w.outcomeLabel.toLowerCase().includes("payment") || w.outcomeLabel.toLowerCase().includes("paid"))).length, sub: "accounts with payment expected", color: "#16a34a" },
+          { label: "Payment commitments", value: workedAccounts.filter(w => w.outcomeLabel && (w.outcomeLabel.toLowerCase().includes("promis") || w.outcomeLabel.toLowerCase().includes("paid"))).length, sub: "accounts with payment expected", color: "#16a34a" },
           { label: "Dollars per hour", value: (() => { const hrs = (Date.now() - sessionStart) / 3600000; return hrs > 0.01 && totalEV > 0 ? fmt(Math.round(totalEV / Math.max(hrs, 0.1))) : "—"; })(), sub: "EV worked ÷ session time", color: "#7c3aed" },
         ].map(({ label, value, sub, color }) => (
           <div key={label} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
@@ -3210,7 +3394,31 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
         ))}
       </div>
 
-      {/* Site filter — collector assignment */}
+      {/* Inbound WorkLink rail — resolutions/declines coming back to this collector */}
+      {inboundWls.length > 0 && (
+        <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "#1e40af", textTransform: "uppercase", marginBottom: 8 }}>
+            ⇄ {inboundWls.length} inbound {inboundWls.length === 1 ? "resolution" : "resolutions"} · click an account to act
+          </div>
+          {inboundWls.slice(0, 5).map((w, ix) => (
+            <div key={ix} onClick={() => { handleSearch(w.accountId); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 4, background: "#fff", border: "1px solid #dbeafe", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+              <span style={{ fontSize: 14 }}>{w.requestIcon}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: "#0f172a", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {w.requestLabel} · {w.patient} ({w.accountId})
+                </div>
+                <div style={{ color: "#64748b", fontSize: 11, marginTop: 2 }}>{w.note}</div>
+              </div>
+              <span style={{ color: "#2563eb", fontSize: 11 }}>→ open</span>
+            </div>
+          ))}
+          {inboundWls.length > 5 && (
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>+ {inboundWls.length - 5} more inbound — search or scroll the worklist to find them</div>
+          )}
+        </div>
+      )}
+
+      {/* Site filter */}
       {(() => {
         const sites = [...new Set(arScored.map(a => a.site))].sort((a,b) => parseInt(a.replace(/\D/g,"")) - parseInt(b.replace(/\D/g,"")));
         if (sites.length <= 1) return null;
@@ -3218,65 +3426,32 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px" }}>
             <span style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0 }}>My sites:</span>
             <button onClick={() => setCollectorSiteFilter(null)}
-              style={{ padding: "3px 10px", fontSize: 11, fontWeight: !collectorSiteFilter ? 600 : 400, border: `1px solid ${!collectorSiteFilter ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: !collectorSiteFilter ? "#2563eb" : "#fff", color: !collectorSiteFilter ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
-              All
-            </button>
+              style={{ padding: "3px 10px", fontSize: 11, fontWeight: !collectorSiteFilter ? 600 : 400, border: `1px solid ${!collectorSiteFilter ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: !collectorSiteFilter ? "#2563eb" : "#fff", color: !collectorSiteFilter ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>All</button>
             {sites.map(s => (
               <button key={s} onClick={() => setCollectorSiteFilter(collectorSiteFilter === s ? null : s)}
-                style={{ padding: "3px 10px", fontSize: 11, fontWeight: collectorSiteFilter === s ? 600 : 400, border: `1px solid ${collectorSiteFilter === s ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: collectorSiteFilter === s ? "#2563eb" : "#fff", color: collectorSiteFilter === s ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
-                {s}
-              </button>
+                style={{ padding: "3px 10px", fontSize: 11, fontWeight: collectorSiteFilter === s ? 600 : 400, border: `1px solid ${collectorSiteFilter === s ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: collectorSiteFilter === s ? "#2563eb" : "#fff", color: collectorSiteFilter === s ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>{s}</button>
             ))}
-            {collectorSiteFilter && <span style={{ fontSize: 10, color: "#2563eb", marginLeft: 4 }}>— showing your assigned accounts</span>}
-            {!collectorSiteFilter && <span style={{ fontSize: 10, color: "#94a3b8", marginLeft: 4 }}>— select your assigned sites to filter your queue</span>}
           </div>
         );
       })()}
 
-      {/* Sort + View mode controls */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 11, color: "#94a3b8" }}>Sort:</span>
-          <button onClick={() => setSortMode("ev")}
-            style={{ padding: "4px 12px", fontSize: 11, fontWeight: sortMode === "ev" ? 600 : 400, border: `1px solid ${sortMode === "ev" ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: sortMode === "ev" ? "#2563eb" : "#fff", color: sortMode === "ev" ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
-            Expected Value
-          </button>
-          <button onClick={() => setSortMode("triage")}
-            style={{ padding: "4px 12px", fontSize: 11, fontWeight: sortMode === "triage" ? 600 : 400, border: `1px solid ${sortMode === "triage" ? "#dc2626" : "#e2e8f0"}`, borderRadius: 20, background: sortMode === "triage" ? "#dc2626" : "#fff", color: sortMode === "triage" ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
-            ⚡ Triage
-          </button>
-          {hasFiling && sortMode === "ev" && (
-            <span style={{ fontSize: 11, color: "#dc2626", fontWeight: 600 }}>⚠ Timely filing risk in queue — consider Triage sort</span>
-          )}
-          {sortMode === "triage" && (
-            <span style={{ fontSize: 11, color: "#64748b" }}>Weighted by EV × filing urgency</span>
-          )}
-        </div>
+      {/* View mode toggle */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 4, background: "#f1f5f9", borderRadius: 8, padding: 3 }}>
           <button onClick={() => setViewMode("worklist")}
-            style={{ padding: "4px 12px", fontSize: 11, fontWeight: viewMode === "worklist" ? 600 : 400, border: "none", borderRadius: 6, background: viewMode === "worklist" ? "#fff" : "transparent", color: viewMode === "worklist" ? "#0f172a" : "#64748b", cursor: "pointer", fontFamily: "inherit", boxShadow: viewMode === "worklist" ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>
-            ☰ Worklist
-          </button>
+            style={{ padding: "4px 12px", fontSize: 11, fontWeight: viewMode === "worklist" ? 600 : 400, border: "none", borderRadius: 6, background: viewMode === "worklist" ? "#fff" : "transparent", color: viewMode === "worklist" ? "#0f172a" : "#64748b", cursor: "pointer", fontFamily: "inherit", boxShadow: viewMode === "worklist" ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>☰ Worklist</button>
           <button onClick={() => setViewMode("focus")}
-            style={{ padding: "4px 12px", fontSize: 11, fontWeight: viewMode === "focus" ? 600 : 400, border: "none", borderRadius: 6, background: viewMode === "focus" ? "#fff" : "transparent", color: viewMode === "focus" ? "#0f172a" : "#64748b", cursor: "pointer", fontFamily: "inherit", boxShadow: viewMode === "focus" ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>
-            ⊙ Focus
-          </button>
+            style={{ padding: "4px 12px", fontSize: 11, fontWeight: viewMode === "focus" ? 600 : 400, border: "none", borderRadius: 6, background: viewMode === "focus" ? "#fff" : "transparent", color: viewMode === "focus" ? "#0f172a" : "#64748b", cursor: "pointer", fontFamily: "inherit", boxShadow: viewMode === "focus" ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>⊙ Focus</button>
         </div>
       </div>
 
       {/* Search */}
-      <SearchBar
-        value={searchQuery}
-        onChange={handleSearch}
-        placeholder="Search by account ID, patient, or payer..."
-      />
-
+      <SearchBar value={searchQuery} onChange={handleSearch} placeholder="Search by account ID, patient, or payer..." />
       {searchQuery && !searchResult && (
         <div style={{ background: "#fefce8", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#854d0e" }}>
           No account found for "{searchQuery}"
         </div>
       )}
-
       {searchResult && (
         <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 12, color: "#1e40af", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>Showing search result — {searchResult.id} · {searchResult.patient}</span>
@@ -3284,82 +3459,105 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
         </div>
       )}
 
-      {/* Queue position */}
-      {!searchResult && queue.length > 0 && (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Account {workedAccounts.length + 1} of {arScored.length} · sorted by expected value</div>
-          <div style={{ fontSize: 12, color: "#94a3b8" }}>{queue.length} remaining</div>
-        </div>
-      )}
-
-      {/* Worklist mode — compact list */}
-      {viewMode === "worklist" && (
-        <div style={{ marginBottom: 16 }}>
-          {queue.length > 0 && (
-            <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>
-              {queue.length} accounts · {fmt(queue.reduce((s,a)=>s+a.expectedValue,0))} EV · click any row to expand
-            </div>
-          )}
-          {(searchResult ? [searchResult] : queue.slice(0, 100)).map(acc => {
-            const sev = SEV[acc.cfg.severity] || SEV.ROUTINE;
-            const isExpanded = expandedId === acc.id;
-            return (
-              <div key={acc.id} style={{ marginBottom: 4 }}>
-                {!isExpanded ? (
-                  <div onClick={() => setExpandedId(acc.id)}
-                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, cursor: "pointer" }}
-                    onMouseEnter={e => e.currentTarget.style.background="#f8fafc"}
-                    onMouseLeave={e => e.currentTarget.style.background="#fff"}>
-                    <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3, background: sev.bg, color: sev.text, border: `1px solid ${sev.border}`, flexShrink: 0 }}>{acc.cfg.severity}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{acc.patient}</div>
-                      <div style={{ fontSize: 11, color: "#94a3b8" }}>{acc.id} · {acc.payer}{acc.subPayer ? ` — ${acc.subPayer}` : ""} · {acc.daysOut}d out</div>
-                    </div>
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#2563eb" }}>{fmt(acc.expectedValue)}</div>
-                    </div>
-                    <span style={{ fontSize: 10, color: "#94a3b8" }}>▼</span>
-                  </div>
-                ) : (
-                  <div>
-                    <button onClick={() => setExpandedId(null)} style={{ fontSize: 11, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textDecoration: "underline", padding: "0 0 4px 0" }}>▲ collapse</button>
-                    <CollectorAccountCard key={acc.id} acc={acc} onLog={handleLog} onWorkLink={onWorkLink} />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {!searchResult && queue.length > 100 && (
-            <div style={{ textAlign: "center", padding: "16px", fontSize: 12, color: "#94a3b8" }}>
-              Showing top 100 of {queue.length.toLocaleString()} accounts by expected value · work these first or search for a specific account
-            </div>
-          )}
-          {queue.length === 0 && !searchResult && (
-            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "40px 24px", textAlign: "center" }}>
-              <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "#16a34a", marginBottom: 6 }}>Queue complete</div>
-              <div style={{ fontSize: 13, color: "#166534" }}>All {arScored.length} accounts worked this session. {fmt(totalEV)} expected recovery logged.</div>
-            </div>
-          )}
+      {/* Queue summary — total + bucket distribution */}
+      {!searchResult && actionableQueue.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, fontSize: 12, color: "#64748b" }}>
+          <div>{actionableQueue.length.toLocaleString()} accounts actionable · {fmt(totalQueueEV)} EV</div>
+          <div>
+            {BUCKET_ORDER.map(b => buckets[b].length > 0 ? (
+              <span key={b} style={{ marginLeft: 8, color: BUCKET_META[b].color, fontWeight: 600 }}>
+                {buckets[b].length} {BUCKET_META[b].label}
+              </span>
+            ) : null)}
+          </div>
         </div>
       )}
 
       {/* Focus mode — single account at a time */}
       {viewMode === "focus" && (currentAccount ? (
-        <CollectorAccountCard key={currentAccount.id + workedAccounts.length} acc={currentAccount} onLog={handleLog} onWorkLink={onWorkLink} />
+        <CollectorAccountCard key={currentAccount.id + workedAccounts.length} acc={currentAccount} onLog={handleLog} onWorkLink={onWorkLink} sentWorklinks={openWlsByAccount[currentAccount.id] || []} />
       ) : !searchQuery ? (
         <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "40px 24px", textAlign: "center" }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
           <div style={{ fontSize: 15, fontWeight: 600, color: "#16a34a", marginBottom: 6 }}>Queue complete</div>
-          <div style={{ fontSize: 13, color: "#166534" }}>All {arScored.length} accounts worked this session. {fmt(totalEV)} expected recovery logged.</div>
+          <div style={{ fontSize: 13, color: "#166534" }}>All actionable accounts worked this session. {fmt(totalEV)} expected recovery logged.</div>
         </div>
       ) : null)}
 
-      {/* Worked list */}
-      <WorkedList worked={workedAccounts} />
+      {/* Worklist mode — bucketed sections (Critical → Urgent → Watch → Routine) */}
+      {viewMode === "worklist" && !searchResult && (
+        <div style={{ marginBottom: 16 }}>
+          {BUCKET_ORDER.map(bucketKey => {
+            const accs = buckets[bucketKey];
+            if (accs.length === 0) return null;
+            const meta = BUCKET_META[bucketKey];
+            const isCollapsed = collapsedBuckets.has(bucketKey);
+            const bucketEV = accs.reduce((s, a) => s + a.expectedValue, 0);
+            return (
+              <div key={bucketKey} style={{ marginBottom: 14 }}>
+                <div onClick={() => toggleBucket(bucketKey)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", background: meta.bg, border: `1px solid ${meta.border}`, borderRadius: 8, cursor: "pointer", marginBottom: 6 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, letterSpacing: "0.08em" }}>{isCollapsed ? "▶" : "▼"} {meta.label}</span>
+                  <span style={{ fontSize: 12, color: meta.color, fontWeight: 600 }}>{accs.length} account{accs.length === 1 ? "" : "s"} · {fmt(bucketEV)} EV</span>
+                  <span style={{ fontSize: 11, color: "#64748b", marginLeft: 6, flex: 1 }}>{meta.desc}</span>
+                </div>
+                {!isCollapsed && accs.slice(0, 100).map(acc => {
+                  const isExpanded = expandedId === acc.id;
+                  const reason = bucketReason(acc, openWlsByAccount[acc.id] || []);
+                  return (
+                    <div key={acc.id} style={{ marginBottom: 4 }}>
+                      {!isExpanded ? (
+                        <div onClick={() => setExpandedId(acc.id)}
+                          style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, cursor: "pointer" }}
+                          onMouseEnter={e => e.currentTarget.style.background="#f8fafc"}
+                          onMouseLeave={e => e.currentTarget.style.background="#fff"}>
+                          {reason && (
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3, background: meta.bg, color: meta.color, border: `1px solid ${meta.border}`, flexShrink: 0 }}>{reason}</span>
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{acc.patient}</div>
+                            <div style={{ fontSize: 11, color: "#94a3b8" }}>{acc.id} · {acc.payer}{acc.subPayer ? ` — ${acc.subPayer}` : ""} · {acc.daysOut}d out</div>
+                          </div>
+                          <div style={{ textAlign: "right", flexShrink: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: "#2563eb" }}>{fmt(acc.expectedValue)}</div>
+                          </div>
+                          <span style={{ fontSize: 10, color: "#94a3b8" }}>▼</span>
+                        </div>
+                      ) : (
+                        <div>
+                          <button onClick={() => setExpandedId(null)} style={{ fontSize: 11, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textDecoration: "underline", padding: "0 0 4px 0" }}>▲ collapse</button>
+                          <CollectorAccountCard key={acc.id + workedAccounts.length} acc={acc} onLog={handleLog} onWorkLink={onWorkLink} sentWorklinks={openWlsByAccount[acc.id] || []} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {!isCollapsed && accs.length > 100 && (
+                  <div style={{ textAlign: "center", padding: "10px", fontSize: 11, color: "#94a3b8" }}>
+                    Showing top 100 of {accs.length.toLocaleString()} in this bucket · search for specific accounts
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {actionableQueue.length === 0 && (
+            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "40px 24px", textAlign: "center" }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "#16a34a", marginBottom: 6 }}>Queue complete</div>
+              <div style={{ fontSize: 13, color: "#166534" }}>All actionable accounts worked this session. {fmt(totalEV)} expected recovery logged.</div>
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* WorkLink suppressed panel */}
-      <WorkLinkSuppressedPanel suppressed={suppressed} />
+      {/* Worklist mode — search result inline (single card) */}
+      {viewMode === "worklist" && searchResult && (
+        <div style={{ marginBottom: 16 }}>
+          <CollectorAccountCard key={searchResult.id} acc={searchResult} onLog={handleLog} onWorkLink={onWorkLink} sentWorklinks={openWlsByAccount[searchResult.id] || []} />
+        </div>
+      )}
+
+      <WorkedList worked={workedAccounts} />
+      <WorkLinkSuppressedPanel suppressed={Object.values(openWlsByAccount).flat()} />
     </div>
   );
 }
