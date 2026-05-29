@@ -73,24 +73,60 @@ const SEV = {
   ROUTINE:  { bg: "#f0fdf4", text: "#166534", border: "#bbf7d0" },
 };
 
+// ─── Canonical STATUS dictionary ──────────────────────────────────────────────
+// Every worker surface (collector, biller, auth specialist, team lead) shares
+// this status vocabulary. Status values feed the worklist (sleep/resurface) and
+// reporting (CFO altitude). Modular: each role uses a subset.
+// Canon docs: Account Status Lifecycle — Auto-Populating, Modular, Role-Dependent.
+const STATUS = {
+  not_started:      { label: "New",                color: "#0d9488", group: "working" },
+  in_progress:      { label: "In progress",        color: "#2563eb", group: "working" },
+  followup_due:     { label: "Follow-up due",      color: "#d97706", group: "working" },
+  awaiting_payer:   { label: "Awaiting payer",     color: "#64748b", group: "awaiting" },
+  awaiting_wl:      { label: "Awaiting WorkLink",  color: "#7c3aed", group: "awaiting" },
+  payment_expected: { label: "Payment expected",   color: "#2563eb", group: "awaiting" }, // 7d sleep waiting for cash post (backend)
+  partial:          { label: "Partial payment",    color: "#16a34a", group: "awaiting" },
+  paid:             { label: "Paid in full",       color: "#16a34a", group: "escalated" },
+  wo_pending:       { label: "Write-off pending",  color: "#dc2626", group: "escalated" },
+  escalated:        { label: "Escalated",          color: "#dc2626", group: "escalated" },
+};
+
+// ─── Canonical 18 outcomes + Other escape valve ───────────────────────────────
+// Each outcome carries: followUpDays (sleep), nextStatus (where it lands),
+// group (UI grouping), and optionally triggersWL / requiresField /
+// requiresNoteChars. NO outcome carries `closes: true` — worker UI never closes
+// accounts; cash posting (backend) does. paid_full and paid_partial advance to
+// payment_expected with 7d sleep, then resurface if cash hasn't posted.
+// Canon docs: Outcome Status List — Design Principles.
 const OUTCOME_STATUSES = [
-  { value: "promised_payment",    label: "Promised payment",       followUpDays: 5,  closed: false },
-  { value: "left_voicemail",      label: "Left voicemail",         followUpDays: 2,  closed: false },
-  { value: "in_adjudication",     label: "In adjudication",        followUpDays: 14, closed: false },
-  { value: "payer_followup",      label: "Payer follow-up pending", followUpDays: 5,  closed: false },
-  { value: "authorization_pending",label: "Authorization pending", followUpDays: 7,  closed: false },
-  { value: "needs_documentation", label: "Needs documentation",    followUpDays: 7,  closed: false },
-  { value: "appeal_filed",        label: "Appeal filed",           followUpDays: 30, closed: false },
-  { value: "alj_appeal_filed",    label: "ALJ appeal filed",       followUpDays: 60, closed: false },
-  { value: "resubmitted",         label: "Resubmitted",            followUpDays: 14, closed: false },
-  { value: "escalated",           label: "Escalated",              followUpDays: 3,  closed: false },
-  { value: "no_response",         label: "No response",            followUpDays: 7,  closed: false },
-  { value: "pending_eligibility", label: "Pending eligibility",    followUpDays: 14, closed: false },
-  { value: "physician_query",     label: "Physician query sent",   followUpDays: 2,  closed: false },
-  { value: "coding_assigned",     label: "Coding assigned",        followUpDays: 3,  closed: false },
-  { value: "paid_full",           label: "Paid — full",            followUpDays: null, closed: true },
-  { value: "paid_partial",        label: "Paid — partial",         followUpDays: 14, closed: false },
-  { value: "writeoff_recommended",label: "Write-off recommended",  followUpDays: null, closed: false, pending: true },
+  { value: "promised_payment",     label: "Promised payment",        followUpDays: 5,    nextStatus: "awaiting_payer",   group: "Awaiting payer" },
+  { value: "left_voicemail",       label: "Left voicemail",          followUpDays: 2,    nextStatus: "in_progress",      group: "Retry" },
+  { value: "in_adjudication",      label: "In adjudication",         followUpDays: 14,   nextStatus: "awaiting_payer",   group: "Awaiting payer" },
+  { value: "payer_followup",       label: "Payer follow-up pending", followUpDays: 5,    nextStatus: "awaiting_payer",   group: "Awaiting payer" },
+  { value: "authorization_pending",label: "Authorization pending",   followUpDays: 7,    nextStatus: "awaiting_payer",   group: "Awaiting payer" },
+  { value: "needs_documentation",  label: "Needs documentation",     followUpDays: 7,    nextStatus: "awaiting_wl",      group: "Action needed", triggersWL: "him_deficiency" },
+  { value: "appeal_filed",         label: "Appeal filed",            followUpDays: 30,   nextStatus: "awaiting_payer",   group: "Awaiting payer", requiresField: "appealRef", requiresFieldLabel: "Appeal reference number" },
+  { value: "alj_appeal_filed",     label: "ALJ appeal filed",        followUpDays: 60,   nextStatus: "awaiting_payer",   group: "Awaiting payer", requiresField: "aljDocket", requiresFieldLabel: "ALJ docket number" },
+  { value: "resubmitted",          label: "Resubmitted",             followUpDays: 14,   nextStatus: "awaiting_payer",   group: "Awaiting payer", requiresField: "resubmissionRef", requiresFieldLabel: "Resubmission claim reference" },
+  { value: "escalated",            label: "Escalated to team lead",  followUpDays: 3,    nextStatus: "escalated",        group: "Terminal", triggersWL: "escalate_lead", requiresNoteChars: 20 },
+  { value: "refer_specialist",     label: "Refer to specialist",     followUpDays: 3,    nextStatus: "escalated",        group: "Terminal", triggersWL: "refer_specialist", requiresNoteChars: 20 },
+  { value: "no_response",          label: "No response",             followUpDays: 7,    nextStatus: "in_progress",      group: "Retry" },
+  { value: "pending_eligibility",  label: "Pending eligibility",     followUpDays: 14,   nextStatus: "awaiting_wl",      group: "Action needed", triggersWL: "eligibility" },
+  { value: "physician_query",      label: "Physician query sent",    followUpDays: 2,    nextStatus: "awaiting_wl",      group: "Action needed", triggersWL: "him_deficiency" },
+  { value: "coding_assigned",      label: "Coding assigned",         followUpDays: 3,    nextStatus: "awaiting_wl",      group: "Action needed" },
+  { value: "paid_full",            label: "Paid in full",            followUpDays: 7,    nextStatus: "payment_expected", group: "Resolution" },
+  { value: "paid_partial",         label: "Paid partial",            followUpDays: 7,    nextStatus: "payment_expected", group: "Resolution" },
+  { value: "writeoff_recommended", label: "Write-off recommended",   followUpDays: null, nextStatus: "wo_pending",       group: "Terminal", triggersWL: "write_off_request", pending: true },
+];
+
+// Outcome grouping for UI pickers (Carlos's LogOutcomeFlow uses this; the older
+// OutcomeSelector uses a simplified 3-group view as a transition).
+const OUTCOME_GROUPS = [
+  { label: "Resolution",     color: "#16a34a", ids: ["paid_full", "paid_partial"] },
+  { label: "Awaiting payer", color: "#2563eb", ids: ["promised_payment", "in_adjudication", "payer_followup", "authorization_pending", "appeal_filed", "alj_appeal_filed", "resubmitted"] },
+  { label: "Retry",          color: "#d97706", ids: ["left_voicemail", "no_response"] },
+  { label: "Action needed",  color: "#7c3aed", ids: ["needs_documentation", "pending_eligibility", "physician_query", "coding_assigned"] },
+  { label: "Terminal",       color: "#dc2626", ids: ["escalated", "refer_specialist", "writeoff_recommended"] },
 ];
 
 
@@ -472,8 +508,8 @@ function isAccountActionable(accountId) {
   const store = getFollowUpStore();
   const entry = store[accountId];
   if (!entry) return true;
-  if (entry === "closed") return false;
-  if (entry === "pending_cfo") return false;
+  if (entry === "closed") return false;       // legacy: pre-migration browsers may have this. New outcomes don't produce it.
+  if (entry === "pending_cfo") return false;  // write-off chain pending
   return entry <= todayISO();
 }
 
@@ -576,16 +612,16 @@ function OutcomeSelector({ onSelect, selectedOutcome }) {
       >
         <option value="" disabled>Select outcome status...</option>
         <optgroup label="In progress">
-          {OUTCOME_STATUSES.filter(o => !o.closed && !o.pending).map(o => (
+          {OUTCOME_STATUSES.filter(o => !o.pending && o.nextStatus !== "payment_expected").map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </optgroup>
-        <optgroup label="Completed">
-          {OUTCOME_STATUSES.filter(o => o.closed).map(o => (
+        <optgroup label="Payment expected (sleeps until cash posts)">
+          {OUTCOME_STATUSES.filter(o => o.nextStatus === "payment_expected").map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </optgroup>
-        <optgroup label="Special">
+        <optgroup label="Pending approval">
           {OUTCOME_STATUSES.filter(o => o.pending).map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
@@ -599,11 +635,26 @@ function FollowUpPreview({ outcome }) {
   if (!outcome) return null;
   const os = OUTCOME_STATUSES.find(o => o.value === outcome);
   if (!os) return null;
+  if (os.pending) {
+    return (
+      <div style={{ marginTop: 10, padding: "10px 14px", background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 8, fontSize: 12, color: "#854d0e" }}>
+        ⏳ Pending CFO write-off approval — no follow-up set.
+      </div>
+    );
+  }
+  if (os.nextStatus === "payment_expected") {
+    return (
+      <div style={{ marginTop: 10, padding: "10px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, fontSize: 12, color: "#1e40af", lineHeight: 1.5 }}>
+        📅 Status → Payment expected. Sleeps {os.followUpDays} business days (resurfaces {addBusinessDays(os.followUpDays)}).
+        <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, fontStyle: "italic" }}>
+          Cash posting closes the account. If cash hasn't arrived by the follow-up date, the account resurfaces here.
+        </div>
+      </div>
+    );
+  }
   return (
-    <div style={{ marginTop: 10, padding: "10px 14px", background: os.closed ? "#f0fdf4" : "#eff6ff", border: `1px solid ${os.closed ? "#bbf7d0" : "#bfdbfe"}`, borderRadius: 8, fontSize: 12, color: os.closed ? "#166534" : "#1e40af" }}>
-      {os.closed ? "✓ Account closed — no follow-up required." :
-       os.pending ? "⏳ Pending CFO write-off approval — no follow-up set." :
-       `📅 Next follow-up: ${addBusinessDays(os.followUpDays)} (${os.followUpDays} business day${os.followUpDays === 1 ? "" : "s"})`}
+    <div style={{ marginTop: 10, padding: "10px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, fontSize: 12, color: "#1e40af" }}>
+      📅 Next follow-up: {addBusinessDays(os.followUpDays)} ({os.followUpDays} business day{os.followUpDays === 1 ? "" : "s"})
     </div>
   );
 }
@@ -822,8 +873,8 @@ function ScratchNoteGenerator({ acc, outcome, onNoteReady }) {
   if (!outcome) return null;
 
   const os = OUTCOME_STATUSES.find(o => o.value === outcome);
-  const followUpText = os?.closed ? "Account closed — no follow-up required." 
-    : os?.pending ? "Pending CFO write-off approval." 
+  const followUpText = os?.pending ? "Pending CFO write-off approval."
+    : os?.nextStatus === "payment_expected" ? `Account → Payment expected. Sleeps ${os.followUpDays} business days waiting for cash posting; resurfaces if no cash by ${addBusinessDays(os.followUpDays)}.`
     : `Follow-up in ${os?.followUpDays} business day${os?.followUpDays === 1 ? "" : "s"}.`;
 
   const generate = async () => {
@@ -2544,7 +2595,7 @@ function CollectorAccountCard({ acc, onLog, onWorkLink }) {
     onLog({
       id: acc.id, patient: acc.patient, amount: acc.amount,
       expectedValue: acc.expectedValue, outcome, outcomeLabel: os.label,
-      followUpDate: os.closed ? "Closed" : os.pending ? "Pending CFO" : addBusinessDays(os.followUpDays),
+      followUpDate: os.pending ? "Pending CFO" : addBusinessDays(os.followUpDays),
       workNote: noteReady === "__SKIPPED__" ? null : noteReady,
       overrideAction: overrideAction,
       timestamp: new Date(),
@@ -2842,10 +2893,14 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
   }, [arScored]);
 
   const handleLog = useCallback(entry => {
-    // Persist follow-up date so queue suppression survives page reload
+    // Persist follow-up date so queue suppression survives page reload.
+    // Worker UI never closes accounts — cash posting (backend) does. paid_full
+    // and paid_partial advance to payment_expected with 7d sleep via the
+    // standard followUpDays branch; if cash hasn't posted by then, account
+    // resurfaces in the queue.
     const os = OUTCOME_STATUSES.find(o => o.value === entry.outcome);
     if (os) {
-      const storeValue = os.closed ? "closed" : os.pending ? "pending_cfo" : addBusinessDaysISO(os.followUpDays);
+      const storeValue = os.pending ? "pending_cfo" : addBusinessDaysISO(os.followUpDays);
       setFollowUpDate(entry.id, storeValue);
       // Notify main component so CFO donuts re-render
       window.dispatchEvent(new CustomEvent("d4_account_logged", { detail: { id: entry.id } }));
