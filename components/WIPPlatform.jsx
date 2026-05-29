@@ -1645,6 +1645,439 @@ function AreaWorklist({ area, dnfbScored, worklinks, onResolve, onReturn, onWork
 }
 
 // ─── Light Recipient View ─────────────────────────────────────────────────────
+// ─── Session 5: Diane's Authorization Specialist Surface ──────────────────────
+// Handles BOTH inbound chase_auth WLs (from collectors blocked on missing auth)
+// AND native AUTH_MISSING / AUTH_EXPIRED DNFB accounts (pre-billing). Unified
+// queue, four resolution paths per item. Resolutions on inbound WLs route back
+// to the originator via handleResolveWorklink's emit path.
+
+function AuthWorkCard({ item, onResolveWl, onLogDnfb, onEscalate }) {
+  const [resolution, setResolution] = useState(null); // 'resolved' | 'reassigned' | 'declined' | 'escalate'
+  const [authNumber, setAuthNumber] = useState("");
+  const [note, setNote] = useState("");
+  const [reassignTo, setReassignTo] = useState("");
+
+  const isWl = item.kind === "wl";
+  const accountId = item.accountId;
+  const patient = item.patient;
+  const payer = item.payer;
+  const amount = item.amount;
+  const ev = item.ev;
+
+  // TF clock derivation
+  const tf = item.acc?.submissionTfRemaining ?? item.acc?.appealTfRemaining ?? null;
+  const tfLabel = item.acc?.bindingLabel || (isWl ? "Auth window" : null);
+  const tfColor = tf == null ? "#64748b" : tf < 0 ? "#64748b" : tf < 3 ? "#dc2626" : tf < 14 ? "#d97706" : tf < 30 ? "#0369a1" : "#16a34a";
+
+  // SLA on inbound WL
+  const wlHrsOut = isWl ? Math.round((Date.now() - new Date(item.sentAt).getTime()) / 3600000) : null;
+  const wlBreached = isWl && wlHrsOut > item.slaHrs;
+
+  const noteValid = note.trim().length >= 10;
+  const authValid = resolution === "resolved" ? authNumber.trim().length >= 3 : true;
+  const reassignValid = resolution === "reassigned" ? reassignTo.trim().length >= 2 : true;
+  const canCommit = resolution && noteValid && authValid && reassignValid;
+
+  const commit = () => {
+    if (!canCommit) return;
+    if (resolution === "escalate") {
+      onEscalate(item, note.trim());
+      return;
+    }
+    if (isWl) {
+      onResolveWl(item.wl.id, {
+        kind: resolution,
+        note: note.trim(),
+        authNumber: resolution === "resolved" ? authNumber.trim() : null,
+        reassignTo: resolution === "reassigned" ? reassignTo.trim() : null,
+      });
+    } else {
+      // Native DNFB account — log outcome, advance status
+      onLogDnfb(item.acc, {
+        outcome: resolution === "resolved" ? "auth_obtained" : resolution === "declined" ? "auth_denied" : "auth_reassigned",
+        authNumber: resolution === "resolved" ? authNumber.trim() : null,
+        note: note.trim(),
+        reassignTo: resolution === "reassigned" ? reassignTo.trim() : null,
+      });
+    }
+  };
+
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", marginBottom: 8 }}>
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid #f8fafc" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 14 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 10, fontWeight: 600, background: isWl ? "#eff6ff" : "#fef3c7", color: isWl ? "#1e40af" : "#854d0e", border: `1px solid ${isWl ? "#bfdbfe" : "#fde68a"}`, padding: "2px 8px", borderRadius: 4 }}>
+                {isWl ? "⇄ INBOUND WORKLINK" : "📋 NATIVE DNFB"}
+              </span>
+              {tf != null && tfLabel && (
+                <span style={{ fontSize: 10, fontWeight: 600, background: tfColor + "12", color: tfColor, border: `1px solid ${tfColor}40`, padding: "2px 8px", borderRadius: 4 }}>
+                  ⏱ {tfLabel}: {tf < 0 ? `CLOSED (${Math.abs(tf)}d past)` : `${tf}d remaining`}
+                </span>
+              )}
+              {isWl && (
+                <span style={{ fontSize: 10, fontWeight: 600, background: wlBreached ? "#fef2f2" : "#fffbeb", color: wlBreached ? "#dc2626" : "#92400e", border: `1px solid ${wlBreached ? "#fecaca" : "#fde68a"}`, padding: "2px 8px", borderRadius: 4 }}>
+                  {wlBreached ? `WL SLA BREACHED · ${wlHrsOut}h of ${item.slaHrs}h` : `${wlHrsOut}h of ${item.slaHrs}h`}
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{patient}</div>
+            <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6 }}>
+              {accountId} · {item.acc?.site || "—"} · {item.acc?.vertical || ""}
+            </div>
+            <div style={{ fontSize: 12, color: "#475569", fontWeight: 500 }}>
+              {payer}
+              {(PAYER_PORTALS[payer]) && (
+                <a href={PAYER_PORTALS[payer]} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", fontSize: 10, marginLeft: 4, textDecoration: "none" }}>↗</a>
+              )}
+            </div>
+            {isWl && (
+              <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>
+                Sent by <strong>{item.wl.from?.name || "Collector"}</strong> ({item.wl.from?.role || "—"}) · {Math.round((Date.now() - new Date(item.sentAt).getTime()) / 86400000)}d ago
+              </div>
+            )}
+            {!isWl && item.acc && (
+              <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>
+                Hold: <strong>{item.acc.cfg.label}</strong> · {item.daysInDNFB}d in DNFB
+              </div>
+            )}
+          </div>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 2, letterSpacing: "0.06em", textTransform: "uppercase" }}>{isWl ? "EV in flight" : "Expected value"}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: "#2563eb", letterSpacing: "-0.03em", lineHeight: 1 }}>{fmt(ev)}</div>
+            <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>{fmt(amount)} balance</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Sender note (inbound WL only) */}
+      {isWl && item.wl.note && (
+        <div style={{ padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: "#64748b", textTransform: "uppercase", marginBottom: 6 }}>Sender's note · context that traveled with this WorkLink</div>
+          <div style={{ fontSize: 13, color: "#0f172a", lineHeight: 1.65, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 6, padding: "10px 14px" }}>
+            {item.wl.note}
+          </div>
+          {item.wl.reason && (
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>Reason: <strong>{item.wl.reason}</strong></div>
+          )}
+        </div>
+      )}
+
+      {/* Resolution paths */}
+      <div style={{ padding: "16px 20px" }}>
+        {!resolution ? (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "#64748b", textTransform: "uppercase", marginBottom: 10 }}>How are you resolving this?</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+              <button onClick={() => setResolution("resolved")} style={{ padding: "10px 14px", background: "#16a34a", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", textAlign: "left" }}>
+                ✓ Auth obtained {isWl ? "· return to sender" : "· log to account"}
+              </button>
+              <button onClick={() => setResolution("escalate")} style={{ padding: "10px 14px", background: "#fff", border: "1px solid #dc2626", borderRadius: 8, color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", textAlign: "left" }}>
+                ⚡ Escalate to Paula (auth team lead)
+              </button>
+              <button onClick={() => setResolution("reassigned")} style={{ padding: "10px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#475569", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", textAlign: "left" }}>
+                ↻ Reassign within auth team
+              </button>
+              {isWl && (
+                <button onClick={() => setResolution("declined")} style={{ padding: "10px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#475569", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", textAlign: "left" }}>
+                  ↩ Decline · push back with reason
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6, lineHeight: 1.5 }}>
+              {isWl
+                ? "Resolution sends a note back to the sender. Auth number is recorded on the account and used downstream by the collector to release the claim."
+                : "Logging advances the account status. Auth number (if obtained) is recorded for the biller to submit with the claim."
+              }
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, fontSize: 13 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 999, background: resolution === "resolved" ? "#16a34a" : resolution === "escalate" ? "#dc2626" : "#d97706" }} />
+              <strong style={{ color: "#0f172a" }}>
+                {resolution === "resolved" && (isWl ? "Resolving · returning auth to sender" : "Logging auth obtained")}
+                {resolution === "escalate" && "Escalating to Paula"}
+                {resolution === "reassigned" && "Reassigning within auth team"}
+                {resolution === "declined" && "Declining · pushing back to sender"}
+              </strong>
+              <button onClick={() => { setResolution(null); setAuthNumber(""); setNote(""); setReassignTo(""); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "#64748b", fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>Change</button>
+            </div>
+
+            {resolution === "resolved" && (
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>Authorization number (required)</label>
+                <input value={authNumber} onChange={(e) => setAuthNumber(e.target.value)} placeholder="e.g. AUTH-99214-RETRO"
+                  style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${authNumber.trim().length >= 3 ? "#e2e8f0" : "#fca5a5"}`, borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#0f172a", fontFamily: "inherit", outline: "none" }} />
+                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>The auth number is recorded on the account and surfaces in the inbound resolution returned to the sender.</div>
+              </div>
+            )}
+
+            {resolution === "reassigned" && (
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>Reassign to (auth specialist name)</label>
+                <input value={reassignTo} onChange={(e) => setReassignTo(e.target.value)} placeholder="e.g. Marcus Chen"
+                  style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${reassignTo.trim().length >= 2 ? "#e2e8f0" : "#fca5a5"}`, borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#0f172a", fontFamily: "inherit", outline: "none" }} />
+              </div>
+            )}
+
+            <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+              {resolution === "resolved" && "Resolution note (required)"}
+              {resolution === "escalate" && "Why does this need Paula's review? (required)"}
+              {resolution === "reassigned" && "Reassignment note · why (required)"}
+              {resolution === "declined" && "Reason for declining (required)"}
+            </label>
+            <textarea value={note} onChange={(e) => setNote(e.target.value)}
+              placeholder={
+                resolution === "resolved" ? `e.g. "Called payer, obtained retro-auth ${authNumber || "AUTH-XXXX"}, valid through end of episode. Claim ready to release."`
+                : resolution === "escalate" ? "e.g. \"Payer stalled — submitted retro 30d ago, two follow-ups, no decision. Need peer-to-peer or medical director call.\""
+                : resolution === "reassigned" ? "e.g. \"Reassigning to specialist with peer-to-peer access to this payer.\""
+                : "e.g. \"This is a coding issue, not auth — route to coding first.\""
+              }
+              style={{ width: "100%", boxSizing: "border-box", minHeight: 80, border: `1px solid ${noteValid ? "#e2e8f0" : "#fca5a5"}`, borderRadius: 8, padding: "10px 12px", fontSize: 13, color: "#0f172a", fontFamily: "inherit", resize: "vertical", outline: "none", lineHeight: 1.5 }} />
+            <div style={{ fontSize: 11, color: noteValid ? "#94a3b8" : "#dc2626", marginTop: 4 }}>
+              {noteValid ? `${note.length} characters` : `${note.length}/10 minimum — add context about what was tried.`}
+            </div>
+
+            <button onClick={commit} disabled={!canCommit}
+              style={{ marginTop: 12, padding: "10px 20px", width: "100%", background: canCommit ? "#0f172a" : "#e2e8f0", border: "none", borderRadius: 8, color: canCommit ? "#fff" : "#94a3b8", cursor: canCommit ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
+              {resolution === "resolved" && (isWl ? "Confirm · send auth back to sender" : "Confirm · log auth obtained")}
+              {resolution === "escalate" && "Send to Paula"}
+              {resolution === "reassigned" && "Confirm reassignment"}
+              {resolution === "declined" && "Confirm · push back to sender"}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DianeAuthView({ dnfbScored, worklinks, onResolve, onSendWorklink, onReturn }) {
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 768;
+  const [worked, setWorked] = useState(new Set());
+  const [expandedId, setExpandedId] = useState(null);
+  const [siteFilter, setSiteFilter] = useState(null);
+
+  // Inbound WLs targeted to Authorization area
+  const inboundWls = useMemo(() => worklinks.filter(w =>
+    w.status === "open" &&
+    w.targetArea === "Authorization" &&
+    !worked.has(w.id) &&
+    (!siteFilter || w.site === siteFilter)
+  ), [worklinks, worked, siteFilter]);
+
+  // Native AUTH_* DNFB accounts (not yet WL'd, not in worked set)
+  const inboundAccIds = new Set(inboundWls.map(w => w.accountId));
+  const nativeDnfb = useMemo(() => dnfbScored.filter(a =>
+    a.area === "Authorization" &&
+    !worked.has(a.id) &&
+    !inboundAccIds.has(a.id) &&
+    (!siteFilter || a.site === siteFilter)
+  ), [dnfbScored, worked, inboundAccIds, siteFilter]);
+
+  // Sent escalations (Diane → Paula) for visibility
+  const sentEscalations = useMemo(() => worklinks.filter(w =>
+    w.status === "open" &&
+    (w.requestType === "escalate_auth_lead" || w.requestType === "escalate_prebill_auth" || w.requestType === "escalate_postbill_auth") &&
+    w.from?.role === "Auth Specialist"
+  ), [worklinks]);
+
+  // Unified queue
+  const items = useMemo(() => {
+    const out = [
+      ...inboundWls.map(w => ({
+        kind: "wl", id: w.id, wl: w, accountId: w.accountId,
+        patient: w.patient, payer: w.payer, amount: w.amount, ev: w.expectedValue,
+        sentAt: w.sentAt, slaHrs: w.slaHrs, slaDue: w.slaDue,
+        acc: null, // WLs don't carry full account, just snapshot fields
+      })),
+      ...nativeDnfb.map(a => ({
+        kind: "dnfb", id: a.id, wl: null, accountId: a.id,
+        patient: a.patient, payer: a.payer, amount: a.amount, ev: a.expectedValue,
+        daysInDNFB: a.daysInDNFB, holdCode: a.holdCode, acc: a,
+      })),
+    ];
+    // Sort: WLs breached first, then non-breached WLs by SLA, then DNFB by daysInDNFB desc, EV desc within ties
+    out.sort((a, b) => {
+      const aBreached = a.kind === "wl" && (Date.now() - new Date(a.sentAt).getTime()) / 3600000 > a.slaHrs;
+      const bBreached = b.kind === "wl" && (Date.now() - new Date(b.sentAt).getTime()) / 3600000 > b.slaHrs;
+      if (aBreached !== bBreached) return aBreached ? -1 : 1;
+      if (a.kind === "wl" && b.kind === "wl") return new Date(a.slaDue) - new Date(b.slaDue);
+      if (a.kind === "wl" && b.kind === "dnfb") return -1;
+      if (a.kind === "dnfb" && b.kind === "wl") return 1;
+      if (a.daysInDNFB !== b.daysInDNFB) return (b.daysInDNFB || 0) - (a.daysInDNFB || 0);
+      return b.ev - a.ev;
+    });
+    return out;
+  }, [inboundWls, nativeDnfb]);
+
+  const totalEV = items.reduce((s, i) => s + i.ev, 0);
+  const wlCount = items.filter(i => i.kind === "wl").length;
+  const wlBreachedCount = items.filter(i => i.kind === "wl" && (Date.now() - new Date(i.sentAt).getTime()) / 3600000 > i.slaHrs).length;
+  const dnfbCount = items.filter(i => i.kind === "dnfb").length;
+
+  const handleResolveWl = useCallback((wlId, resolution) => {
+    onResolve(wlId, resolution);
+    setWorked(prev => new Set([...prev, wlId]));
+    setExpandedId(null);
+  }, [onResolve]);
+
+  const handleLogDnfb = useCallback((acc, entry) => {
+    // For DNFB accounts, log to platform's follow-up store (suppresses from queue)
+    setFollowUpDate(acc.id, addBusinessDaysISO(7));
+    window.dispatchEvent(new CustomEvent("d4_account_logged", { detail: { id: acc.id } }));
+    setWorked(prev => new Set([...prev, acc.id]));
+    setExpandedId(null);
+  }, []);
+
+  const handleEscalate = useCallback((item, escalationNote) => {
+    // Emit escalate_auth_lead WL targeting Paula
+    const escId = `WL-OUT-${Date.now()}-${item.accountId}`;
+    const reqDef = WORKLINK_REQUEST_TYPES.find(t => t.value === "escalate_auth_lead");
+    onSendWorklink({
+      id: escId,
+      accountId: item.accountId, patient: item.patient, payer: item.payer,
+      vertical: item.acc?.vertical || "", site: item.acc?.site || "",
+      amount: item.amount, expectedValue: item.ev,
+      originType: item.kind === "wl" ? "ESCALATED_WL" : "ESCALATED_DNFB",
+      sourceArea: "Authorization", sourceRole: "authorization",
+      from: { name: "Diane Aguilar", role: "Auth Specialist" },
+      requestType: "escalate_auth_lead",
+      requestLabel: reqDef?.label || "Escalate to auth team lead",
+      requestIcon: reqDef?.icon || "⚡",
+      targetRole: "auth_team_lead",
+      note: escalationNote,
+      reason: item.kind === "wl" ? `Escalated from inbound WL ${item.wl.id}` : `Escalated from native DNFB hold ${item.acc?.holdCode}`,
+      parentId: item.kind === "wl" ? item.wl.id : null,
+      status: "open",
+      sentAt: new Date(),
+      slaHrs: WORKLINK_REQUEST_SLA_HRS.escalate_auth_lead,
+      slaDue: new Date(Date.now() + WORKLINK_REQUEST_SLA_HRS.escalate_auth_lead * 3600 * 1000),
+      slaSeverity: "URGENT", slaTier: "high",
+      slaLabel: `${WORKLINK_REQUEST_SLA_HRS.escalate_auth_lead}h`,
+      createdAt: new Date().toISOString(),
+    });
+    // Mark as worked so it leaves Diane's queue (Paula owns it now)
+    setWorked(prev => new Set([...prev, item.id]));
+    setExpandedId(null);
+  }, [onSendWorklink]);
+
+  return (
+    <div style={{ padding: isMobile ? "16px 12px 80px" : "24px 32px" }}>
+      {/* Metrics */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+        {[
+          { label: "Items to work", value: items.length, sub: `${wlCount} inbound · ${dnfbCount} native`, color: "#0f172a" },
+          { label: "WL SLA breached", value: wlBreachedCount, sub: wlBreachedCount > 0 ? "work these first" : "all within SLA", color: wlBreachedCount > 0 ? "#dc2626" : "#16a34a" },
+          { label: "Sent to Paula", value: sentEscalations.length, sub: "auth escalations in flight", color: "#7c3aed" },
+          { label: "Total EV in queue", value: fmt(totalEV), sub: "expected recovery if all resolved", color: "#2563eb" },
+        ].map(({ label, value, sub, color }) => (
+          <div key={label} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color, letterSpacing: "-0.01em" }}>{value}</div>
+            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Site filter */}
+      {(() => {
+        const sites = [...new Set([...inboundWls, ...nativeDnfb].map(x => x.site || x.acc?.site).filter(Boolean))].sort();
+        if (sites.length <= 1) return null;
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px" }}>
+            <span style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em" }}>My sites:</span>
+            <button onClick={() => setSiteFilter(null)} style={{ padding: "3px 10px", fontSize: 11, fontWeight: !siteFilter ? 600 : 400, border: `1px solid ${!siteFilter ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: !siteFilter ? "#2563eb" : "#fff", color: !siteFilter ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>All</button>
+            {sites.map(s => (
+              <button key={s} onClick={() => setSiteFilter(siteFilter === s ? null : s)} style={{ padding: "3px 10px", fontSize: 11, fontWeight: siteFilter === s ? 600 : 400, border: `1px solid ${siteFilter === s ? "#2563eb" : "#e2e8f0"}`, borderRadius: 20, background: siteFilter === s ? "#2563eb" : "#fff", color: siteFilter === s ? "#fff" : "#64748b", cursor: "pointer", fontFamily: "inherit" }}>{s}</button>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* Queue */}
+      {items.length === 0 ? (
+        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "40px 24px", textAlign: "center" }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#16a34a", marginBottom: 6 }}>Auth queue clear</div>
+          <div style={{ fontSize: 13, color: "#166534" }}>No inbound WorkLinks or native auth holds to work right now.</div>
+        </div>
+      ) : (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>{items.length} items · click to expand and resolve</div>
+          {items.slice(0, 50).map(item => {
+            const isExpanded = expandedId === item.id;
+            const breached = item.kind === "wl" && (Date.now() - new Date(item.sentAt).getTime()) / 3600000 > item.slaHrs;
+            return (
+              <div key={item.id} style={{ marginBottom: 4 }}>
+                {!isExpanded ? (
+                  <div onClick={() => setExpandedId(item.id)}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "#fff", border: `1px solid ${breached ? "#fca5a5" : "#e2e8f0"}`, borderRadius: 8, cursor: "pointer" }}
+                    onMouseEnter={e => e.currentTarget.style.background="#f8fafc"}
+                    onMouseLeave={e => e.currentTarget.style.background="#fff"}>
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3, background: item.kind === "wl" ? "#eff6ff" : "#fef3c7", color: item.kind === "wl" ? "#1e40af" : "#854d0e", border: `1px solid ${item.kind === "wl" ? "#bfdbfe" : "#fde68a"}`, flexShrink: 0 }}>
+                      {item.kind === "wl" ? "INBOUND" : "DNFB"}
+                    </span>
+                    {breached && (
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3, background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", flexShrink: 0 }}>BREACHED</span>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.patient}</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8" }}>
+                        {item.accountId} · {item.payer} · {item.kind === "wl" ? `sent by ${item.wl.from?.name || "Collector"}` : `${item.daysInDNFB}d in DNFB`}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#2563eb" }}>{fmt(item.ev)}</div>
+                    </div>
+                    <span style={{ fontSize: 10, color: "#94a3b8" }}>▼</span>
+                  </div>
+                ) : (
+                  <div>
+                    <button onClick={() => setExpandedId(null)} style={{ fontSize: 11, color: "#94a3b8", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textDecoration: "underline", padding: "0 0 4px 0" }}>▲ collapse</button>
+                    <AuthWorkCard key={item.id} item={item} onResolveWl={handleResolveWl} onLogDnfb={handleLogDnfb} onEscalate={handleEscalate} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {items.length > 50 && (
+            <div style={{ textAlign: "center", padding: "10px", fontSize: 11, color: "#94a3b8" }}>
+              Showing top 50 of {items.length} · resolve current items to surface the rest
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Sent escalations panel */}
+      {sentEscalations.length > 0 && (
+        <div style={{ marginTop: 24, background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 10, padding: "12px 16px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "#7c3aed", textTransform: "uppercase", marginBottom: 8 }}>⚡ {sentEscalations.length} escalation{sentEscalations.length === 1 ? "" : "s"} sent to Paula · awaiting resolution</div>
+          {sentEscalations.slice(0, 5).map((w, ix) => {
+            const hrsOut = Math.round((Date.now() - new Date(w.sentAt).getTime()) / 3600000);
+            return (
+              <div key={ix} style={{ fontSize: 12, color: "#581c87", padding: "6px 0", borderTop: ix > 0 ? "1px solid #e9d5ff" : "none" }}>
+                <strong>{w.patient}</strong> ({w.accountId}) · {w.payer} · sent {hrsOut}h ago
+                <div style={{ fontSize: 11, color: "#7c3aed", marginTop: 2 }}>{w.note}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Worked this session */}
+      {worked.size > 0 && (
+        <div style={{ marginTop: 16, fontSize: 11, color: "#94a3b8" }}>
+          {worked.size} item{worked.size === 1 ? "" : "s"} worked this session
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Low-frequency recipients (physicians, credentialing) get NO work-generating queue —
 // just a lightweight "WorkLinks waiting on you" list with one-tap status. Easier than email.
 function LightRecipientView({ area, worklinks, onResolve, roleLabel }) {
@@ -2920,7 +3353,6 @@ function CollectorAccountCard({ acc, onLog, onWorkLink, sentWorklinks = [] }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 10, fontWeight: 600, background: sev.bg, color: sev.text, border: `1px solid ${sev.border}`, padding: "2px 8px", borderRadius: 4 }}>{acc.cfg.severity}</span>
               <span style={{ fontSize: 10, fontWeight: 600, background: acc.cfg.color + "12", color: acc.cfg.color, border: `1px solid ${acc.cfg.color}30`, padding: "2px 8px", borderRadius: 4 }}>{acc.area === 'Collections' ? acc.cfg.label.split(' — ')[0].toUpperCase() : acc.area.toUpperCase()}</span>
               {tfText && (
                 <span style={{ fontSize: 10, fontWeight: 600, background: tfColor + "12", color: tfColor, border: `1px solid ${tfColor}40`, padding: "2px 8px", borderRadius: 4 }}>⏱ {tfText}</span>
@@ -5147,6 +5579,8 @@ Keep every item to one line. Limit pointers to 2-3.`;
         </div>
         {isTeamLeadMode ? (
           <WorkLinkPaula embedded />
+        ) : roleConfig.area === "Authorization" ? (
+          <DianeAuthView dnfbScored={dnfbForRole} worklinks={worklinks} onResolve={handleResolveWorklink} onSendWorklink={handleSendWorklink} onReturn={handleReturnWorklink} />
         ) : (
           <AreaWorklist area={roleConfig.area} dnfbScored={dnfbForRole} worklinks={worklinks} onResolve={handleResolveWorklink} onReturn={handleReturnWorklink} onWorkLink={handleSendWorklink} />
         )}
