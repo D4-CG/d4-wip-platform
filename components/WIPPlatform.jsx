@@ -248,6 +248,7 @@ const PROB_THRESHOLDS = {
 // WorkLink SLA by request type — replaces severity-only SLA
 // Applied as MAX(severity_hrs, request_type_hrs)
 const WORKLINK_REQUEST_SLA_HRS = {
+  // Work requests (existing)
   resubmit:       24,
   recode:         48,
   chase_auth:     72,
@@ -256,7 +257,36 @@ const WORKLINK_REQUEST_SLA_HRS = {
   him_deficiency: 48,
   physician_query: 72,
   other:          48,
+  // Escalations (Session 3 — Carlos/Diane → team leads, specialists, supervisors)
+  escalate_prebill_auth:     24,  // Diane → Paula: auth obtaining stalled pre-bill
+  escalate_postbill_auth:    24,  // Diane or Carlos → Paula: contested obtain post-bill
+  escalate_auth_lead:        24,  // auth specialist → Paula: general escalation
+  escalate_collections_lead: 24,  // Carlos → Amara: collections team lead
+  refer_specialist:          48,  // Carlos → Renata: specialist referral
+  write_off_request:         72,  // Carlos → James/CFO: tier 2 write-off chain
+  // Inbound notifications (Session 3 — resolution returns to originator)
+  inbound_resolution:        24,
+  inbound_decline:           24,
 };
+
+// Paula's SLA tier vocabulary (critical/high/medium/low) — coexists with the
+// existing slaSeverity (CRITICAL/URGENT/MODERATE/ROUTINE) on the same WL.
+// Both render correctly in their respective surfaces; canon unifies in Session 6.
+const WL_SLA_TIER_HOURS = { critical: 4, high: 24, medium: 48, low: 72 };
+
+// Severity ↔ tier mapping for components that need to round-trip
+function sevToTier(sev) {
+  if (sev === "CRITICAL") return "critical";
+  if (sev === "URGENT") return "high";
+  if (sev === "MODERATE") return "medium";
+  return "low";
+}
+function tierToSev(tier) {
+  if (tier === "critical") return "CRITICAL";
+  if (tier === "high") return "URGENT";
+  if (tier === "medium") return "MODERATE";
+  return "ROUTINE";
+}
 
 // Vertical configuration — context injected into AI prompts
 const CLIENT_CONFIG = {
@@ -356,6 +386,7 @@ const WORKLINK_HOLD_MAP = {
 };
 
 const WORKLINK_REQUEST_TYPES = [
+  // Work requests (target an area)
   { value: "chase_auth",    label: "Chase authorization",      icon: "🔐", targetArea: "Authorization" },
   { value: "missing_charge",label: "Missing charge",           icon: "⚡", targetArea: "Charge Capture" },
   { value: "recode",        label: "Recode account",           icon: "💻", targetArea: "Coding" },
@@ -364,9 +395,24 @@ const WORKLINK_REQUEST_TYPES = [
   { value: "resubmit",      label: "Resubmit claim",          icon: "🔄", targetArea: "Billing/Scrubber" },
   { value: "cred_gap",      label: "Credentialing gap",        icon: "📋", targetArea: "Credentialing" },
   { value: "other",         label: "Other",                    icon: "📌", targetArea: null },
+  // Escalations (target a role, not an area)
+  { value: "escalate_prebill_auth",     label: "Pre-bill auth · supervisory unblock", icon: "⚡", targetRole: "auth_team_lead" },
+  { value: "escalate_postbill_auth",    label: "Post-bill auth · contested obtain",   icon: "⚡", targetRole: "auth_team_lead" },
+  { value: "escalate_auth_lead",        label: "Escalate to auth team lead",          icon: "⚡", targetRole: "auth_team_lead" },
+  { value: "escalate_collections_lead", label: "Escalate to collections team lead",   icon: "⚡", targetRole: "collections_team_lead" },
+  { value: "refer_specialist",          label: "Refer to specialist",                 icon: "🎯", targetRole: "specialist" },
+  { value: "write_off_request",         label: "Write-off request",                   icon: "✕", targetRole: "cfo_writeoff" },
+  // Inbound notifications (sent back to originator on resolve/decline)
+  { value: "inbound_resolution", label: "Resolution returned",     icon: "✓", targetRole: null },
+  { value: "inbound_decline",    label: "Declined — returned",     icon: "↩", targetRole: null },
 ];
 
 const WORKLINK_TARGET_AREAS = ["Authorization","Charge Capture","Coding","Clinical/HIM","Billing/Scrubber","Credentialing","Physician/Doc"];
+
+// Escalation receivers — roles that receive escalation WLs.
+// auth_team_lead exists in ROLE_DEFS (Paula). Others are placeholders pending
+// surface fold-in (Session 6 builds minimal stubs for Amara, Renata, James).
+const WORKLINK_TARGET_ROLES = ["auth_team_lead", "collections_team_lead", "specialist", "cfo_writeoff"];
 
 // Seed realistic WorkLink requests for the demo, derived from real DNFB accounts.
 // Produces a credible by-area spread: a mix of open (some SLA-breached) and resolved.
@@ -491,6 +537,125 @@ function seedWorklinks() {
       createdAt: new Date(now - ageHrs * hr).toISOString(),
     });
   }
+
+  // ---- Escalation WorkLinks (Session 3) ----
+  // Carlos/Diane → Paula (auth_team_lead), Amara (collections_team_lead),
+  // Renata (specialist), James (cfo_writeoff). These give Session 6 real seed
+  // data when Paula's surface folds in. Escalation WLs carry targetRole (not
+  // targetArea), from{name,role} for inbound-back-routing, and slaTier in
+  // Paula's vocabulary.
+  const escalations = [
+    // Paula's six (mirroring original WorkLinkPaula sample data)
+    {
+      requestType: "escalate_prebill_auth",
+      from: { name: "Diane Aguilar", role: "Auth Specialist" },
+      account: { id: "DNFB-00412", patient: "Patricia Nguyen", payer: "Blue Cross", amount: 92500, vertical: "Outpatient Surgery", site: "Site 6", cpt: "47562", dischargeDate: "2026-02-19", phase: "prebill" },
+      note: "Submitted retro-auth via Availity 2026-04-22. Two follow-ups, payer says clinical reviewer is backlogged. Day 30 with no decision and TF window closing. Need supervisory unblock — peer-to-peer or medical director call to push the decision.",
+      reason: "Payer stalled — retro-auth submitted, no decision after 30d",
+      ageHrs: 96, slaTier: "critical",
+    },
+    {
+      requestType: "escalate_postbill_auth",
+      from: { name: "Diane Aguilar", role: "Auth Specialist" },
+      account: { id: "AR-08434", patient: "Margaret Ramirez", payer: "Humana", amount: 41200, vertical: "Outpatient Surgery", site: "Site 4", cpt: "29881", denialDate: "2026-04-26", phase: "postbill" },
+      note: "Auth on file (AUTH-44102) is for wrong CPT (29882 vs 29881 billed). Tried to correct — Humana says original auth was approved only for the listed CPT and won't extend. Looks like a coding/auth mismatch at the front end. Need your call on whether to push back for review or route to coding for analysis.",
+      reason: "Auth/CPT mismatch — payer refuses to extend",
+      ageHrs: 120, slaTier: "high",
+    },
+    {
+      requestType: "escalate_prebill_auth",
+      from: { name: "Diane Aguilar", role: "Auth Specialist" },
+      account: { id: "DNFB-01188", patient: "James Whitfield", payer: "Medicare", amount: 64000, vertical: "Infusion", site: "Site 2", cpt: "96365", dischargeDate: "2025-06-02", phase: "prebill" },
+      note: "Auth expired before DOS (AUTH-88231 exp 2025-05-30, DOS 2025-06-02). Submitted retro on 05-13, ref pending. Day 9, no payer response yet. Account is also approaching TF — wanted you to have eyes on it before it gets worse.",
+      reason: "Expired auth · retro pending · approaching TF",
+      ageHrs: 108, slaTier: "high",
+    },
+    {
+      requestType: "escalate_postbill_auth",
+      from: { name: "Carlos Mendez", role: "Collector" },
+      account: { id: "AR-09781", patient: "Anthony Reeves", payer: "United Health", amount: 28400, vertical: "Cardiology", site: "Site 7", cpt: "93458", denialDate: "2026-03-15", phase: "postbill" },
+      note: "Denied CO-197 (auth absent). Verified with UHC there was a pre-auth on file but submitted under wrong NPI. Auth team tried to correct — UHC says provider needs to be re-credentialed first. This is past the obtain window. Asking you to call it: appeal route or write-off?",
+      reason: "Auth submitted under wrong NPI · credentialing tangle",
+      ageHrs: 132, slaTier: "medium",
+    },
+    {
+      requestType: "escalate_prebill_auth",
+      from: { name: "Diane Aguilar", role: "Auth Specialist" },
+      account: { id: "DNFB-02041", patient: "Robert Nguyen", payer: "Medicaid", amount: 12400, vertical: "Behavioral Health", site: "Site 3", cpt: "90837", dischargeDate: "2026-02-25", phase: "prebill" },
+      note: "Medicaid auth required for >12 visits. Patient already at visit 18, no auth obtained at intake. Submitted retro, Medicaid policy says they don't grant retros for behavioral health absent emergent justification. Need your view — push for exception, or write down to patient responsibility per the policy?",
+      reason: "Medicaid behavioral-health retro generally not granted",
+      ageHrs: 156, slaTier: "medium",
+    },
+    {
+      requestType: "escalate_postbill_auth",
+      from: { name: "Carlos Mendez", role: "Collector" },
+      account: { id: "AR-07203", patient: "Sandra Patel", payer: "Aetna", amount: 9800, vertical: "Radiology", site: "Site 9", cpt: "70553", denialDate: "2026-04-10", phase: "postbill" },
+      note: "Repeat denial — third time this provider's MRI auths bounce from Aetna with same reason. Possible systemic issue at intake. Routing to you so you can look across the pattern, not just this account.",
+      reason: "Pattern flag — repeat MRI auth denials at this site",
+      ageHrs: 180, slaTier: "low",
+    },
+    // Amara — collections team lead (2 from Carlos)
+    {
+      requestType: "escalate_collections_lead",
+      from: { name: "Carlos Mendez", role: "Collector" },
+      account: { id: "AR-04127", patient: "Lisa Henderson", payer: "Aetna", amount: 18600, vertical: "Ophthalmology", site: "Site 5", cpt: "67028", denialDate: "2026-03-20", phase: "postbill" },
+      note: "Three calls to Aetna, three different reps, three different answers on why CO-22 wasn't fixable by phone. Need a senior to push for escalation contact or formal complaint. Account is at 70 days with appeal TF closing in 10.",
+      reason: "Payer reps giving conflicting info · need senior escalation",
+      ageHrs: 72, slaTier: "high", targetRole: "collections_team_lead",
+    },
+    {
+      requestType: "escalate_collections_lead",
+      from: { name: "Carlos Mendez", role: "Collector" },
+      account: { id: "AR-06892", patient: "David Park", payer: "Cigna", amount: 33200, vertical: "Orthopedics", site: "Site 1", cpt: "27447", denialDate: "2026-02-08", phase: "postbill" },
+      note: "Cigna denying CO-50 medical necessity despite two appeals with clinical documentation. Considering ALJ but the patient's chart has gaps the physician hasn't addressed. Need guidance on whether to push physician for addendum or accept the denial.",
+      reason: "Two appeals failed · ALJ decision needed · physician chart gaps",
+      ageHrs: 144, slaTier: "medium", targetRole: "collections_team_lead",
+    },
+    // James — CFO write-off chain (1 from Carlos)
+    {
+      requestType: "write_off_request",
+      from: { name: "Carlos Mendez", role: "Collector" },
+      account: { id: "AR-02547", patient: "Maria Sanchez", payer: "Medicaid", amount: 4200, vertical: "Behavioral Health", site: "Site 3", cpt: "90834", denialDate: "2025-09-15", phase: "postbill" },
+      note: "Medicaid CO-4 — three retro auth attempts over 8 months exhausted. Payer final on denial. All recovery paths exhausted. 12% collection probability after 257 days. Recommending write-off.",
+      reason: "Recovery exhausted · 12% probability after 257d · TF closed",
+      ageHrs: 48, slaTier: "low", targetRole: "cfo_writeoff",
+    },
+  ];
+
+  for (const esc of escalations) {
+    const targetRole = esc.targetRole || "auth_team_lead";
+    const slaHrs = WL_SLA_TIER_HOURS[esc.slaTier];
+    const breached = esc.ageHrs > slaHrs;
+    out.push({
+      id: `WL-SEED-ESC-${++seq}`,
+      accountId: esc.account.id, patient: esc.account.patient, payer: esc.account.payer,
+      vertical: esc.account.vertical, site: esc.account.site, cpt: esc.account.cpt,
+      amount: esc.account.amount,
+      expectedValue: esc.account.phase === "prebill" ? Math.round(esc.account.amount * 0.78) : esc.account.amount,
+      originType: esc.from.role === "Collector" ? "AR" : "DNFB",
+      sourceArea: esc.from.role === "Collector" ? "Collections" : "Authorization",
+      sourceRole: esc.from.role === "Collector" ? "commercial_collector" : "authorization",
+      from: esc.from,
+      requestType: esc.requestType,
+      requestLabel: WORKLINK_REQUEST_TYPES.find(t => t.value === esc.requestType)?.label || esc.requestType,
+      requestIcon: WORKLINK_REQUEST_TYPES.find(t => t.value === esc.requestType)?.icon || "⚡",
+      targetRole,
+      note: esc.note,
+      reason: esc.reason,
+      phase: esc.account.phase,
+      denialDate: esc.account.denialDate,
+      dischargeDate: esc.account.dischargeDate,
+      status: "open",
+      sentAt: new Date(now - esc.ageHrs * hr),
+      slaDue: new Date(now - esc.ageHrs * hr + slaHrs * hr),
+      slaHrs,
+      slaSeverity: tierToSev(esc.slaTier),
+      slaTier: esc.slaTier,
+      slaLabel: breached ? "BREACHED" : `${slaHrs}h`,
+      createdAt: new Date(now - esc.ageHrs * hr).toISOString(),
+    });
+  }
+
   return out;
 }
 function fmtSeed(n) { return "$" + n.toLocaleString(); }
@@ -3152,7 +3317,6 @@ function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLi
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#2563eb" }}>{fmt(acc.expectedValue)}</div>
-                      <div style={{ fontSize: 10, color: "#94a3b8" }}>{acc.prob}% likely</div>
                     </div>
                     <span style={{ fontSize: 10, color: "#94a3b8" }}>▼</span>
                   </div>
@@ -4150,7 +4314,74 @@ export default function WIPPlatform() {
   }, []);
 
   const handleSendWorklink = (req) => setWorklinks(prev => [...prev, req]);
-  const handleResolveWorklink = (id, note) => setWorklinks(prev => prev.map(w => w.id === id ? {...w, status: "resolved", resolvedAt: new Date(), resolutionNote: note} : w));
+
+  // Resolve a WorkLink with one of three kinds (Session 3):
+  //   - resolved: completion. Optional authNumber for auth resolutions.
+  //               Emits inbound WL back to originator with the resolution context.
+  //   - reassigned: handed off to another worker in the same role/area.
+  //                 WL stays open (status unchanged), recipient changes via reassignedTo.
+  //                 No inbound emitted (stays internal to receiving role).
+  //   - declined: pushed back to originator with a reason.
+  //               Emits inbound WL back to originator.
+  //
+  // Backward compat: if `resolution` is a string, treated as {kind:"resolved", note:string}.
+  const handleResolveWorklink = (id, resolution) => {
+    const r = typeof resolution === "string" ? { kind: "resolved", note: resolution } : (resolution || {});
+    const kind = r.kind || "resolved";
+    setWorklinks(prev => {
+      const wl = prev.find(w => w.id === id);
+      const updated = prev.map(w => {
+        if (w.id !== id) return w;
+        const update = {
+          ...w,
+          status: kind === "reassigned" ? "open" : kind === "declined" ? "returned" : "resolved",
+          resolvedAt: new Date(),
+          resolutionNote: r.note || "",
+          resolutionKind: kind,
+        };
+        if (r.authNumber) update.authNumber = r.authNumber;
+        if (r.reassignTo) update.reassignedTo = r.reassignTo;
+        return update;
+      });
+      // Emit inbound WL back to originator for resolved/declined (NOT reassigned)
+      if (wl && (kind === "resolved" || kind === "declined") && (wl.from || wl.sourceRole || wl.sourceArea)) {
+        const targetRole = wl.from?.role === "Collector" ? "commercial_collector"
+                         : wl.from?.role === "Auth Specialist" ? "authorization"
+                         : wl.sourceRole || null;
+        const targetArea = !targetRole ? (wl.sourceArea || null) : null;
+        const inboundId = `WL-INBOUND-${Date.now()}-${id}`;
+        const inboundWl = {
+          id: inboundId,
+          parentId: id,
+          accountId: wl.accountId, patient: wl.patient, payer: wl.payer,
+          vertical: wl.vertical, site: wl.site, cpt: wl.cpt,
+          amount: wl.amount, expectedValue: wl.expectedValue,
+          originType: "INBOUND",
+          sourceArea: wl.targetArea || null,
+          sourceRole: wl.targetRole || null,
+          from: { name: wl.targetRole === "auth_team_lead" ? "Paula" : wl.targetRole || wl.targetArea, role: wl.targetRole || wl.targetArea },
+          requestType: kind === "resolved" ? "inbound_resolution" : "inbound_decline",
+          requestLabel: kind === "resolved"
+            ? `Resolved by ${wl.targetRole === "auth_team_lead" ? "Paula" : wl.targetRole || wl.targetArea}`
+            : `Declined by ${wl.targetRole === "auth_team_lead" ? "Paula" : wl.targetRole || wl.targetArea}`,
+          requestIcon: kind === "resolved" ? "✓" : "↩",
+          targetRole, targetArea,
+          note: `${kind === "resolved" ? "Resolved" : "Declined"}: ${r.note || ""}${r.authNumber ? ` · Auth: ${r.authNumber}` : ""}`,
+          authNumber: r.authNumber || null,
+          status: "open",
+          sentAt: new Date(),
+          slaDue: new Date(Date.now() + 24 * 3600 * 1000),
+          slaHrs: 24,
+          slaSeverity: "ROUTINE",
+          slaTier: "low",
+          slaLabel: "24h",
+          createdAt: new Date().toISOString(),
+        };
+        return [...updated, inboundWl];
+      }
+      return updated;
+    });
+  };
   const handleReturnWorklink = (id, reason, redirectArea) => {
     setWorklinks(prev => prev.map(w => {
       if (w.id !== id) return w;
