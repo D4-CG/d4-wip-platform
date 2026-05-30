@@ -212,7 +212,13 @@ function CollectorAccountRow({ acc, onSelect, idx }) {
     >
       <div>
         <div style={{ fontSize: 14.5, fontWeight: 600, color: INK, marginBottom: 4, display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          {primaryIssue && <span>{primaryIssue.code} · {primaryIssue.label}</span>}
+          {primaryIssue && (
+            <span>
+              {CLAIM_STATE_CODES.has(primaryIssue.code)
+                ? primaryIssue.label
+                : `${primaryIssue.code} · ${primaryIssue.label}`}
+            </span>
+          )}
           {moreIssues && <Pill color={MUTE} bg="#f1f5f9">+{acc.issues.length - 1} more</Pill>}
           {acc.newDenialOverride && <Pill color={RED} bg="#fee2e2">NEW DENIAL</Pill>}
         </div>
@@ -686,24 +692,24 @@ const HOLD_CONFIG = {
   SCRUBBER_EDIT:      { area: "Billing/Scrubber", color: "#0f766e", label: "Scrubber — edit hold",         adj: -4,  severity: "ROUTINE" },
   ELIGIBILITY:        { area: "Billing/Scrubber", color: "#0f766e", label: "Eligibility — mismatch",       adj: -8,  severity: "MODERATE" },
   // ── Denial codes (CO/PR/OA) — primary identifier for adjudicated denials ─────
-  "CO-4":             { area: "Authorization",    color: "#c2410c", label: "Denial CO-4 — not covered",            adj: -35, severity: "URGENT" },
-  "CO-11":            { area: "Coding",           color: "#6d28d9", label: "Denial CO-11 — DX/CPT mismatch",       adj: -12, severity: "MODERATE" },
-  "CO-16":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-16 — missing info",          adj: -8,  severity: "MODERATE" },
-  "CO-18":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-18 — duplicate claim",       adj: -5,  severity: "ROUTINE" },
-  "CO-22":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-22 — COB primary unclear",   adj: -20, severity: "MODERATE" },
-  "CO-23":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-23 — prior payer impact",    adj: -15, severity: "MODERATE" },
-  "CO-29":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-29 — timely filing exceeded",adj: -40, severity: "CRITICAL" },
-  "CO-31":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-31 — patient unidentified",  adj: -20, severity: "URGENT" },
-  "CO-45":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-45 — exceeds fee schedule",  adj: -10, severity: "MODERATE" },
-  "CO-50":            { area: "Physician/Doc",    color: "#1d4ed8", label: "Denial CO-50 — medical necessity",     adj: -30, severity: "URGENT" },
-  "CO-97":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-97 — bundled / inclusive",   adj: -15, severity: "MODERATE" },
-  "CO-109":           { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-109 — not covered by payer", adj: -20, severity: "MODERATE" },
-  "CO-197":           { area: "Authorization",    color: "#c2410c", label: "Denial CO-197 — auth absent",          adj: -25, severity: "URGENT" },
-  "CO-B7":            { area: "Credentialing",    color: "#9f1239", label: "Denial CO-B7 — provider not eligible", adj: -35, severity: "CRITICAL" },
-  "PR-1":             { area: "Patient Balance",  color: "#374151", label: "Denial PR-1 — patient deductible",     adj: 0,   severity: "ROUTINE" },
-  "PR-3":             { area: "Patient Balance",  color: "#374151", label: "Denial PR-3 — patient copay",          adj: 0,   severity: "ROUTINE" },
-  "PR-204":           { area: "Patient Balance",  color: "#374151", label: "Denial PR-204 — not covered by plan",  adj: -5,  severity: "MODERATE" },
-  "OA-23":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial OA-23 — prior payer impact",    adj: -10, severity: "MODERATE" },
+  "CO-4":             { area: "Authorization",    color: "#c2410c", label: "not covered",                          adj: -35, severity: "URGENT" },
+  "CO-11":            { area: "Coding",           color: "#6d28d9", label: "DX/CPT mismatch",                      adj: -12, severity: "MODERATE" },
+  "CO-16":            { area: "Billing/Scrubber", color: "#0f766e", label: "missing info",                         adj: -8,  severity: "MODERATE" },
+  "CO-18":            { area: "Billing/Scrubber", color: "#0f766e", label: "duplicate claim",                      adj: -5,  severity: "ROUTINE" },
+  "CO-22":            { area: "Billing/Scrubber", color: "#0f766e", label: "COB primary unclear",                  adj: -20, severity: "MODERATE" },
+  "CO-23":            { area: "Billing/Scrubber", color: "#0f766e", label: "prior payer impact",                   adj: -15, severity: "MODERATE" },
+  "CO-29":            { area: "Billing/Scrubber", color: "#0f766e", label: "timely filing exceeded",               adj: -40, severity: "CRITICAL" },
+  "CO-31":            { area: "Billing/Scrubber", color: "#0f766e", label: "patient unidentified",                 adj: -20, severity: "URGENT" },
+  "CO-45":            { area: "Billing/Scrubber", color: "#0f766e", label: "exceeds fee schedule",                 adj: -10, severity: "MODERATE" },
+  "CO-50":            { area: "Physician/Doc",    color: "#1d4ed8", label: "medical necessity",                    adj: -30, severity: "URGENT" },
+  "CO-97":            { area: "Billing/Scrubber", color: "#0f766e", label: "bundled / inclusive",                  adj: -15, severity: "MODERATE" },
+  "CO-109":           { area: "Billing/Scrubber", color: "#0f766e", label: "not covered by payer",                 adj: -20, severity: "MODERATE" },
+  "CO-197":           { area: "Authorization",    color: "#c2410c", label: "auth absent",                          adj: -25, severity: "URGENT" },
+  "CO-B7":            { area: "Credentialing",    color: "#9f1239", label: "provider not eligible",                adj: -35, severity: "CRITICAL" },
+  "PR-1":             { area: "Patient Balance",  color: "#374151", label: "patient deductible",                   adj: 0,   severity: "ROUTINE" },
+  "PR-3":             { area: "Patient Balance",  color: "#374151", label: "patient copay",                        adj: 0,   severity: "ROUTINE" },
+  "PR-204":           { area: "Patient Balance",  color: "#374151", label: "not covered by patient plan",          adj: -5,  severity: "MODERATE" },
+  "OA-23":            { area: "Billing/Scrubber", color: "#0f766e", label: "prior payer adjustment",               adj: -10, severity: "MODERATE" },
   // ── Pre-adjudication claim states — for AR accounts not yet denied ─────────
   PENDING_SUBMISSION: { area: "Billing/Scrubber", color: "#dc2626", label: "Submission pending — not yet billed",  adj: 0,   severity: "URGENT" },
   IN_TRANSIT:         { area: "Billing/Scrubber", color: "#64748b", label: "In transit — clearinghouse",           adj: 0,   severity: "ROUTINE" },
@@ -721,6 +727,11 @@ const CLAIM_STATE_TO_CODE = {
   "At Payer":                    "AT_PAYER",
   "Rejected by Clearinghouse":   "REJECTED",
 };
+
+// Set of HOLD_CONFIG keys that represent claim states (not real denial codes).
+// Row renderers use this to suppress the code prefix and show just the label,
+// since the SCREAMING_SNAKE code is not a meaningful identifier to surface.
+const CLAIM_STATE_CODES = new Set(["PENDING_SUBMISSION", "IN_TRANSIT", "AT_PAYER", "REJECTED"]);
 
 const SEV = {
   CRITICAL: { bg: "#fee2e2", text: "#b91c1c", border: "#fca5a5" },
@@ -4613,7 +4624,11 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [] }) {
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: FAINT, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>{acc.id}</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: INK, letterSpacing: "-0.02em" }}>
-              {primaryIssue ? `${primaryIssue.code} · ${primaryIssue.label}` : "—"}
+              {primaryIssue
+                ? (CLAIM_STATE_CODES.has(primaryIssue.code)
+                    ? primaryIssue.label
+                    : `${primaryIssue.code} · ${primaryIssue.label}`)
+                : "—"}
             </div>
             {additionalIssues.length > 0 && (
               <div style={{ fontSize: 12, color: MUTE, marginTop: 4 }}>
