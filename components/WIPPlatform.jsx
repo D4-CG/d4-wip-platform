@@ -4349,6 +4349,81 @@ const BUCKET_ORDER = ["critical", "urgent", "watch", "routine"];
 // Used ONLY for the commercial_collector role. The other 4 collector roles
 // (medicare_bc, medicaid, self_pay, wc) keep the existing CollectorView until
 // they get their own design pass.
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE B.2.1: CarlosDetailView — Header card slice
+// ═══════════════════════════════════════════════════════════════════════════
+// Faithful port of Carlos's standalone DetailView header card. This slice
+// renders ONLY the back button, optional jump-from-inbound notice, and the
+// header card. The Recommended Action card, Send WorkLink shortcut, Account
+// Summary, and Payer Contact block land in B.2.2 → B.2.5. Write-off flow +
+// sleeping state in B.2.6.
+//
+// Ported verbatim from standalone lines 1294-1314 with two data-shape
+// adjustments: (1) urgent computed from appealTfRemaining ?? submissionTfRemaining
+// (platform shape) instead of bindingClock (standalone shape, which collapsed
+// both into one numeric field); (2) STATUS[acc.status] guarded with ?. since
+// platform data may have statuses the standalone didn't have.
+function CarlosDetailView({ acc, onBack, jumpFromInbound }) {
+  const tf = acc.appealTfRemaining ?? acc.submissionTfRemaining;
+  const urgent = tf != null && tf <= 14;
+  const borderColor = urgent ? RED : (STATUS[acc.status]?.color || MUTE);
+  const primaryIssue = acc.issues?.find(i => i.primary) || acc.issues?.[0];
+  const additionalIssues = acc.issues?.filter(i => !i.primary && i !== primaryIssue) || [];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <button onClick={onBack} style={{ ...btnGhost, alignSelf: "flex-start" }}>← back to worklist</button>
+
+      {jumpFromInbound && (
+        <div style={{ padding: "10px 14px", background: "#f0f7ff", border: `1px solid ${BLUE}`, borderRadius: 8, fontSize: 12, color: INK }}>
+          <strong style={{ color: BLUE }}>From inbound:</strong>{" "}
+          {jumpFromInbound.from?.name || "—"} ({jumpFromInbound.from?.role || jumpFromInbound.fromArea || "—"}) —{" "}
+          {jumpFromInbound.requestLabel || jumpFromInbound.requestType || "WorkLink"}
+          {jumpFromInbound.note ? <> · {jumpFromInbound.note}</> : null}
+        </div>
+      )}
+
+      {/* Header card */}
+      <div style={{ padding: "18px 22px", background: "#fff", border: `1px solid ${LINE}`, borderLeft: `3px solid ${borderColor}`, borderRadius: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 14 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: FAINT, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>{acc.id}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: INK, letterSpacing: "-0.02em" }}>
+              {primaryIssue ? `${primaryIssue.code} · ${primaryIssue.label}` : "—"}
+            </div>
+            {additionalIssues.length > 0 && (
+              <div style={{ fontSize: 12, color: MUTE, marginTop: 4 }}>
+                + also {additionalIssues.map(i => `${i.code} · ${i.label}`).join("; ")}
+              </div>
+            )}
+            <div style={{ fontSize: 13, color: MUTE, marginTop: 4 }}>
+              {acc.patient} · {acc.payer}{acc.site ? ` · ${acc.site}` : ""}
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 11, color: FAINT, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>Expected value</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: INK, letterSpacing: "-0.03em" }}>
+              {"$" + Math.round(acc.expectedValue || acc.ev || 0).toLocaleString()}
+            </div>
+            <div style={{ fontSize: 12, color: MUTE }}>{"$" + Math.round(acc.amount || 0).toLocaleString()} AR</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap", alignItems: "center" }}>
+          <StatusPill status={acc.status} />
+          <CollectorDeadlinePill acc={acc} />
+        </div>
+      </div>
+
+      {/* Placeholder for remaining slices */}
+      <div style={{ padding: "14px 18px", background: "#fffbeb", border: `1px solid #fde68a`, borderRadius: 10, fontSize: 12, color: "#92400e", lineHeight: 1.6 }}>
+        <strong style={{ color: AMBER, letterSpacing: "0.04em" }}>B.2.1 shipped: header card.</strong>{" "}
+        Coming next: B.2.2 Recommended Action card · B.2.3 Send WorkLink shortcut · B.2.4 Account Summary prose ·
+        B.2.5 Payer Contact block · B.2.6 Write-off flow + sleeping state.
+      </div>
+    </div>
+  );
+}
+
 function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
@@ -4532,6 +4607,20 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
           Book: commercial · EV ≥ $10K · {actionable.length + enrichedWls.length} items surfaced
         </div>
 
+        {expandedId ? (
+          (() => {
+            const acc = accountById[expandedId];
+            if (!acc) return <div style={{ padding: 20, color: MUTE }}>Account not found · <button onClick={() => setExpandedId(null)} style={btnGhostLink}>back to worklist</button></div>;
+            return (
+              <CarlosDetailView
+                acc={acc}
+                onBack={() => { setExpandedId(null); setJumpedFromWl(null); }}
+                jumpFromInbound={jumpedFromWl}
+              />
+            );
+          })()
+        ) : (
+          <>
         {/* Burning banner — clickable to apply ≤14d filter */}
         <div style={{ marginBottom: 14 }}>
           <BurningBanner
@@ -4591,25 +4680,6 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
         ) : (
           <div>
             {sorted.map((item, idx) => {
-              // If this row is expanded, render the existing Session 4 card
-              // inline (B.1 stopgap — B.2 replaces with Carlos's DetailView).
-              const isExpanded = !item.isInbound && expandedId === item.id;
-              if (isExpanded) {
-                return (
-                  <div key={item.id} style={{ marginBottom: 8, animation: "rise 280ms cubic-bezier(.16,1,.3,1) both" }}>
-                    <div style={{ fontSize: 11, color: FAINT, marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ color: AMBER, fontWeight: 600 }}>● Detail view — full Carlos DetailView lands in Phase B.2</span>
-                      <button onClick={() => setExpandedId(null)} style={btnGhostLink}>↑ collapse</button>
-                    </div>
-                    <CollectorAccountCard
-                      acc={item}
-                      onLog={handleLog}
-                      onWorkLink={onWorkLink}
-                      sentWorklinks={openOutboundByAcc[item.id] || []}
-                    />
-                  </div>
-                );
-              }
               if (item.isInbound) {
                 return (
                   <InboundWorkLinkRow key={item.id} wl={item} idx={idx} variant="card" onOpen={handleSelectInbound} />
@@ -4627,6 +4697,8 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
           <div style={{ marginTop: 24, fontSize: 11, color: FAINT, textAlign: "center" }}>
             {workedAccounts.length} {workedAccounts.length === 1 ? "account" : "accounts"} worked this session
           </div>
+        )}
+          </>
         )}
       </div>
     </div>
