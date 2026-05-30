@@ -106,7 +106,13 @@ function SlaPill({ hoursLeft, state, full }) {
 // weight because collector surface has no tab to disambiguate deadline type.
 function CollectorDeadlinePill({ acc }) {
   const c = acc.appealTfRemaining ?? acc.submissionTfRemaining;
-  const lbl = acc.bindingLabel;
+  // Strip payer prefix — platform's bindingLabel is '[Payer] appeal TF' but
+  // payer already appears in the row's metadata line above. Match Carlos's
+  // standalone format: 'Appeal TF' / 'Submission TF' only.
+  const rawLbl = acc.bindingLabel || "";
+  const lbl = rawLbl.toLowerCase().includes("appeal") ? "Appeal TF"
+            : rawLbl.toLowerCase().includes("submission") ? "Submission TF"
+            : rawLbl;
   const dt = acc.bindingCloseDate;
   if (c == null) {
     if (acc.followUpDaysAway != null && acc.followUpDaysAway <= 0) return <Pill color={AMBER} bg="#fef3c7">Follow-up due</Pill>;
@@ -4485,7 +4491,7 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
   // referenced account (jumpedFrom tracks the WL so the detail view can show
   // sender context). For B.1, this just expands the underlying account.
   const [jumpedFromWl, setJumpedFromWl] = useState(null);
-  const handleSelectRow = (acc) => { setJumpedFromWl(null); setExpandedId(acc.id); };
+  const handleSelectRow = (id) => { setJumpedFromWl(null); setExpandedId(id); };
   const handleSelectInbound = (wl) => {
     if (!wl.account) return;
     setJumpedFromWl(wl);
