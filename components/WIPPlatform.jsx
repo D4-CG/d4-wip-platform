@@ -8,6 +8,40 @@ import DAILY from "../app/data/daily-baseline.json";
 import CFO_KPIS from "../app/data/cfo-kpis.json";
 import WorkLinkPaula from "./WorkLinkPaula";
 
+// ─── PHASE A.1: SHARED DESIGN TOKENS ─────────────────────────────────────────
+// Hex values verified identical across Carlos's and Diane's standalone artifacts.
+// These name what existed scattered as inline literals (718 occurrences across
+// this file as of port). New code MUST use these constants. Old code stays —
+// the hex values are the same, retroactive replacement is busywork.
+//
+// Carlos's palette adds BLUE/PURPLE/TEAL for status pills and inbound rows.
+// Diane's palette is the subset {INK, MUTE, FAINT, LINE, PAPER, RED, AMBER, GREEN}.
+// All future surfaces (Paula, Amara, Renata, James) draw from this set.
+const INK    = "#0f172a";   // Primary text, h1, strong values
+const MUTE   = "#64748b";   // Secondary text, metadata
+const FAINT  = "#94a3b8";   // Tertiary text, separators in metadata lines
+const LINE   = "#e2e8f0";   // Borders, dividers
+const PAPER  = "#f8fafc";   // Card backgrounds (hover, sleeping state, subtle tints)
+const RED    = "#dc2626";   // Critical urgency, breached SLA, write-off
+const AMBER  = "#d97706";   // Watch urgency, in-progress alerts
+const GREEN  = "#16a34a";   // All-clear state, paid, resolved
+const BLUE   = "#2563eb";   // In-progress status, inbound WL accent
+const PURPLE = "#7c3aed";   // Reserved: escalation, supervisory routing
+const TEAL   = "#0d9488";   // Reserved: specialist routing
+
+// ─── SHARED KEYFRAME STYLES ──────────────────────────────────────────────────
+// Both standalones use these exact keyframes. Carlos staggers rows at idx*28ms,
+// Diane at idx*40ms; we'll preserve each surface's rhythm in its own renders.
+// This style block renders ONCE at the platform root (via PlatformStyles below).
+const PLATFORM_KEYFRAMES = `
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
+`;
+function PlatformStyles() {
+  return <style>{PLATFORM_KEYFRAMES}</style>;
+}
+
 function useWindowWidth() {
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1280);
   useEffect(() => {
@@ -1664,6 +1698,29 @@ function AuthWorkCard({ item, onResolveWl, onLogDnfb, onEscalate }) {
   const amount = item.amount;
   const ev = item.ev;
 
+  // ── WL origin classification ──────────────────────────────────────────────
+  // Three origins, each with different sender attribution and resolution semantics:
+  //   1. AR-originated from a collector (Collections sourceArea, originType=AR)
+  //   2. DNFB-originated from Billing intake (Billing/Scrubber sourceArea, originType=DNFB)
+  //      — pre-routed by intake/scrubber, no human sender to push back to
+  //   3. Escalation from another auth specialist (from.role=Auth Specialist)
+  const wlOrigin = !isWl ? null
+    : item.wl.from?.role === "Collector" || item.wl.originType === "AR" ? "collector"
+    : item.wl.from?.role === "Auth Specialist" ? "auth_peer"
+    : item.wl.originType === "DNFB" ? "intake"
+    : "unknown";
+  const senderLabel = wlOrigin === "collector" ? (item.wl.from?.name || "Collector")
+    : wlOrigin === "auth_peer" ? (item.wl.from?.name || "Auth peer")
+    : wlOrigin === "intake" ? "Billing intake"
+    : "Sender";
+  const senderRoleLabel = wlOrigin === "collector" ? "Collector"
+    : wlOrigin === "auth_peer" ? "Auth Specialist"
+    : wlOrigin === "intake" ? "Billing/Scrubber intake (auto-routed)"
+    : "—";
+  // Decline only valid when there's a real human sender to receive the pushback.
+  // Intake WLs (auto-routed from scrubber) have no sender to notify — resolve or escalate only.
+  const canDecline = wlOrigin === "collector" || wlOrigin === "auth_peer";
+
   // TF clock derivation
   const tf = item.acc?.submissionTfRemaining ?? item.acc?.appealTfRemaining ?? null;
   const tfLabel = item.acc?.bindingLabel || (isWl ? "Auth window" : null);
@@ -1692,7 +1749,6 @@ function AuthWorkCard({ item, onResolveWl, onLogDnfb, onEscalate }) {
         reassignTo: resolution === "reassigned" ? reassignTo.trim() : null,
       });
     } else {
-      // Native DNFB account — log outcome, advance status
       onLogDnfb(item.acc, {
         outcome: resolution === "resolved" ? "auth_obtained" : resolution === "declined" ? "auth_denied" : "auth_reassigned",
         authNumber: resolution === "resolved" ? authNumber.trim() : null,
@@ -1702,14 +1758,23 @@ function AuthWorkCard({ item, onResolveWl, onLogDnfb, onEscalate }) {
     }
   };
 
+  // Inbound badge label varies by origin
+  const inboundBadge = wlOrigin === "collector" ? "⇄ INBOUND · collector"
+    : wlOrigin === "auth_peer" ? "⇄ INBOUND · auth peer"
+    : wlOrigin === "intake" ? "📨 ROUTED · billing intake"
+    : "⇄ INBOUND";
+  const inboundBadgeColors = wlOrigin === "intake"
+    ? { bg: "#fdf4ff", color: "#7c2d92", border: "#e9d5ff" }   // purple — intake-routed
+    : { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" };  // blue — human sender
+
   return (
     <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", marginBottom: 8 }}>
       <div style={{ padding: "16px 20px", borderBottom: "1px solid #f8fafc" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 14 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 10, fontWeight: 600, background: isWl ? "#eff6ff" : "#fef3c7", color: isWl ? "#1e40af" : "#854d0e", border: `1px solid ${isWl ? "#bfdbfe" : "#fde68a"}`, padding: "2px 8px", borderRadius: 4 }}>
-                {isWl ? "⇄ INBOUND WORKLINK" : "📋 NATIVE DNFB"}
+              <span style={{ fontSize: 10, fontWeight: 600, background: isWl ? inboundBadgeColors.bg : "#fef3c7", color: isWl ? inboundBadgeColors.color : "#854d0e", border: `1px solid ${isWl ? inboundBadgeColors.border : "#fde68a"}`, padding: "2px 8px", borderRadius: 4 }}>
+                {isWl ? inboundBadge : "📋 NATIVE DNFB"}
               </span>
               {tf != null && tfLabel && (
                 <span style={{ fontSize: 10, fontWeight: 600, background: tfColor + "12", color: tfColor, border: `1px solid ${tfColor}40`, padding: "2px 8px", borderRadius: 4 }}>
@@ -1724,7 +1789,7 @@ function AuthWorkCard({ item, onResolveWl, onLogDnfb, onEscalate }) {
             </div>
             <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{patient}</div>
             <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6 }}>
-              {accountId} · {item.acc?.site || "—"} · {item.acc?.vertical || ""}
+              {accountId} · {item.acc?.site || item.wl?.site || "—"} · {item.acc?.vertical || item.wl?.vertical || ""}
             </div>
             <div style={{ fontSize: 12, color: "#475569", fontWeight: 500 }}>
               {payer}
@@ -1734,7 +1799,11 @@ function AuthWorkCard({ item, onResolveWl, onLogDnfb, onEscalate }) {
             </div>
             {isWl && (
               <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>
-                Sent by <strong>{item.wl.from?.name || "Collector"}</strong> ({item.wl.from?.role || "—"}) · {Math.round((Date.now() - new Date(item.sentAt).getTime()) / 86400000)}d ago
+                {wlOrigin === "intake" ? (
+                  <>Routed by <strong>Billing intake</strong> (auto) · {Math.round((Date.now() - new Date(item.sentAt).getTime()) / 86400000)}d in queue</>
+                ) : (
+                  <>Sent by <strong>{senderLabel}</strong> ({senderRoleLabel}) · {Math.round((Date.now() - new Date(item.sentAt).getTime()) / 86400000)}d ago</>
+                )}
               </div>
             )}
             {!isWl && item.acc && (
@@ -1751,10 +1820,12 @@ function AuthWorkCard({ item, onResolveWl, onLogDnfb, onEscalate }) {
         </div>
       </div>
 
-      {/* Sender note (inbound WL only) */}
+      {/* Sender note / intake context (inbound WL only) */}
       {isWl && item.wl.note && (
         <div style={{ padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: "#64748b", textTransform: "uppercase", marginBottom: 6 }}>Sender's note · context that traveled with this WorkLink</div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: "#64748b", textTransform: "uppercase", marginBottom: 6 }}>
+            {wlOrigin === "intake" ? "Intake context · auto-routed from scrubber" : "Sender's note · context that traveled with this WorkLink"}
+          </div>
           <div style={{ fontSize: 13, color: "#0f172a", lineHeight: 1.65, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 6, padding: "10px 14px" }}>
             {item.wl.note}
           </div>
@@ -1771,7 +1842,7 @@ function AuthWorkCard({ item, onResolveWl, onLogDnfb, onEscalate }) {
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "#64748b", textTransform: "uppercase", marginBottom: 10 }}>How are you resolving this?</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
               <button onClick={() => setResolution("resolved")} style={{ padding: "10px 14px", background: "#16a34a", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", textAlign: "left" }}>
-                ✓ Auth obtained {isWl ? "· return to sender" : "· log to account"}
+                ✓ Auth obtained {isWl ? (wlOrigin === "intake" ? "· release to biller" : `· return to ${senderLabel}`) : "· log to account"}
               </button>
               <button onClick={() => setResolution("escalate")} style={{ padding: "10px 14px", background: "#fff", border: "1px solid #dc2626", borderRadius: 8, color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", textAlign: "left" }}>
                 ⚡ Escalate to Paula (auth team lead)
@@ -1779,15 +1850,17 @@ function AuthWorkCard({ item, onResolveWl, onLogDnfb, onEscalate }) {
               <button onClick={() => setResolution("reassigned")} style={{ padding: "10px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#475569", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", textAlign: "left" }}>
                 ↻ Reassign within auth team
               </button>
-              {isWl && (
+              {isWl && canDecline && (
                 <button onClick={() => setResolution("declined")} style={{ padding: "10px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, color: "#475569", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", textAlign: "left" }}>
-                  ↩ Decline · push back with reason
+                  ↩ Decline · push back to {senderLabel}
                 </button>
               )}
             </div>
             <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6, lineHeight: 1.5 }}>
-              {isWl
-                ? "Resolution sends a note back to the sender. Auth number is recorded on the account and used downstream by the collector to release the claim."
+              {wlOrigin === "intake"
+                ? "Intake-routed WLs have no human sender — resolve releases the claim back to biller; escalate sends to Paula. No 'decline' path (nothing to push back to)."
+                : isWl
+                ? `Resolution sends a note back to ${senderLabel}. Auth number is recorded on the account and used downstream to release the claim.`
                 : "Logging advances the account status. Auth number (if obtained) is recorded for the biller to submit with the claim."
               }
             </div>
@@ -1797,10 +1870,10 @@ function AuthWorkCard({ item, onResolveWl, onLogDnfb, onEscalate }) {
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, fontSize: 13 }}>
               <span style={{ width: 8, height: 8, borderRadius: 999, background: resolution === "resolved" ? "#16a34a" : resolution === "escalate" ? "#dc2626" : "#d97706" }} />
               <strong style={{ color: "#0f172a" }}>
-                {resolution === "resolved" && (isWl ? "Resolving · returning auth to sender" : "Logging auth obtained")}
+                {resolution === "resolved" && (isWl ? (wlOrigin === "intake" ? "Resolving · releasing to biller" : `Resolving · returning auth to ${senderLabel}`) : "Logging auth obtained")}
                 {resolution === "escalate" && "Escalating to Paula"}
                 {resolution === "reassigned" && "Reassigning within auth team"}
-                {resolution === "declined" && "Declining · pushing back to sender"}
+                {resolution === "declined" && `Declining · pushing back to ${senderLabel}`}
               </strong>
               <button onClick={() => { setResolution(null); setAuthNumber(""); setNote(""); setReassignTo(""); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "#64748b", fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>Change</button>
             </div>
@@ -1810,7 +1883,7 @@ function AuthWorkCard({ item, onResolveWl, onLogDnfb, onEscalate }) {
                 <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>Authorization number (required)</label>
                 <input value={authNumber} onChange={(e) => setAuthNumber(e.target.value)} placeholder="e.g. AUTH-99214-RETRO"
                   style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${authNumber.trim().length >= 3 ? "#e2e8f0" : "#fca5a5"}`, borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#0f172a", fontFamily: "inherit", outline: "none" }} />
-                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>The auth number is recorded on the account and surfaces in the inbound resolution returned to the sender.</div>
+                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>The auth number is recorded on the account and surfaces in the inbound resolution returned to {wlOrigin === "intake" ? "the biller" : senderLabel}.</div>
               </div>
             )}
 
@@ -1842,10 +1915,10 @@ function AuthWorkCard({ item, onResolveWl, onLogDnfb, onEscalate }) {
 
             <button onClick={commit} disabled={!canCommit}
               style={{ marginTop: 12, padding: "10px 20px", width: "100%", background: canCommit ? "#0f172a" : "#e2e8f0", border: "none", borderRadius: 8, color: canCommit ? "#fff" : "#94a3b8", cursor: canCommit ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
-              {resolution === "resolved" && (isWl ? "Confirm · send auth back to sender" : "Confirm · log auth obtained")}
+              {resolution === "resolved" && (isWl ? (wlOrigin === "intake" ? "Confirm · release to biller" : `Confirm · send auth back to ${senderLabel}`) : "Confirm · log auth obtained")}
               {resolution === "escalate" && "Send to Paula"}
               {resolution === "reassigned" && "Confirm reassignment"}
-              {resolution === "declined" && "Confirm · push back to sender"}
+              {resolution === "declined" && `Confirm · push back to ${senderLabel}`}
             </button>
           </>
         )}
@@ -2027,7 +2100,13 @@ function DianeAuthView({ dnfbScored, worklinks, onResolve, onSendWorklink, onRet
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.patient}</div>
                       <div style={{ fontSize: 11, color: "#94a3b8" }}>
-                        {item.accountId} · {item.payer} · {item.kind === "wl" ? `sent by ${item.wl.from?.name || "Collector"}` : `${item.daysInDNFB}d in DNFB`}
+                        {item.accountId} · {item.payer} · {
+                          item.kind === "dnfb" ? `${item.daysInDNFB}d in DNFB`
+                          : item.wl.from?.role === "Collector" || item.wl.originType === "AR" ? `sent by ${item.wl.from?.name || "Collector"}`
+                          : item.wl.from?.role === "Auth Specialist" ? `escalated by ${item.wl.from?.name || "auth peer"}`
+                          : item.wl.originType === "DNFB" ? "routed by Billing intake"
+                          : "inbound"
+                        }
                       </div>
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
