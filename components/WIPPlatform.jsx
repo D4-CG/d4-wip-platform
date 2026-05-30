@@ -405,6 +405,163 @@ function InboundWorkLinkRow({ wl, idx, onOpen, variant = "card" }) {
   );
 }
 
+// ─── PHASE A.4: BURNING BANNER ───────────────────────────────────────────────
+// Shared "what needs attention now" alert. White card with 3px colored left
+// border — RED when burning, GREEN when all clear. Sentence-format body. Clickable
+// when burning (jumps to a filtered view via onClick handler).
+//
+// Two variants, both seen in standalones:
+//   "overline" — Carlos's design. Tiny uppercase overline ("WORK FIRST" /
+//     "ALL CLEAR IN YOUR BOOK") above larger body text. Hover-lift effect.
+//     "show these →" affordance right-aligned. Visual weight: prominent.
+//   "single" — Diane's design. Single-line body. Inline "Click to work these
+//     first →" affordance. No hover lift. Visual weight: quieter.
+//
+// Caller passes already-computed numbers + an idleMessage. The component is
+// thin — it doesn't compute burning logic, it just renders what it's given.
+function BurningBanner({
+  burningCount, burningEV, breakdown,
+  idleMessage, idleSecondary,
+  onClick, variant = "overline",
+}) {
+  const clickable = burningCount > 0 && onClick;
+  const isOverline = variant === "overline";
+  const fmtMoney = (n) => "$" + Math.round(n || 0).toLocaleString();
+  const baseStyle = {
+    padding: isOverline ? "16px 20px" : "18px 20px",
+    background: "#fff",
+    border: `1px solid ${LINE}`,
+    borderLeft: `3px solid ${burningCount ? RED : GREEN}`,
+    borderRadius: isOverline ? 12 : 14,
+    cursor: clickable ? "pointer" : "default",
+    transition: "transform 120ms, box-shadow 120ms",
+    animation: `rise ${isOverline ? 480 : 520}ms cubic-bezier(.16,1,.3,1) ${isOverline ? 60 : 80}ms both`,
+  };
+  const handleEnter = (e) => {
+    if (!clickable || !isOverline) return;
+    e.currentTarget.style.transform = "translateY(-1px)";
+    e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.05)";
+  };
+  const handleLeave = (e) => {
+    if (!isOverline) return;
+    e.currentTarget.style.transform = "translateY(0)";
+    e.currentTarget.style.boxShadow = "none";
+  };
+
+  if (isOverline) {
+    return (
+      <div onClick={clickable ? onClick : undefined} role={clickable ? "button" : undefined}
+        style={baseStyle} onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: burningCount ? RED : GREEN, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              {burningCount ? "Work first" : "All clear in your book"}
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: INK, marginTop: 4, lineHeight: 1.4 }}>
+              {burningCount ? (
+                <>
+                  <strong>{burningCount}</strong> {burningCount === 1 ? "item" : "items"} need attention now
+                  {breakdown && <> — {breakdown}</>}
+                  {burningEV != null && <> — <strong>{fmtMoney(burningEV)}</strong> EV at risk</>}
+                </>
+              ) : (
+                <>{idleMessage || "No deadline pressure."}{idleSecondary && <> {idleSecondary}</>}</>
+              )}
+            </div>
+          </div>
+          {burningCount > 0 && (
+            <div style={{ fontSize: 11, color: MUTE, whiteSpace: "nowrap", flexShrink: 0 }}>show these →</div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // single-line variant
+  return (
+    <div onClick={clickable ? onClick : undefined} style={baseStyle}>
+      {burningCount ? (
+        <div style={{ fontSize: 16, lineHeight: 1.5 }}>
+          <strong style={{ color: RED }}>{burningCount} {burningCount === 1 ? "item" : "items"}</strong>
+          {" need attention now"}
+          {breakdown && <> — {breakdown}</>}
+          {burningEV != null && <> — <strong>{fmtMoney(burningEV)}</strong> at risk</>}
+          .<span style={{ color: MUTE }}> Click to work these first →</span>
+        </div>
+      ) : (
+        <div style={{ fontSize: 16 }}>{idleMessage || "Nothing burning."}{idleSecondary && <> {idleSecondary}</>}</div>
+      )}
+    </div>
+  );
+}
+
+// ─── PHASE A.5: SURFACE HEADER ───────────────────────────────────────────────
+// Shared header chrome. Tiny uppercase overline (role context like
+// "AUTHORIZATION · OBTAINING" or "COLLECTIONS · COMMERCIAL · CARLOS MENDEZ"),
+// then h1 with the surface's title, with a right-aligned 2-line summary slot.
+// Identical pattern across all three standalones; this consolidates it.
+//
+// `summary` is JSX so each surface chooses what to put in the right slot —
+// Carlos shows "$X EV · N items ready" + "$Y AR balance · M inbound WLs";
+// Diane shows "$X gross · N pre-bill" + "$Y net/EV · M post-bill".
+function SurfaceHeader({ overline, title, summary }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "baseline", justifyContent: "space-between",
+      gap: 16, marginBottom: 18,
+      animation: "fade 600ms ease both",
+    }}>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: FAINT }}>
+          {overline}
+        </div>
+        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", margin: "4px 0 0", color: INK }}>
+          {title}
+        </h1>
+      </div>
+      {summary && (
+        <div style={{ fontSize: 12, color: MUTE, textAlign: "right" }}>
+          {summary}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── PHASE A.6: GROUP HEADER + BUTTON STYLES ─────────────────────────────────
+// GroupHeader — Paula's surface grouping divider. Renders "PRE-BILL ·
+// SUPERVISORY UNBLOCK   3 requests" left, dollar subtotal right. Used inside
+// her single rounded card to separate sections of the queue. Carlos and Diane
+// don't use this (Carlos has TF filter pills, Diane has tabs) but Paula's
+// surface depends on it for Phase D.
+function GroupHeader({ title, count, sum, currency }) {
+  const fmtMoney = (n) => "$" + Math.round(n || 0).toLocaleString();
+  return (
+    <div style={{
+      display: "flex", alignItems: "baseline", justifyContent: "space-between",
+      padding: "18px 20px 10px",
+    }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: MUTE }}>{title}</span>
+        <span style={{ fontSize: 11, color: FAINT }}>{count} {count === 1 ? "request" : "requests"}</span>
+      </div>
+      {sum != null && (
+        <span style={{ fontSize: 12, color: MUTE }}>
+          <strong style={{ color: INK, fontWeight: 600 }}>{fmtMoney(sum)}</strong> {currency}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// Shared button styles. All three standalones use the same primary/ghost
+// pattern with minor variations; this is the canonical pair. Used in detail
+// views, banners, and confirmation flows. NOT React components — style objects
+// callers spread into <button style={...btnPrimary}>...</button>.
+const btnPrimary = { background: INK, color: "#fff", border: "none", borderRadius: 9, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" };
+const btnGhost = { background: "#fff", color: INK, border: `1px solid ${LINE}`, borderRadius: 9, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" };
+const btnGhostLink = { background: "none", border: "none", color: MUTE, fontSize: 11, fontFamily: "inherit", cursor: "pointer", textDecoration: "underline", padding: "4px 0" };
+
 function useWindowWidth() {
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1280);
   useEffect(() => {
