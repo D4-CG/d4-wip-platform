@@ -759,10 +759,13 @@ const OUTCOME_GROUPS = [
 
 const PAYER_CATEGORY = {
   "Medicare": "medicare",
+  "Medicare Advantage": "commercial",  // MA admin'd by commercial insurers; collector workflow is commercial
   "Blue Cross": "commercial", "Blue Shield": "commercial",
   "Aetna": "commercial", "United Health": "commercial",
   "Cigna": "commercial", "Humana": "commercial",
+  "Anthem": "commercial", "Highmark": "commercial", "Independence BC": "commercial",
   "Medicaid": "medicaid",
+  "Self-Pay": "self_pay",
   "Worker Comp": "workers_comp",
 };
 
@@ -770,6 +773,7 @@ const PAYER_BENCHMARKS = {
   medicare:     { min: 85, max: 92, label: "Medicare" },
   commercial:   { min: 75, max: 88, label: "Commercial" },
   medicaid:     { min: 55, max: 70, label: "Medicaid" },
+  self_pay:     { min: 25, max: 50, label: "Self-Pay" },
   workers_comp: { min: 45, max: 65, label: "Worker's Comp" },
 };
 
@@ -7232,6 +7236,7 @@ Keep every item to one line. Limit pointers to 2-3.`;
                 Medicare:   { label: "Medicare",    accounts: arFiltered.filter(a => PAYER_CATEGORY[a.payer] === "medicare") },
                 Commercial: { label: "Commercial",  accounts: arFiltered.filter(a => PAYER_CATEGORY[a.payer] === "commercial") },
                 Medicaid:   { label: "Medicaid",    accounts: arFiltered.filter(a => PAYER_CATEGORY[a.payer] === "medicaid") },
+                "Self-Pay": { label: "Self-Pay",    accounts: arFiltered.filter(a => PAYER_CATEGORY[a.payer] === "self_pay") },
                 "Worker Comp": { label: "Worker's Comp", accounts: arFiltered.filter(a => PAYER_CATEGORY[a.payer] === "workers_comp") },
               };
               return (
