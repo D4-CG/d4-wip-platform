@@ -4316,6 +4316,315 @@ const BUCKET_META = {
 };
 const BUCKET_ORDER = ["critical", "urgent", "watch", "routine"];
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE B.1: CarlosCollectorView — Commercial Collector surface
+// ═══════════════════════════════════════════════════════════════════════════
+// Faithful port of Carlos's standalone main queue view, rendering against
+// platform data (AR_DATA scored + live worklinks state) via the A-phase
+// primitives.
+//
+// What this surface does:
+//   • Reads role-filtered AR accounts (arScored — commercial vertical only)
+//   • Applies STRATUM_FLOOR = $10K EV (Carlos's book scope)
+//   • Suppresses accounts referenced by open inbound WLs (duplicate-suppression:
+//     the WL row replaces the native row to avoid the same account appearing
+//     twice — the WL row carries additional sender context)
+//   • Enriches inbound WLs with hoursLeft + slaState
+//   • Mixes native accounts and inbound WLs into one queue, sorted by urgency
+//     (TF ≤14d OR WL breached/critical), then EV descending within bucket
+//   • Supports TF filter (All / ≤3d / ≤14d / ≤30d) with live counts
+//   • Burning banner clickable to apply ≤14d filter
+//
+// B.1 click handler temporarily defers to the existing Session 4
+// CollectorAccountCard for inline-expanded outcome logging. B.2 will replace
+// that with Carlos's faithful DetailView (AccountSummary, PayerContactBlock,
+// recommendAction, full-screen pattern).
+//
+// Used ONLY for the commercial_collector role. The other 4 collector roles
+// (medicare_bc, medicaid, self_pay, wc) keep the existing CollectorView until
+// they get their own design pass.
+function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 768;
+  const STRATUM_FLOOR = 10000;
+
+  const [tfFilter, setTfFilter] = useState("all");
+  const [expandedId, setExpandedId] = useState(null);
+  const [workedAccounts, setWorkedAccounts] = useState([]);
+
+  // Open inbound WLs targeting commercial_collector. Index by account for
+  // suppression + by ID for fast lookup.
+  const inboundWls = useMemo(
+    () => worklinks.filter(w => w.status === "open" && w.targetRole === "commercial_collector"),
+    [worklinks]
+  );
+  const suppressedIds = useMemo(() => new Set(inboundWls.map(w => w.accountId)), [inboundWls]);
+
+  // Open outbound WLs by account (so the expanded card can show "WL in flight").
+  const openOutboundByAcc = useMemo(() => {
+    const idx = {};
+    for (const w of worklinks) {
+      if (w.status !== "open") continue;
+      if (w.targetRole === "commercial_collector") continue;     // inbound, not outbound
+      if (w.requestType === "inbound_resolution" || w.requestType === "inbound_decline") continue;
+      if (!w.accountId) continue;
+      (idx[w.accountId] = idx[w.accountId] || []).push(w);
+    }
+    return idx;
+  }, [worklinks]);
+
+  // Account lookup for WL enrichment.
+  const accountById = useMemo(() => Object.fromEntries(arScored.map(a => [a.id, a])), [arScored]);
+
+  // Enrich each inbound WL with hoursLeft + slaState + referenced account snapshot.
+  const enrichedWls = useMemo(() => inboundWls.map(wl => {
+    const elapsed = Math.round((Date.now() - new Date(wl.sentAt).getTime()) / 3600000);
+    const hoursLeft = (wl.slaHrs || 24) - elapsed;
+    const window = wl.slaHrs || 24;
+    const slaState =
+      hoursLeft <= 0 ? "breached"
+      : hoursLeft <= window * 0.25 ? "critical"
+      : hoursLeft <= window * 0.5 ? "watch"
+      : "normal";
+    return {
+      ...wl,
+      account: accountById[wl.accountId] || null,
+      hoursLeft, slaState, elapsed,
+      isInbound: true,
+    };
+  }), [inboundWls, accountById]);
+
+  // Native actionable queue:
+  //   - in stratum (EV ≥ $10K)
+  //   - not suppressed by an open inbound WL
+  //   - not worked this session
+  //   - actionable per follow-up store (isAccountActionable)
+  const workedSet = useMemo(() => new Set(workedAccounts.map(w => w.id)), [workedAccounts]);
+  const actionable = useMemo(() =>
+    arScored.filter(a =>
+      (a.expectedValue || 0) >= STRATUM_FLOOR &&
+      !suppressedIds.has(a.id) &&
+      !workedSet.has(a.id) &&
+      isAccountActionable(a.id)
+    ),
+    [arScored, suppressedIds, workedSet]
+  );
+
+  // Urgency tests. Native: any TF/appeal ≤14d. WL: SLA breached or critical.
+  const isUrgentNative = (a) => {
+    const tf = a.appealTfRemaining ?? a.submissionTfRemaining;
+    return tf != null && tf <= 14;
+  };
+  const isUrgentWl = (w) => w.slaState === "breached" || w.slaState === "critical";
+
+  // TF filter — Carlos's standalone filter set, ported.
+  const TF_FILTERS = [
+    { id: "all",  label: "All",   test: () => true },
+    { id: "tf3",  label: "≤3d",   test: (a) => { const tf = a.appealTfRemaining ?? a.submissionTfRemaining; return tf != null && tf <= 3; } },
+    { id: "tf14", label: "≤14d",  test: (a) => { const tf = a.appealTfRemaining ?? a.submissionTfRemaining; return tf != null && tf <= 14; } },
+    { id: "tf30", label: "≤30d",  test: (a) => { const tf = a.appealTfRemaining ?? a.submissionTfRemaining; return tf != null && tf <= 30; } },
+  ];
+  const activeFilter = TF_FILTERS.find(f => f.id === tfFilter) || TF_FILTERS[0];
+
+  // Filtered subsets.
+  const filteredNative = useMemo(() => actionable.filter(activeFilter.test), [actionable, tfFilter]);
+  const filteredInbound = useMemo(() => {
+    if (tfFilter === "all") return enrichedWls;
+    return enrichedWls.filter(w => w.account ? activeFilter.test(w.account) : true);
+  }, [enrichedWls, tfFilter]);
+
+  // Mixed sort: urgent first (priority 0), normal second (priority 1). Within
+  // each, EV descending. WL EV = referenced account's EV.
+  const getEv = (item) => item.isInbound
+    ? (item.account?.expectedValue || item.account?.amount || 0)
+    : (item.expectedValue || 0);
+  const getPriority = (item) => (item.isInbound ? isUrgentWl(item) : isUrgentNative(item)) ? 0 : 1;
+  const sorted = useMemo(() => {
+    const combined = [...filteredNative, ...filteredInbound];
+    return combined.sort((a, b) => {
+      const pa = getPriority(a), pb = getPriority(b);
+      if (pa !== pb) return pa - pb;
+      return getEv(b) - getEv(a);
+    });
+  }, [filteredNative, filteredInbound]);
+
+  // Top-level summary numbers.
+  const totalEV = actionable.reduce((s, a) => s + (a.expectedValue || 0), 0)
+    + enrichedWls.reduce((s, w) => s + (w.account?.expectedValue || w.account?.amount || 0), 0);
+  const totalAR = actionable.reduce((s, a) => s + (a.amount || 0), 0)
+    + enrichedWls.reduce((s, w) => s + (w.account?.amount || 0), 0);
+
+  // Burning calculation.
+  const burningNative = actionable.filter(isUrgentNative);
+  const burningWls = enrichedWls.filter(isUrgentWl);
+  const burningCount = burningNative.length + burningWls.length;
+  const burningEV = burningNative.reduce((s, a) => s + (a.expectedValue || 0), 0)
+    + burningWls.reduce((s, w) => s + (w.account?.expectedValue || w.account?.amount || 0), 0);
+  const burningBreakdown = (() => {
+    const parts = [];
+    if (burningNative.length > 0) parts.push(`${burningNative.length} within 14d of TF/appeal`);
+    if (burningWls.length > 0) parts.push(`${burningWls.length} inbound WL${burningWls.length === 1 ? "" : "s"} at SLA risk`);
+    return parts.join(" · ");
+  })();
+  const idleSecondary = `${actionable.length + enrichedWls.length} items ready to work, sorted by expected value.`;
+
+  // Log handler — uses platform's follow-up store + tracks worked accounts in
+  // session state. Same shape as the existing CollectorView's handleLog.
+  const handleLog = useCallback(entry => {
+    const os = OUTCOME_STATUSES.find(o => o.value === entry.outcome);
+    if (os && !os.pending && os.followUpDays != null) {
+      const storeValue = addBusinessDaysISO(os.followUpDays);
+      setFollowUpDate(entry.id, storeValue);
+    } else if (os?.pending) {
+      setFollowUpDate(entry.id, "pending_cfo");
+    }
+    setWorkedAccounts(prev => [...prev, entry]);
+    setExpandedId(null);
+  }, []);
+
+  // WL jump — when a user clicks an inbound WL row, route into the WL's
+  // referenced account (jumpedFrom tracks the WL so the detail view can show
+  // sender context). For B.1, this just expands the underlying account.
+  const [jumpedFromWl, setJumpedFromWl] = useState(null);
+  const handleSelectRow = (acc) => { setJumpedFromWl(null); setExpandedId(acc.id); };
+  const handleSelectInbound = (wl) => {
+    if (!wl.account) return;
+    setJumpedFromWl(wl);
+    setExpandedId(wl.account.id);
+  };
+
+  // Surface chrome
+  const summary = (
+    <>
+      <div>
+        <strong style={{ color: INK }}>{"$" + Math.round(totalEV).toLocaleString()}</strong> EV ·{" "}
+        {actionable.length + enrichedWls.length} {(actionable.length + enrichedWls.length) === 1 ? "item" : "items"} ready
+      </div>
+      <div style={{ marginTop: 2, fontSize: 11 }}>
+        {"$" + Math.round(totalAR).toLocaleString()} AR balance
+        {enrichedWls.length > 0 && <> · {enrichedWls.length} inbound WL{enrichedWls.length === 1 ? "" : "s"}</>}
+      </div>
+    </>
+  );
+
+  return (
+    <div style={{
+      minHeight: "auto", background: PAPER, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif", color: INK,
+    }}>
+      <PlatformStyles />
+      <div style={{ maxWidth: 980, margin: "0 auto", padding: isMobile ? "20px 16px 60px" : "28px 28px 60px" }}>
+        <SurfaceHeader
+          overline="Collections · Commercial · Carlos Mendez"
+          title="Carlos's worklist"
+          summary={summary}
+        />
+
+        {/* Book label — read-only stratum tag */}
+        <div style={{ display: "inline-block", padding: "4px 10px", background: PAPER, border: `1px solid ${LINE}`, borderRadius: 14, fontSize: 11, color: MUTE, marginBottom: 14 }}>
+          Book: commercial · EV ≥ $10K · {actionable.length + enrichedWls.length} items surfaced
+        </div>
+
+        {/* Burning banner — clickable to apply ≤14d filter */}
+        <div style={{ marginBottom: 14 }}>
+          <BurningBanner
+            variant="overline"
+            burningCount={burningCount}
+            burningEV={burningEV}
+            breakdown={burningBreakdown}
+            idleMessage="No deadline pressure."
+            idleSecondary={idleSecondary}
+            onClick={burningCount > 0 ? () => setTfFilter("tf14") : undefined}
+          />
+        </div>
+
+        {/* TF filter pills */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 10.5, color: FAINT, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginRight: 4 }}>Filter</span>
+          {TF_FILTERS.map(f => {
+            const active = tfFilter === f.id;
+            const nativeCount = actionable.filter(f.test).length;
+            const wlCount = f.id === "all" ? enrichedWls.length : enrichedWls.filter(w => w.account ? f.test(w.account) : false).length;
+            const count = nativeCount + wlCount;
+            return (
+              <button key={f.id} onClick={() => setTfFilter(f.id)}
+                style={{
+                  padding: "5px 11px",
+                  border: `1px solid ${active ? INK : LINE}`,
+                  background: active ? INK : "#fff",
+                  color: active ? "#fff" : INK,
+                  borderRadius: 14, cursor: "pointer", fontFamily: "inherit",
+                  fontSize: 11.5, fontWeight: active ? 600 : 500,
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                }}>
+                {f.label}
+                <span style={{ color: active ? "#fff" : FAINT, fontWeight: 400, fontSize: 10.5 }}>{count}</span>
+              </button>
+            );
+          })}
+          {tfFilter !== "all" && (
+            <button onClick={() => setTfFilter("all")} style={{ ...btnGhostLink, marginLeft: 4 }}>clear filter</button>
+          )}
+        </div>
+
+        {/* Sort note */}
+        <div style={{ fontSize: 11, color: FAINT, marginBottom: 14 }}>
+          Sorted by urgency, then expected value · {sorted.length} {sorted.length === 1 ? "item" : "items"}
+          {enrichedWls.length > 0 && <> ({filteredNative.length} native · {filteredInbound.length} inbound WL{filteredInbound.length === 1 ? "" : "s"})</>}
+          {tfFilter !== "all" && <> · filter active</>}
+        </div>
+
+        {/* Queue */}
+        {sorted.length === 0 ? (
+          <div style={{ padding: "40px 20px", textAlign: "center", color: FAINT, fontSize: 13 }}>
+            {tfFilter === "all"
+              ? "Nothing ready to work right now. Sleeping accounts will resurface when their follow-up dates arrive."
+              : "No accounts match this filter."}
+          </div>
+        ) : (
+          <div>
+            {sorted.map((item, idx) => {
+              // If this row is expanded, render the existing Session 4 card
+              // inline (B.1 stopgap — B.2 replaces with Carlos's DetailView).
+              const isExpanded = !item.isInbound && expandedId === item.id;
+              if (isExpanded) {
+                return (
+                  <div key={item.id} style={{ marginBottom: 8, animation: "rise 280ms cubic-bezier(.16,1,.3,1) both" }}>
+                    <div style={{ fontSize: 11, color: FAINT, marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: AMBER, fontWeight: 600 }}>● Detail view — full Carlos DetailView lands in Phase B.2</span>
+                      <button onClick={() => setExpandedId(null)} style={btnGhostLink}>↑ collapse</button>
+                    </div>
+                    <CollectorAccountCard
+                      acc={item}
+                      onLog={handleLog}
+                      onWorkLink={onWorkLink}
+                      sentWorklinks={openOutboundByAcc[item.id] || []}
+                    />
+                  </div>
+                );
+              }
+              if (item.isInbound) {
+                return (
+                  <InboundWorkLinkRow key={item.id} wl={item} idx={idx} variant="card" onOpen={handleSelectInbound} />
+                );
+              }
+              return (
+                <CollectorAccountRow key={item.id} acc={item} idx={idx} onSelect={handleSelectRow} />
+              );
+            })}
+          </div>
+        )}
+
+        {/* Session worked */}
+        {workedAccounts.length > 0 && (
+          <div style={{ marginTop: 24, fontSize: 11, color: FAINT, textAlign: "center" }}>
+            {workedAccounts.length} {workedAccounts.length === 1 ? "account" : "accounts"} worked this session
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CollectorView({ arScored, dnfbScored, isMedicareBc, worklinks, onWorkLink }) {
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
@@ -6062,7 +6371,11 @@ Keep every item to one line. Limit pointers to 2-3.`;
           <span style={{ fontSize: 12, color: "#64748b" }}>{roleConfig?.label} — {roleConfig?.mode === "medicare_bc" ? "Unified DNFB + AR" : "Collections Queue"}</span>
           <span style={{ fontSize: 11, color: "#94a3b8" }}>· {arForRole.length} accounts · sorted by expected value</span>
         </div>
-        <CollectorView arScored={arForRole} dnfbScored={dnfbForRole} isMedicareBc={roleConfig?.mode === "medicare_bc"} worklinks={worklinks} onWorkLink={handleSendWorklink} />
+        {role === "commercial_collector" ? (
+          <CarlosCollectorView arScored={arForRole} worklinks={worklinks} onWorkLink={handleSendWorklink} />
+        ) : (
+          <CollectorView arScored={arForRole} dnfbScored={dnfbForRole} isMedicareBc={roleConfig?.mode === "medicare_bc"} worklinks={worklinks} onWorkLink={handleSendWorklink} />
+        )}
       </div>
     );
   }
