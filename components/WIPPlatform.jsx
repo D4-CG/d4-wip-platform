@@ -4406,7 +4406,7 @@ const BUCKET_ORDER = ["critical", "urgent", "watch", "routine"];
 //     the WL row replaces the native row to avoid the same account appearing
 //     twice — the WL row carries additional sender context)
 //   • Enriches inbound WLs with hoursLeft + slaState
-//   • Mixes native accounts and inbound WLs into one queue, sorted by urgency
+//   • Mixes native accounts and inbound WLs into one queue, sorted by EV descending
 //     (TF ≤14d OR WL breached/critical), then EV descending within bucket
 //   • Supports TF filter (All / ≤3d / ≤14d / ≤30d) with live counts
 //   • Burning banner clickable to apply ≤14d filter
@@ -4761,14 +4761,11 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
   const getEv = (item) => item.isInbound
     ? (item.account?.expectedValue || item.account?.amount || 0)
     : (item.expectedValue || 0);
-  const getPriority = (item) => (item.isInbound ? isUrgentWl(item) : isUrgentNative(item)) ? 0 : 1;
+  // Sort: pure EV descending. Urgency still surfaces via burning banner,
+  // 3px red left border on urgent rows, and TF filter pills.
   const sorted = useMemo(() => {
     const combined = [...filteredNative, ...filteredInbound];
-    return combined.sort((a, b) => {
-      const pa = getPriority(a), pb = getPriority(b);
-      if (pa !== pb) return pa - pb;
-      return getEv(b) - getEv(a);
-    });
+    return combined.sort((a, b) => getEv(b) - getEv(a));
   }, [filteredNative, filteredInbound]);
 
   // Top-level summary numbers.
@@ -4909,7 +4906,7 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
 
         {/* Sort note */}
         <div style={{ fontSize: 11, color: FAINT, marginBottom: 14 }}>
-          Sorted by urgency, then expected value · {sorted.length} {sorted.length === 1 ? "item" : "items"}
+          Sorted by expected value · {sorted.length} {sorted.length === 1 ? "item" : "items"}
           {enrichedWls.length > 0 && <> ({filteredNative.length} native · {filteredInbound.length} inbound WL{filteredInbound.length === 1 ? "" : "s"})</>}
           {tfFilter !== "all" && <> · filter active</>}
         </div>
