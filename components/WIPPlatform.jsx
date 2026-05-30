@@ -685,12 +685,41 @@ const HOLD_CONFIG = {
   HIM_DEFICIENCY:     { area: "Clinical/HIM",     color: "#0369a1", label: "HIM — record deficiency",      adj: -6,  severity: "MODERATE" },
   SCRUBBER_EDIT:      { area: "Billing/Scrubber", color: "#0f766e", label: "Scrubber — edit hold",         adj: -4,  severity: "ROUTINE" },
   ELIGIBILITY:        { area: "Billing/Scrubber", color: "#0f766e", label: "Eligibility — mismatch",       adj: -8,  severity: "MODERATE" },
-  "CO-4":             { area: "Authorization",    color: "#c2410c", label: "Denial CO-4 — not covered",    adj: -35, severity: "URGENT" },
-  "CO-16":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-16 — missing info",  adj: -8,  severity: "MODERATE" },
-  "CO-22":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-22 — COB issue",     adj: -20, severity: "MODERATE" },
-  "CO-50":            { area: "Physician/Doc",    color: "#1d4ed8", label: "Denial CO-50 — med necessity", adj: -30, severity: "URGENT" },
-  "CO-97":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-97 — bundling",      adj: -15, severity: "MODERATE" },
-  PENDING:            { area: "Pending",      color: "#374151", label: "Pending payment",              adj: 0,   severity: "ROUTINE" },
+  // ── Denial codes (CO/PR/OA) — primary identifier for adjudicated denials ─────
+  "CO-4":             { area: "Authorization",    color: "#c2410c", label: "Denial CO-4 — not covered",            adj: -35, severity: "URGENT" },
+  "CO-11":            { area: "Coding",           color: "#6d28d9", label: "Denial CO-11 — DX/CPT mismatch",       adj: -12, severity: "MODERATE" },
+  "CO-16":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-16 — missing info",          adj: -8,  severity: "MODERATE" },
+  "CO-18":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-18 — duplicate claim",       adj: -5,  severity: "ROUTINE" },
+  "CO-22":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-22 — COB primary unclear",   adj: -20, severity: "MODERATE" },
+  "CO-23":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-23 — prior payer impact",    adj: -15, severity: "MODERATE" },
+  "CO-29":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-29 — timely filing exceeded",adj: -40, severity: "CRITICAL" },
+  "CO-31":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-31 — patient unidentified",  adj: -20, severity: "URGENT" },
+  "CO-45":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-45 — exceeds fee schedule",  adj: -10, severity: "MODERATE" },
+  "CO-50":            { area: "Physician/Doc",    color: "#1d4ed8", label: "Denial CO-50 — medical necessity",     adj: -30, severity: "URGENT" },
+  "CO-97":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-97 — bundled / inclusive",   adj: -15, severity: "MODERATE" },
+  "CO-109":           { area: "Billing/Scrubber", color: "#0f766e", label: "Denial CO-109 — not covered by payer", adj: -20, severity: "MODERATE" },
+  "CO-197":           { area: "Authorization",    color: "#c2410c", label: "Denial CO-197 — auth absent",          adj: -25, severity: "URGENT" },
+  "CO-B7":            { area: "Credentialing",    color: "#9f1239", label: "Denial CO-B7 — provider not eligible", adj: -35, severity: "CRITICAL" },
+  "PR-1":             { area: "Patient Balance",  color: "#374151", label: "Denial PR-1 — patient deductible",     adj: 0,   severity: "ROUTINE" },
+  "PR-3":             { area: "Patient Balance",  color: "#374151", label: "Denial PR-3 — patient copay",          adj: 0,   severity: "ROUTINE" },
+  "PR-204":           { area: "Patient Balance",  color: "#374151", label: "Denial PR-204 — not covered by plan",  adj: -5,  severity: "MODERATE" },
+  "OA-23":            { area: "Billing/Scrubber", color: "#0f766e", label: "Denial OA-23 — prior payer impact",    adj: -10, severity: "MODERATE" },
+  // ── Pre-adjudication claim states — for AR accounts not yet denied ─────────
+  PENDING_SUBMISSION: { area: "Billing/Scrubber", color: "#dc2626", label: "Submission pending — not yet billed",  adj: 0,   severity: "URGENT" },
+  IN_TRANSIT:         { area: "Billing/Scrubber", color: "#64748b", label: "In transit — clearinghouse",           adj: 0,   severity: "ROUTINE" },
+  AT_PAYER:           { area: "Billing/Scrubber", color: "#64748b", label: "At payer — awaiting adjudication",     adj: 0,   severity: "ROUTINE" },
+  REJECTED:           { area: "Billing/Scrubber", color: "#dc2626", label: "Rejected — clearinghouse bounce",      adj: -10, severity: "URGENT" },
+  // ── Fallback when nothing else matches (legacy, becoming rare) ─────────────
+  PENDING:            { area: "Pending",          color: "#374151", label: "Pending payment",                      adj: 0,   severity: "ROUTINE" },
+};
+
+// Maps claimStatus (from AR data) to a HOLD_CONFIG key for non-denied accounts.
+// Used by score() to populate issues[0] meaningfully for pre-adjudication AR.
+const CLAIM_STATE_TO_CODE = {
+  "Pending Submission":          "PENDING_SUBMISSION",
+  "Submitted to Clearinghouse":  "IN_TRANSIT",
+  "At Payer":                    "AT_PAYER",
+  "Rejected by Clearinghouse":   "REJECTED",
 };
 
 const SEV = {
@@ -1354,19 +1383,45 @@ function score(acc, type) {
   const todayMs = Date.now();
   let derived = { payerRule: rule };
   if (type === "ar") {
-    const denialMs = todayMs - daysOut * 86400000;
-    const appealCloseMs = denialMs + rule.appealTfDays * 86400000;
-    derived = {
-      ...derived,
-      denialDate: new Date(denialMs).toISOString().slice(0, 10),
-      issues: [{ code: acc.denialCode || "PENDING", label: cfg.label, primary: true }],
-      notes: [],
-      bindingClock: "appeal_tf",
-      bindingLabel: `${rule.label} appeal TF`,
-      bindingCloseDate: new Date(appealCloseMs).toISOString().slice(0, 10),
-      appealTfRemaining: rule.appealTfDays - daysOut,
-      appealTfCloseDate: new Date(appealCloseMs).toISOString().slice(0, 10),
-    };
+    const isDenied = acc.claimStatus === "Adjudicated — Denied" || !!acc.denialCode;
+    if (isDenied) {
+      // Denied account → Appeal TF is the binding clock
+      const denialDate = acc.denialDate || new Date(todayMs - daysOut * 86400000).toISOString().slice(0, 10);
+      const denialMs = new Date(denialDate + "T00:00:00Z").getTime();
+      const appealCloseMs = denialMs + rule.appealTfDays * 86400000;
+      const denialCode = acc.denialCode || "PENDING";
+      const denialCfg = HOLD_CONFIG[denialCode] || HOLD_CONFIG.PENDING;
+      const daysSinceDenial = Math.round((todayMs - denialMs) / 86400000);
+      derived = {
+        ...derived,
+        denialDate,
+        issues: [{ code: denialCode, label: denialCfg.label, primary: true }],
+        notes: [],
+        bindingClock: "appeal_tf",
+        bindingLabel: `${rule.label} appeal TF`,
+        bindingCloseDate: new Date(appealCloseMs).toISOString().slice(0, 10),
+        appealTfRemaining: rule.appealTfDays - daysSinceDenial,
+        appealTfCloseDate: new Date(appealCloseMs).toISOString().slice(0, 10),
+      };
+    } else {
+      // Pre-adjudication AR → Submission TF is the binding clock
+      // Service date used as the anchor for the submission window
+      const serviceDateMs = acc.serviceDate ? new Date(acc.serviceDate + "T00:00:00Z").getTime() : todayMs - daysOut * 86400000;
+      const daysSinceService = Math.round((todayMs - serviceDateMs) / 86400000);
+      const subCloseMs = serviceDateMs + rule.submissionTfDays * 86400000;
+      const stateCode = CLAIM_STATE_TO_CODE[acc.claimStatus] || "PENDING";
+      const stateCfg = HOLD_CONFIG[stateCode] || HOLD_CONFIG.PENDING;
+      derived = {
+        ...derived,
+        issues: [{ code: stateCode, label: stateCfg.label, primary: true }],
+        notes: [],
+        bindingClock: "submission_tf",
+        bindingLabel: `${rule.label} submission TF`,
+        bindingCloseDate: new Date(subCloseMs).toISOString().slice(0, 10),
+        submissionTfRemaining: rule.submissionTfDays - daysSinceService,
+        submissionTfCloseDate: new Date(subCloseMs).toISOString().slice(0, 10),
+      };
+    }
   } else if (type === "dnfb") {
     const dosMs = todayMs - (acc.daysInDNFB || 0) * 86400000;
     const subCloseMs = dosMs + rule.submissionTfDays * 86400000;
@@ -3905,7 +3960,7 @@ function CollectorAccountCard({ acc, onLog, onWorkLink, sentWorklinks = [] }) {
   const [worklinkSent, setWorklinkSent] = useState(false);
 
   const sev = SEV[acc.cfg.severity];
-  const tf = acc.appealTfRemaining;
+  const tf = acc.appealTfRemaining ?? acc.submissionTfRemaining;
   const tfColor = tf == null ? "#64748b" : tf < 0 ? "#64748b" : tf < 3 ? "#dc2626" : tf < 14 ? "#d97706" : tf < 30 ? "#0369a1" : "#16a34a";
   const tfText = tf == null ? null : tf < 0 ? `${acc.bindingLabel}: CLOSED (${Math.abs(tf)}d past)` : `${acc.bindingLabel}: ${tf}d remaining`;
 
@@ -4290,7 +4345,7 @@ function WorkedList({ worked }) {
 // Past-TF accounts (tf<0) stay in routine with a "TF CLOSED" badge that
 // prompts write-off review rather than work.
 function classifyCollectorBucket(acc, openWlsForAccount) {
-  const tf = acc.appealTfRemaining;
+  const tf = acc.appealTfRemaining ?? acc.submissionTfRemaining;
   const wlBreached = openWlsForAccount.some(w => {
     const hrsOut = (Date.now() - new Date(w.sentAt).getTime()) / 3600000;
     return hrsOut > w.slaHrs;
@@ -4307,7 +4362,7 @@ function classifyCollectorBucket(acc, openWlsForAccount) {
 }
 
 function bucketReason(acc, openWlsForAccount) {
-  const tf = acc.appealTfRemaining;
+  const tf = acc.appealTfRemaining ?? acc.submissionTfRemaining;
   const wlBreached = openWlsForAccount.some(w => {
     const hrsOut = (Date.now() - new Date(w.sentAt).getTime()) / 3600000;
     return hrsOut > w.slaHrs;
