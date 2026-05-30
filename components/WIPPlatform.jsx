@@ -42,6 +42,369 @@ function PlatformStyles() {
   return <style>{PLATFORM_KEYFRAMES}</style>;
 }
 
+// ─── PHASE A.2: VISUAL PRIMITIVES ────────────────────────────────────────────
+// Date formatters (Carlos's standalone provides these; platform did not have them).
+// Used by CollectorDeadlinePill ("closes May 12") and any surface chrome with a date.
+const prettyDate = (iso) =>
+  new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const prettyDateLong = (iso) =>
+  new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+
+// ── Pill ─────────────────────────────────────────────────────────────────────
+// Low-level inline metadata badge. Rounded-rect (radius 6), tinted bg + colored fg.
+// Carlos's standalone primitive — used in CollectorDeadlinePill, NEW DENIAL flag,
+// "+N more" overflow indicators, and any short colored tag.
+function Pill({ children, color, bg }) {
+  return (
+    <span style={{ fontSize: 10.5, fontWeight: 600, color, background: bg, padding: "2px 7px", borderRadius: 6, whiteSpace: "nowrap" }}>
+      {children}
+    </span>
+  );
+}
+
+// ── SlaPill ──────────────────────────────────────────────────────────────────
+// WorkLink SLA timer. Unified to Diane+Paula's pill-capsule design (radius 999,
+// 1px tinted border, soft tinted bg). Carlos's older rounded-rect SLA pill is
+// retired per the "unify on newer design language" decision.
+// Used on every inbound WorkLink row across Carlos, Diane, Paula surfaces.
+// `full` prop scales up for detail-view headers.
+function SlaPill({ hoursLeft, state, full }) {
+  const map = {
+    breached: { bg: "#fef2f2", bd: "#fecaca", fg: RED },
+    critical: { bg: "#fef2f2", bd: "#fecaca", fg: RED },
+    watch:    { bg: "#fffbeb", bd: "#fde68a", fg: AMBER },
+    normal:   { bg: PAPER,     bd: LINE,      fg: MUTE },
+  };
+  const c = map[state] || map.normal;
+  const label =
+    hoursLeft <= 0 ? `SLA ${Math.abs(hoursLeft)}h past`
+    : hoursLeft < 24 ? `${hoursLeft}h left`
+    : `${Math.round(hoursLeft / 24)}d left`;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 5,
+      fontSize: full ? 13 : 12, fontWeight: 600, color: c.fg,
+      background: c.bg, border: `1px solid ${c.bd}`,
+      padding: full ? "5px 12px" : "3px 9px", borderRadius: 999, whiteSpace: "nowrap",
+    }}>
+      {(state === "critical" || state === "breached") && (
+        <span style={{ width: 5, height: 5, borderRadius: 999, background: RED }} />
+      )}
+      {label}
+    </span>
+  );
+}
+
+// ── CollectorDeadlinePill ────────────────────────────────────────────────────
+// Information-dense deadline pill for the collector surface (Carlos, Medicare,
+// Medicaid, Self-Pay, WC). Reads platform-shape account: bindingLabel +
+// bindingCloseDate are STRINGS; the days-remaining number comes from
+// appealTfRemaining (AR) or submissionTfRemaining (DNFB). Carlos's standalone
+// collapsed these into one field named `bindingClock` (a number); platform
+// keeps `bindingClock` as the TYPE identifier and stores the number separately.
+// Renders rich text: "Appeal TF · 14d · closes May 12". Carries more semantic
+// weight because collector surface has no tab to disambiguate deadline type.
+function CollectorDeadlinePill({ acc }) {
+  const c = acc.appealTfRemaining ?? acc.submissionTfRemaining;
+  const lbl = acc.bindingLabel;
+  const dt = acc.bindingCloseDate;
+  if (c == null) {
+    if (acc.followUpDaysAway != null && acc.followUpDaysAway <= 0) return <Pill color={AMBER} bg="#fef3c7">Follow-up due</Pill>;
+    if (acc.followUpDaysAway != null && acc.followUpDaysAway <= 7) return <Pill color={MUTE} bg="#f1f5f9">Follow-up {acc.followUpDaysAway}d</Pill>;
+    return null;
+  }
+  if (c <= 0) return <Pill color={RED} bg="#fecaca">{lbl} CLOSED · {dt ? prettyDate(dt) : "—"}</Pill>;
+  if (c <= 14) return <Pill color={RED} bg="#fee2e2">{lbl} · {c}d · closes {prettyDate(dt)}</Pill>;
+  if (acc.followUpDaysAway != null && acc.followUpDaysAway <= 0) return <Pill color={AMBER} bg="#fef3c7">Follow-up due</Pill>;
+  if (c <= 30) return <Pill color={AMBER} bg="#fef3c7">{lbl} · {c}d · closes {prettyDate(dt)}</Pill>;
+  if (acc.followUpDaysAway != null && acc.followUpDaysAway <= 7) return <Pill color={MUTE} bg="#f1f5f9">Follow-up {acc.followUpDaysAway}d</Pill>;
+  return null;
+}
+
+// ── AuthDeadlinePill ─────────────────────────────────────────────────────────
+// Minimal deadline pill for the auth surface (Diane). Renders short labels
+// ("14d left" / "due today" / "3d past"). Pill capsule with red-dot prefix for
+// critical. Justified by Diane's tabbed surface — pre-bill / post-bill tab plus
+// the row's hold/denial code already disambiguates the deadline type.
+// `full` prop scales up for detail-view headers.
+function AuthDeadlinePill({ daysLeft, tier, full }) {
+  const map = {
+    critical: { bg: "#fef2f2", bd: "#fecaca", fg: RED },
+    watch:    { bg: "#fffbeb", bd: "#fde68a", fg: AMBER },
+    normal:   { bg: PAPER,     bd: LINE,      fg: MUTE },
+  };
+  const c = map[tier] || map.normal;
+  const label =
+    daysLeft < 0 ? `${Math.abs(daysLeft)}d past`
+    : daysLeft === 0 ? "due today"
+    : `${daysLeft}d left`;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 5,
+      fontSize: full ? 13 : 12, fontWeight: 600, color: c.fg,
+      background: c.bg, border: `1px solid ${c.bd}`,
+      padding: full ? "5px 12px" : "3px 9px", borderRadius: 999, whiteSpace: "nowrap",
+    }}>
+      {tier === "critical" && (
+        <span style={{ width: 5, height: 5, borderRadius: 999, background: RED }} />
+      )}
+      {label}
+    </span>
+  );
+}
+
+// ── StatusPill ───────────────────────────────────────────────────────────────
+// Account status indicator. Renders ONLY for not_started and in_progress per
+// Carlos's standalone reasoning: other statuses (followup_due, awaiting_payer,
+// awaiting_wl, partial) are either stale-by-the-time-collector-sees-row or
+// implied by queue gating (the queue itself surfaces follow-up-due items).
+// Reads from platform's STATUS dict (defined below this primitive block).
+function StatusPill({ status }) {
+  if (status !== "not_started" && status !== "in_progress") return null;
+  const s = STATUS[status];
+  if (!s) return null;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: s.color }}>
+      <span style={{ width: 6, height: 6, borderRadius: 3, background: s.color }} />
+      {s.label}
+    </span>
+  );
+}
+
+// ─── PHASE A.3: ROW COMPONENTS ───────────────────────────────────────────────
+// Three rows port faithfully from the standalones. They are NOT unified — each
+// surface has its own canonical row design driven by different IA needs.
+//
+// CollectorAccountRow — Carlos's design. 3px colored left border (red if TF≤14d,
+// else status color). Card stacks: each row is a standalone card with
+// marginBottom and rounded corners, separated by visible white gap. Hover lifts
+// the card with transform translateY(-1px) and a soft shadow. Animation: idx*28ms
+// stagger, 380ms rise. Carries primary issue + "+N more" + NEW DENIAL pill on
+// top line; patient/payer/id on second line; StatusPill + CollectorDeadlinePill
+// on third line; EV + AR balance right-aligned. No chevron — click navigates.
+function CollectorAccountRow({ acc, onSelect, idx }) {
+  const tfRemaining = acc.appealTfRemaining ?? acc.submissionTfRemaining;
+  const isUrgent =
+    (tfRemaining != null && tfRemaining <= 14) ||
+    (acc.followUpDaysAway != null && acc.followUpDaysAway <= 0);
+  const statusColor = STATUS[acc.status]?.color || MUTE;
+  const borderColor = isUrgent ? RED : statusColor;
+  const primaryIssue = acc.issues?.find(i => i.primary) || acc.issues?.[0];
+  const moreIssues = acc.issues && acc.issues.length > 1;
+  return (
+    <div
+      onClick={() => onSelect(acc.id)}
+      style={{
+        padding: "14px 18px", background: "#fff", border: `1px solid ${LINE}`,
+        borderLeft: `3px solid ${borderColor}`, borderRadius: 10, marginBottom: 8, cursor: "pointer",
+        display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center",
+        transition: "transform 120ms, box-shadow 120ms",
+        animation: `rise 380ms cubic-bezier(.16,1,.3,1) ${Math.min((idx || 0) * 28, 280)}ms both`,
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
+    >
+      <div>
+        <div style={{ fontSize: 14.5, fontWeight: 600, color: INK, marginBottom: 4, display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          {primaryIssue && <span>{primaryIssue.code} · {primaryIssue.label}</span>}
+          {moreIssues && <Pill color={MUTE} bg="#f1f5f9">+{acc.issues.length - 1} more</Pill>}
+          {acc.newDenialOverride && <Pill color={RED} bg="#fee2e2">NEW DENIAL</Pill>}
+        </div>
+        <div style={{ fontSize: 12, color: MUTE, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <span>{acc.patient}</span><span style={{ color: FAINT }}>·</span>
+          <span>{acc.payer}</span><span style={{ color: FAINT }}>·</span>
+          <span style={{ color: FAINT }}>{acc.id}</span>
+          {acc.followUpDate && acc.followUpDaysAway > 0 && (
+            <>
+              <span style={{ color: FAINT }}>·</span>
+              <span style={{ color: MUTE }}>Follow-up {prettyDate(acc.followUpDate)}</span>
+            </>
+          )}
+          {acc.status === "partial" && acc.paid && (
+            <>
+              <span style={{ color: FAINT }}>·</span>
+              <span style={{ color: MUTE }}>Partial: paid {"$" + Math.round(acc.paid).toLocaleString()}</span>
+            </>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <StatusPill status={acc.status} />
+          <CollectorDeadlinePill acc={acc} />
+        </div>
+      </div>
+      <div style={{ textAlign: "right" }}>
+        <div style={{ fontSize: 10.5, color: FAINT, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>EV</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: INK, letterSpacing: "-0.02em" }}>
+          {"$" + Math.round(acc.expectedValue || acc.ev || 0).toLocaleString()}
+        </div>
+        <div style={{ fontSize: 11, color: MUTE }}>
+          {"$" + Math.round(acc.amount || 0).toLocaleString()} AR
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// AuthAccountRow — Diane's design. No left border; continuous rows inside a
+// rounded card container, separated by borderBottom. Hover changes background
+// to PAPER. Sleeping accounts (status === "awaiting") render at opacity 0.72
+// with subtle bg shift. Animation: idx*40ms stagger, 460ms rise. Renders the
+// hold/denial reason + patient name on top line; account id + payer + vertical
+// + site + optional status badge on second line. Amount + currency type +
+// AuthDeadlinePill + chevron on the right. Tier derived locally from daysLeft
+// using Diane's thresholds (≤7 critical, ≤21 watch).
+function AuthAccountRow({ acc, onSelect, idx, holdLabels, denialLabels }) {
+  const [hover, setHover] = useState(false);
+  const isPre = acc.phase === "prebill" || acc.type === "dnfb";
+  const reason = isPre
+    ? (holdLabels?.[acc.holdCode] || acc.cfg?.label || acc.holdCode)
+    : (denialLabels?.[acc.denialCode] || acc.cfg?.label || acc.denialCode || "Denied");
+  const daysLeft = acc.appealTfRemaining ?? acc.submissionTfRemaining;
+  const tier = daysLeft == null ? "normal" : daysLeft <= 7 ? "critical" : daysLeft <= 21 ? "watch" : "normal";
+  const sleeping = STATUS[acc.status]?.group === "awaiting" && acc.status === "awaiting_payer";
+  const statusVisible = acc.status && acc.status !== "not_started" && STATUS[acc.status];
+  return (
+    <div
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      onClick={() => onSelect(acc)}
+      style={{
+        display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 16,
+        padding: "16px 20px",
+        background: hover ? PAPER : (sleeping ? "#fbfcfd" : "#fff"),
+        borderBottom: `1px solid ${LINE}`,
+        transition: "background 120ms ease",
+        cursor: "pointer", opacity: sleeping ? 0.72 : 1,
+        animation: `rise 460ms cubic-bezier(.16,1,.3,1) ${(idx || 0) * 40}ms both`,
+      }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: INK, letterSpacing: "-0.01em" }}>{reason}</span>
+          <span style={{ fontSize: 13, color: MUTE }}>{acc.patient}</span>
+        </div>
+        <div style={{ fontSize: 12, color: FAINT, marginTop: 4, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span>{acc.id} · {acc.payer}{acc.vertical ? ` · ${acc.vertical}` : ""}{acc.site ? ` · ${acc.site}` : ""}</span>
+          {statusVisible && (
+            <span style={{ fontSize: 11, fontWeight: 600, color: STATUS[acc.status].color, background: PAPER, border: `1px solid ${LINE}`, borderRadius: 999, padding: "1px 8px" }}>
+              {STATUS[acc.status].label}
+            </span>
+          )}
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 18, justifySelf: "end" }}>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: INK, letterSpacing: "-0.02em" }}>
+            {"$" + Math.round(acc.amount || 0).toLocaleString()}
+          </div>
+          <div style={{ fontSize: 11, color: FAINT, marginTop: 1 }}>
+            {isPre ? "gross" : "net / EV"}
+          </div>
+        </div>
+        <div style={{ minWidth: 78, textAlign: "right" }}>
+          {sleeping && acc.followUpDate ? (
+            <div style={{ fontSize: 11, color: MUTE, lineHeight: 1.3 }}>
+              follow-up<br />
+              <span style={{ fontWeight: 600, color: INK }}>{prettyDate(acc.followUpDate)}</span>
+            </div>
+          ) : daysLeft != null ? (
+            <AuthDeadlinePill daysLeft={daysLeft} tier={tier} />
+          ) : null}
+        </div>
+        <span style={{ fontSize: 18, color: hover ? INK : LINE, transition: "color 120ms" }}>›</span>
+      </div>
+    </div>
+  );
+}
+
+// InboundWorkLinkRow — shared between Carlos and Diane surfaces. The 84-90px
+// FROM rail on the left is the canonical "this came from someone else" visual
+// marker (per the WorkLink Integration Pattern: integrate, don't separate).
+// Same shape language as the surface's native AccountRow, with sender context
+// elevated into a column instead of buried in metadata. Used on every collector
+// queue and every auth queue when an inbound WL is present. Reads enriched WL
+// state: from{name,role}, reason, note, hoursLeft, slaState, account (looked up).
+// `variant` prop chooses between Carlos's card-stacks rhythm (margins, radius,
+// hover lift) and Diane's continuous-rows rhythm (borderBottom, hover bg).
+function InboundWorkLinkRow({ wl, idx, onOpen, variant = "card" }) {
+  const [hover, setHover] = useState(false);
+  const acc = wl.account;
+  const isUrgent = wl.slaState === "breached" || wl.slaState === "critical";
+  const isCard = variant === "card";
+  // Carlos's standalone uses card variant with 3px colored left border (red if
+  // urgent, else BLUE for "inbound accent"). Diane's standalone uses continuous
+  // variant — no left border, just borderBottom separation.
+  const cardStyles = isCard ? {
+    border: `1px solid ${LINE}`,
+    borderLeft: `3px solid ${isUrgent ? RED : BLUE}`,
+    borderRadius: 10, marginBottom: 8,
+  } : {
+    borderBottom: `1px solid ${LINE}`,
+  };
+  const cardHover = isCard
+    ? { transform: "translateY(-1px)", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }
+    : { background: PAPER };
+  return (
+    <div
+      onMouseEnter={(e) => { setHover(true); if (isCard) { e.currentTarget.style.transform = cardHover.transform; e.currentTarget.style.boxShadow = cardHover.boxShadow; } }}
+      onMouseLeave={(e) => { setHover(false); if (isCard) { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; } }}
+      onClick={() => onOpen(wl)}
+      style={{
+        display: "grid", gridTemplateColumns: "auto 1fr auto", alignItems: "center", gap: 16,
+        padding: isCard ? "14px 18px" : "16px 20px",
+        background: !isCard && hover ? PAPER : "#fff",
+        cursor: "pointer",
+        transition: isCard ? "transform 120ms, box-shadow 120ms" : "background 120ms ease",
+        animation: `rise ${isCard ? 380 : 460}ms cubic-bezier(.16,1,.3,1) ${(idx || 0) * (isCard ? 28 : 40)}ms both`,
+        ...cardStyles,
+      }}>
+      {/* FROM rail */}
+      <div style={{ width: 84, paddingRight: 12, borderRight: `1px solid ${LINE}`, display: "flex", flexDirection: "column", gap: 2 }}>
+        <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.06em", color: FAINT, textTransform: "uppercase" }}>WL · from</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: INK, lineHeight: 1.2 }}>
+          {(wl.from?.name || "—").split(" ")[0]}
+        </span>
+        <span style={{ fontSize: 10, color: FAINT }}>{wl.from?.role || wl.fromArea || ""}</span>
+      </div>
+      {/* Content */}
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 14.5, fontWeight: 600, color: INK, marginBottom: 4, display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          <span>{wl.reason || (wl.requestLabel || "WorkLink") + (acc ? " ready" : "")}</span>
+          <Pill color={BLUE} bg="#dbeafe">INBOUND</Pill>
+        </div>
+        <div style={{ fontSize: 12, color: MUTE, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {acc ? (
+            <>
+              <span>{acc.patient}</span><span style={{ color: FAINT }}>·</span>
+              <span>{acc.payer}</span><span style={{ color: FAINT }}>·</span>
+              <span style={{ color: FAINT }}>{acc.id}</span>
+            </>
+          ) : (
+            <span style={{ color: FAINT }}>Account {wl.accountId}</span>
+          )}
+          <span style={{ color: FAINT }}>·</span>
+          <span style={{ color: FAINT }}>{wl.id}</span>
+        </div>
+        {wl.note && (
+          <div style={{ fontSize: 12, color: MUTE, marginTop: 4, lineHeight: 1.45 }}>
+            {wl.note.length > 100 ? wl.note.slice(0, 100) + "..." : wl.note}
+          </div>
+        )}
+      </div>
+      {/* Right side: EV (from account) + SLA pill */}
+      <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+        {acc && (
+          <>
+            <div style={{ fontSize: 10.5, color: FAINT, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>EV</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: INK, letterSpacing: "-0.02em" }}>
+              {"$" + Math.round(acc.expectedValue || acc.ev || acc.amount || 0).toLocaleString()}
+            </div>
+          </>
+        )}
+        <SlaPill hoursLeft={wl.hoursLeft} state={wl.slaState} />
+      </div>
+    </div>
+  );
+}
+
 function useWindowWidth() {
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1280);
   useEffect(() => {
