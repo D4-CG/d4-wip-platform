@@ -4350,6 +4350,157 @@ const BUCKET_ORDER = ["critical", "urgent", "watch", "routine"];
 // (medicare_bc, medicaid, self_pay, wc) keep the existing CollectorView until
 // they get their own design pass.
 // ═══════════════════════════════════════════════════════════════════════════
+// PHASE B.2.2: recommendAction + RecommendedActionCard
+// ═══════════════════════════════════════════════════════════════════════════
+// Ports standalone recommendAction (line 727) and the inline Recommended Action
+// card render (lines 1363-1402) into CarlosDetailView. Adaptations from
+// standalone for platform shape: bindingClock as number derived from
+// appealTfRemaining ?? submissionTfRemaining; bindingLabel payer prefix
+// stripped; followUp info read from platform's getFollowUpStore; wlSent
+// derived from open outbound WLs in worklinks state; newDenialOverride branch
+// skipped (no upstream signal for it in platform yet).
+
+// Strip payer prefix from bindingLabel for in-prose use ('Aetna appeal TF' → 'Appeal TF').
+const cleanBindingLabel = (rawLbl) => {
+  if (!rawLbl) return "binding clock";
+  const lower = rawLbl.toLowerCase();
+  if (lower.includes("appeal")) return "Appeal TF";
+  if (lower.includes("submission")) return "Submission TF";
+  return rawLbl;
+};
+
+function recommendAction(acc, ctx) {
+  const tf = acc.appealTfRemaining ?? acc.submissionTfRemaining;
+  const bindingLbl = cleanBindingLabel(acc.bindingLabel);
+  const isDenied = acc.denialDate != null;
+  const denialAge = isDenied ? Math.round((Date.now() - new Date(acc.denialDate).getTime()) / 86400000) : null;
+  const followUpDate = ctx?.followUpDate || null;
+  const followUpDaysAway = ctx?.followUpDaysAway;
+  const openOutbound = ctx?.openOutbound || [];
+
+  // Closed window → write-off recommendation
+  if (tf != null && tf <= 0) {
+    return {
+      outcomeId: "wo_recommended",
+      rationale: `Binding clock (${bindingLbl}) is closed. No further recovery possible at this level. Recommend opening the write-off chain.`,
+      confidence: "high",
+    };
+  }
+
+  // Awaiting another area's reply (platform check: open outbound WL exists)
+  if (openOutbound.length > 0) {
+    const wl = openOutbound[0];
+    const targetName = wl.targetArea || wl.targetRole || "another area";
+    const reqLabel = wl.requestLabel || wl.requestType || "open WorkLink";
+    return {
+      outcomeId: null,
+      noAction: true,
+      rationale: `Awaiting response from ${targetName} on ${reqLabel}. No collector action recommended until they reply.`,
+      confidence: "high",
+    };
+  }
+
+  // Payment expected — sleeping until cash posts or follow-up arrives
+  if (acc.status === "payment_expected" && followUpDaysAway != null && followUpDaysAway > 0) {
+    return {
+      outcomeId: null,
+      noAction: true,
+      rationale: `Account in payment-expected sleep until ${prettyDate(followUpDate)}. Cash posting closes it when payment arrives. If no payment by the follow-up date, account resurfaces and you'll call ${acc.payer} for status.`,
+      confidence: "high",
+    };
+  }
+
+  // Urgent binding clock → file appeal (denied) or resubmit (not yet denied)
+  if (tf != null && tf <= 14) {
+    if (isDenied) {
+      return {
+        outcomeId: "appeal_filed",
+        rationale: `Denied claim — appeal window closes in ${tf}d. File appeal now; capture the appeal reference when payer issues it.`,
+        confidence: "high",
+      };
+    }
+    return {
+      outcomeId: "resubmitted",
+      rationale: `Submission TF window closes in ${tf}d. Resubmit before the window expires; capture the resubmission claim reference.`,
+      confidence: "high",
+    };
+  }
+
+  // Follow-up due
+  if (followUpDaysAway != null && followUpDaysAway <= 0) {
+    return {
+      outcomeId: "payer_followup",
+      rationale: `Follow-up date ${prettyDate(followUpDate)} has arrived. Call ${acc.payer} for status — log the rep name and any reference they provide.`,
+      confidence: "high",
+    };
+  }
+
+  // Denied account, no recent contact → call payer
+  if (isDenied) {
+    return {
+      outcomeId: "payer_followup",
+      rationale: `Denied ${denialAge != null ? denialAge + "d ago" : "recently"}. Call ${acc.payer} to dispute or request reconsideration; capture the rep name and reference number.`,
+      confidence: "medium",
+    };
+  }
+
+  // Default: check status with payer
+  return {
+    outcomeId: "payer_followup",
+    rationale: `Call ${acc.payer} to verify current claim status and confirm next-action timing.`,
+    confidence: "low",
+  };
+}
+
+// Lookup helper — OUTCOME_STATUSES is an array of {value, label, ...}.
+const outcomeLabel = (id) => OUTCOME_STATUSES.find(o => o.value === id)?.label || id;
+
+function RecommendedActionCard({ rec, onApprove, onOverride, onOther }) {
+  return (
+    <div style={{ padding: "16px 20px", background: "#fff", border: `1px solid ${LINE}`, borderRadius: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: FAINT, letterSpacing: "0.08em", textTransform: "uppercase" }}>Recommended action</div>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", color: PURPLE, background: "#faf5ff", border: `1px solid ${PURPLE}`, borderRadius: 6, padding: "2px 8px" }}>
+          AI-SUGGESTED · YOU APPROVE
+        </span>
+      </div>
+      {rec.noAction ? (
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: MUTE, marginBottom: 4 }}>No action recommended right now</div>
+          <div style={{ fontSize: 13, color: MUTE, lineHeight: 1.5, marginBottom: 14 }}>{rec.rationale}</div>
+        </div>
+      ) : (
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 4 }}>
+            {outcomeLabel(rec.outcomeId)}
+            <span style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 600, color: rec.confidence === "high" ? GREEN : rec.confidence === "medium" ? AMBER : MUTE, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+              · {rec.confidence} confidence
+            </span>
+          </div>
+          <div style={{ fontSize: 13, color: MUTE, lineHeight: 1.55, marginBottom: 14 }}>{rec.rationale}</div>
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {!rec.noAction && (
+          <button onClick={onApprove}
+            style={{ padding: "8px 16px", background: INK, color: "#fff", border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            Approve →
+          </button>
+        )}
+        <button onClick={onOverride}
+          style={{ padding: "8px 16px", background: "#fff", color: INK, border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+          Pick different outcome
+        </button>
+        <button onClick={onOther}
+          style={{ padding: "8px 16px", background: "#fff", color: AMBER, border: `1px solid ${AMBER}`, borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+          Doesn't fit any of these
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // PHASE B.2.1: CarlosDetailView — Header card slice
 // ═══════════════════════════════════════════════════════════════════════════
 // Faithful port of Carlos's standalone DetailView header card. This slice
@@ -4363,12 +4514,26 @@ const BUCKET_ORDER = ["critical", "urgent", "watch", "routine"];
 // (platform shape) instead of bindingClock (standalone shape, which collapsed
 // both into one numeric field); (2) STATUS[acc.status] guarded with ?. since
 // platform data may have statuses the standalone didn't have.
-function CarlosDetailView({ acc, onBack, jumpFromInbound }) {
+function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [] }) {
   const tf = acc.appealTfRemaining ?? acc.submissionTfRemaining;
   const urgent = tf != null && tf <= 14;
   const borderColor = urgent ? RED : (STATUS[acc.status]?.color || MUTE);
   const primaryIssue = acc.issues?.find(i => i.primary) || acc.issues?.[0];
   const additionalIssues = acc.issues?.filter(i => !i.primary && i !== primaryIssue) || [];
+
+  // Follow-up context for recommendation
+  const followUpRaw = (() => {
+    try { return getFollowUpStore()[acc.id]; } catch { return null; }
+  })();
+  const followUpDate = (typeof followUpRaw === "string" && followUpRaw !== "closed" && followUpRaw !== "pending_cfo") ? followUpRaw : null;
+  const followUpDaysAway = followUpDate ? Math.round((new Date(followUpDate + "T00:00:00Z").getTime() - Date.now()) / 86400000) : null;
+
+  const rec = recommendAction(acc, { openOutbound, followUpDate, followUpDaysAway });
+
+  // B.2.2 button handlers — no-op stubs until B.2.3 lands LogOutcomeFlow + Other flow.
+  const handleApprove = () => {};
+  const handleOverride = () => {};
+  const handleOther = () => {};
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -4414,10 +4579,14 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound }) {
         </div>
       </div>
 
+      {/* B.2.2: Recommended Action card */}
+      <RecommendedActionCard rec={rec} onApprove={handleApprove} onOverride={handleOverride} onOther={handleOther} />
+
       {/* Placeholder for remaining slices */}
       <div style={{ padding: "14px 18px", background: "#fffbeb", border: `1px solid #fde68a`, borderRadius: 10, fontSize: 12, color: "#92400e", lineHeight: 1.6 }}>
-        <strong style={{ color: AMBER, letterSpacing: "0.04em" }}>B.2.1 shipped: header card.</strong>{" "}
-        Coming next: B.2.2 Recommended Action card · B.2.3 Send WorkLink shortcut · B.2.4 Account Summary prose ·
+        <strong style={{ color: AMBER, letterSpacing: "0.04em" }}>B.2.2 shipped: Recommended Action card visual.</strong>{" "}
+        Buttons are present and styled but no-op until B.2.3 wires the log-outcome flow. Coming next:
+        B.2.3 Send WorkLink shortcut + LogOutcomeFlow + Other flow · B.2.4 Account Summary prose ·
         B.2.5 Payer Contact block · B.2.6 Write-off flow + sleeping state.
       </div>
     </div>
@@ -4616,6 +4785,7 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
                 acc={acc}
                 onBack={() => { setExpandedId(null); setJumpedFromWl(null); }}
                 jumpFromInbound={jumpedFromWl}
+                openOutbound={openOutboundByAcc[acc.id] || []}
               />
             );
           })()
