@@ -4419,10 +4419,9 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
 
   // TF filter — Carlos's standalone filter set, ported.
   const TF_FILTERS = [
-    { id: "all",  label: "All",   test: () => true },
-    { id: "tf3",  label: "≤3d",   test: (a) => { const tf = a.appealTfRemaining ?? a.submissionTfRemaining; return tf != null && tf <= 3; } },
-    { id: "tf14", label: "≤14d",  test: (a) => { const tf = a.appealTfRemaining ?? a.submissionTfRemaining; return tf != null && tf <= 14; } },
-    { id: "tf30", label: "≤30d",  test: (a) => { const tf = a.appealTfRemaining ?? a.submissionTfRemaining; return tf != null && tf <= 30; } },
+    { id: "all",  label: "All",       test: () => true },
+    { id: "tf14", label: "TF ≤ 14d",  test: (a) => { const tf = a.appealTfRemaining ?? a.submissionTfRemaining; return tf != null && tf <= 14; } },
+    { id: "tf30", label: "TF ≤ 30d",  test: (a) => { const tf = a.appealTfRemaining ?? a.submissionTfRemaining; return tf != null && tf <= 30; } },
   ];
   const activeFilter = TF_FILTERS.find(f => f.id === tfFilter) || TF_FILTERS[0];
 
@@ -4513,6 +4512,9 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
     }}>
       <PlatformStyles />
       <div style={{ maxWidth: 980, margin: "0 auto", padding: isMobile ? "20px 16px 60px" : "28px 28px 60px" }}>
+        <div style={{ fontSize: 11, color: FAINT, marginBottom: 10, animation: "fade 500ms ease both" }}>
+          {prettyDateLong(new Date().toISOString().split("T")[0])}
+        </div>
         <SurfaceHeader
           overline="Collections · Commercial · Carlos Mendez"
           title="Carlos's worklist"
