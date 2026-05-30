@@ -4381,7 +4381,7 @@ function recommendAction(acc, ctx) {
   // Closed window → write-off recommendation
   if (tf != null && tf <= 0) {
     return {
-      outcomeId: "wo_recommended",
+      outcomeId: "writeoff_recommended",
       rationale: `Binding clock (${bindingLbl}) is closed. No further recovery possible at this level. Recommend opening the write-off chain.`,
       confidence: "high",
     };
