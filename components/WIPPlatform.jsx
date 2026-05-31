@@ -480,10 +480,10 @@ function BurningBanner({
         style={baseStyle} onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
           <div>
-            <div style={{ fontSize: 10.5, fontWeight: 700, color: burningCount ? RED : GREEN, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: burningCount ? RED : GREEN, letterSpacing: "0.08em", textTransform: "uppercase" }}>
               {burningCount ? "Work first" : "All clear in your book"}
             </div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: INK, marginTop: 4, lineHeight: 1.4 }}>
+            <div style={{ fontSize: 18, fontWeight: 600, color: INK, marginTop: 5, lineHeight: 1.4 }}>
               {burningCount ? (
                 <>
                   <strong>{burningCount}</strong> {burningCount === 1 ? "item" : "items"} need attention now
@@ -496,7 +496,7 @@ function BurningBanner({
             </div>
           </div>
           {burningCount > 0 && (
-            <div style={{ fontSize: 11, color: MUTE, whiteSpace: "nowrap", flexShrink: 0 }}>show these →</div>
+            <div style={{ fontSize: 13, color: MUTE, whiteSpace: "nowrap", flexShrink: 0 }}>show these →</div>
           )}
         </div>
       </div>
