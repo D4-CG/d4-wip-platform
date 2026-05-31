@@ -5209,6 +5209,8 @@ function WriteOffCompose({ acc, contextNote, openOutbound = [], onSend, onBack }
 
 function WorkCompose({ acc, t, contextNote, onSend, onBack }) {
   const [note, setNote] = useState(contextNote || "");
+  const [drafting, setDrafting] = useState(false);
+  const [drafted, setDrafted] = useState(false);
   const minLen = 10;
   const canSend = note.trim().length >= minLen;
 
@@ -5223,22 +5225,67 @@ function WorkCompose({ acc, t, contextNote, onSend, onBack }) {
     });
   };
 
+  // AI draft — generates a professional WL request note from account context.
+  // Uses any existing `note` (scratch, or carried-over from an outcome's
+  // rationale via contextNote) as sender notes. Same prompt pattern as
+  // WorkLinkForm.generateNote (line 3702). Optional — user can write manually.
+  const draft = async () => {
+    setDrafting(true);
+    const scratch = note.trim();
+    const targetArea = t.targetArea || t.targetRole || "destination team";
+    const prompt = `You are a healthcare revenue cycle specialist creating a structured internal work request. Generate a concise, professional work request note in 2-3 sentences.
+
+Account: ${acc.id} · ${acc.patient} · ${acc.payer} · Balance: $${(acc.amount || 0).toLocaleString()} · EV: $${Math.round(acc.expectedValue || 0).toLocaleString()}
+Hold / issue: ${acc.cfg?.label || acc.issues?.[0]?.label || acc.area || "—"}
+Request type: ${t.label}
+Target area: ${targetArea}
+${scratch ? `Sender notes: "${scratch}"` : "Sender notes: none (use account context only)"}
+
+Write as a direct communication to the ${targetArea} team. Be specific about what action is needed and why it matters (dollar value, time pressure, downstream impact). Preserve any reference numbers, dates, or rep names from the sender notes. Return only the note text — no preamble, no bullet points, no markdown.`;
+    try {
+      const res = await fetch("/api/claude", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 250, messages: [{ role: "user", content: prompt }] })
+      });
+      const data = await res.json();
+      const text = data.content?.filter(b => b.type === "text").map(b => b.text).join("").trim() || "";
+      if (text) {
+        setNote(text);
+        setDrafted(true);
+      }
+    } catch {
+      // Fallback template — sensible default the user can edit and send.
+      const fallback = `${t.label} needed for ${acc.patient} (${acc.id}, ${acc.payer}). Balance $${(acc.amount || 0).toLocaleString()}, expected value $${Math.round(acc.expectedValue || 0).toLocaleString()}. ${scratch || "Please review and take action."}`;
+      setNote(fallback);
+      setDrafted(true);
+    }
+    setDrafting(false);
+  };
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
         <button onClick={onBack} style={btnGhostLink}>← pick different request</button>
       </div>
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 10.5, fontWeight: 700, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
-          Note to {t.targetArea}
-          <span style={{ marginLeft: 8, color: canSend ? GREEN : AMBER, fontWeight: 600 }}>· {note.trim().length}/{minLen}+ chars</span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 700, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+            Note to {t.targetArea || t.targetRole || "target"}
+            <span style={{ marginLeft: 8, color: canSend ? GREEN : AMBER, fontWeight: 600 }}>· {note.trim().length}/{minLen}+ chars</span>
+            {drafted && <span style={{ marginLeft: 8, color: PURPLE, fontWeight: 600 }}>· AI-DRAFTED</span>}
+          </div>
+          <button onClick={draft} disabled={drafting}
+            style={{ padding: "4px 10px", border: `1px solid ${LINE}`, background: drafting ? PAPER : "#fff", color: drafting ? FAINT : INK, borderRadius: 6, cursor: drafting ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: 11, fontWeight: 600 }}>
+            {drafting ? "Drafting..." : drafted ? "Redraft with AI" : "✦ Draft with AI"}
+          </button>
         </div>
-        <textarea value={note} onChange={(e) => setNote(e.target.value)}
-          placeholder={`What does ${t.targetArea} need to do? Include payer detail, dates, references.`}
+        <textarea value={note} onChange={(e) => { setNote(e.target.value); if (drafted) setDrafted(false); }}
+          placeholder={`What does ${t.targetArea || t.targetRole} need to do? Include payer detail, dates, references. Or click "Draft with AI" to start from account context.`}
           style={{ width: "100%", minHeight: 100, padding: "10px 12px", border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 13, color: INK, fontFamily: "inherit", lineHeight: 1.5, resize: "vertical", outline: "none", background: PAPER, boxSizing: "border-box" }} />
       </div>
       <div style={{ padding: "10px 12px", background: PAPER, border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 12, color: MUTE, marginBottom: 14, lineHeight: 1.5 }}>
-        <strong style={{ color: INK }}>On send:</strong> Account status → Awaiting WorkLink. Sits in queue with WL pending indicator until {t.targetArea} responds.
+        <strong style={{ color: INK }}>On send:</strong> Account status → Awaiting WorkLink. Sits in queue with WL pending indicator until {t.targetArea || t.targetRole} responds.
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
         <button onClick={handleSend} disabled={!canSend}
