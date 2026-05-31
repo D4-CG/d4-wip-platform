@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import AR_DATA from "../app/data/ar-accounts.json";
 import DNFB_DATA from "../app/data/dnfb-accounts.json";
 import SITE_NPR from "../app/data/site-npr.json";
@@ -5207,10 +5207,11 @@ function WriteOffCompose({ acc, contextNote, openOutbound = [], onSend, onBack }
   );
 }
 
-function WorkCompose({ acc, t, contextNote, onSend, onBack }) {
+function WorkCompose({ acc, t, contextNote, autoDraft = false, onSend, onBack }) {
   const [note, setNote] = useState(contextNote || "");
   const [drafting, setDrafting] = useState(false);
   const [drafted, setDrafted] = useState(false);
+  const autoDraftFired = useRef(false);
   const minLen = 10;
   const canSend = note.trim().length >= minLen;
 
@@ -5263,6 +5264,18 @@ Write as a direct communication to the ${targetArea} team. Be specific about wha
     setDrafting(false);
   };
 
+  // Agentic flow: auto-fire draft once on mount when autoDraft is true.
+  // Used by handleAgenticReviewSend in CarlosDetailView — user clicked
+  // "Review & Send" on the AI WL draft card, so we draft immediately and
+  // they review the result. Ref guard prevents re-firing on re-render.
+  useEffect(() => {
+    if (autoDraft && !autoDraftFired.current) {
+      autoDraftFired.current = true;
+      draft();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoDraft]);
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
@@ -5297,7 +5310,7 @@ Write as a direct communication to the ${targetArea} team. Be specific about wha
   );
 }
 
-function SendWorkLinkFlow({ acc, preselectedType, contextNote, openOutbound = [], onSend, onCancel }) {
+function SendWorkLinkFlow({ acc, preselectedType, contextNote, openOutbound = [], autoDraft = false, onSend, onCancel }) {
   const [type, setType] = useState(preselectedType || null);
   const t = type ? getWlType(type) : null;
 
@@ -5342,7 +5355,7 @@ function SendWorkLinkFlow({ acc, preselectedType, contextNote, openOutbound = []
         <WriteOffCompose acc={acc} contextNote={contextNote} openOutbound={openOutbound} onSend={onSend} onBack={() => setType(null)} />
       )}
       {type && type !== "write_off_request" && t && (
-        <WorkCompose acc={acc} t={t} contextNote={contextNote} onSend={onSend} onBack={() => setType(null)} />
+        <WorkCompose acc={acc} t={t} contextNote={contextNote} autoDraft={autoDraft} onSend={onSend} onBack={() => setType(null)} />
       )}
     </div>
   );
@@ -5395,14 +5408,47 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
   // alongside the WL — closing the audit gap (Q4 fix May 31). If user
   // cancels the composer, this is discarded (no orphan outcome).
   const [pendingOutcomeLog, setPendingOutcomeLog] = useState(null);
+  // Agentic shortcut flag — when true, WorkCompose auto-runs the AI draft on
+  // mount. Set by handleAgenticReviewSend (one-click from recommendation to
+  // pre-drafted WL). Cleared by handleSendWL/cancel along with the rest of the
+  // WL composer state.
+  const [autoDraft, setAutoDraft] = useState(false);
   const [toast, setToast] = useState(null);
 
   const showToast = (text) => { setToast(text); setTimeout(() => setToast(null), 3000); };
 
+  // Recommendation outcome that triggers an agentic WL shortcut. Excludes
+  // write_off_request — write-offs need the full WriteOffCompose flow
+  // (approval chain, amount slider, confirmation checkbox), the agentic
+  // shortcut would skip the confirmation gate.
+  const recOutcome = rec.outcomeId ? getOutcome(rec.outcomeId) : null;
+  const agenticWL = recOutcome?.triggersWL && recOutcome.triggersWL !== "write_off_request"
+    ? getWlType(recOutcome.triggersWL)
+    : null;
+
   const handleApprove = () => { setPreselectOutcome(rec.outcomeId); setAction("log_outcome"); };
   const handleOverride = () => { setPreselectOutcome(null); setAction("log_outcome"); };
   const handleOther = () => setAction("other");
-  const handleSendWLShortcut = () => { setWlPreselect(null); setWlContextNote(null); setAction("send_wl"); };
+  const handleSendWLShortcut = () => { setWlPreselect(null); setWlContextNote(null); setAutoDraft(false); setAction("send_wl"); };
+
+  // Agentic Review & Send — one click from recommendation to pre-drafted WL.
+  // Bypasses LogOutcomeFlow: outcome rationale is auto-set to rec.rationale,
+  // WL composer opens with the type preselected, and WorkCompose auto-runs
+  // the AI draft on mount. User reviews and sends; outcome + WL log together.
+  const handleAgenticReviewSend = () => {
+    if (!recOutcome || !agenticWL) return;
+    setPendingOutcomeLog({
+      method: "System",
+      outcomeId: rec.outcomeId,
+      note: rec.rationale,
+      nextStatus: recOutcome.nextStatus,
+      sleepDays: recOutcome.followUpDays,
+    });
+    setWlPreselect(recOutcome.triggersWL);
+    setWlContextNote(rec.rationale);
+    setAutoDraft(true);
+    setAction("send_wl");
+  };
 
   const handleLogSave = (log) => {
     setAction(null); setPreselectOutcome(null);
@@ -5421,6 +5467,7 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
   const handleTriggerWL = ({ wlType, contextNote, outcomeId, method, ...rest }) => {
     setWlPreselect(wlType); setWlContextNote(contextNote); setAction("send_wl");
     setPreselectOutcome(null);
+    setAutoDraft(false);
     // Capture the outcome payload so handleSendWL can log it alongside the WL.
     // If user cancels the composer, this is discarded by handleCancelWL.
     if (outcomeId) {
@@ -5487,6 +5534,7 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
       } catch {}
       setPendingOutcomeLog(null);
     }
+    setAutoDraft(false);
     try { setFollowUpDate(acc.id, new Date(Date.now() + fuDays * 86400000).toISOString().split("T")[0]); } catch {}
     // Notify CFO dashboard + any other listeners that this account has been worked
     try { window.dispatchEvent(new CustomEvent("d4_account_logged", { detail: { id: acc.id } })); } catch {}
@@ -5583,8 +5631,9 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
           preselectedType={wlPreselect}
           contextNote={wlContextNote}
           openOutbound={openOutbound}
+          autoDraft={autoDraft}
           onSend={handleSendWL}
-          onCancel={() => { setAction(null); setWlPreselect(null); setWlContextNote(null); setPendingOutcomeLog(null); }}
+          onCancel={() => { setAction(null); setWlPreselect(null); setWlContextNote(null); setPendingOutcomeLog(null); setAutoDraft(false); }}
         />
       )}
       {action === "other" && (
@@ -5599,6 +5648,26 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
         <>
           {/* Recommended Action card */}
           <RecommendedActionCard rec={rec} onApprove={handleApprove} onOverride={handleOverride} onOther={handleOther} />
+
+          {/* Agentic WL draft card — surfaces when the recommended outcome
+              triggers a WL (excluding write-off, which needs the structured
+              flow). One click drops the user into a pre-drafted WL composer
+              with outcome rationale carried over as scratch. Outcome + WL log
+              together on send. */}
+          {agenticWL && (
+            <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", minWidth: 0 }}>
+                <span style={{ fontSize: 11, color: PURPLE, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>✦ AI WorkLink draft ready</span>
+                <span style={{ fontSize: 12, color: INK }}>
+                  {agenticWL.icon} {agenticWL.label} → <strong>{agenticWL.targetArea || agenticWL.targetRole}</strong>
+                </span>
+              </div>
+              <button onClick={handleAgenticReviewSend}
+                style={{ padding: "7px 16px", background: PURPLE, color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                Review & Send →
+              </button>
+            </div>
+          )}
 
           {/* Send WorkLink shortcut */}
           <div style={{ padding: "10px 14px", background: PAPER, border: `1px solid ${LINE}`, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
