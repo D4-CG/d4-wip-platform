@@ -541,9 +541,11 @@ function SurfaceHeader({ overline, title, summary }) {
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: FAINT }}>
           {overline}
         </div>
-        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", margin: "4px 0 0", color: INK }}>
-          {title}
-        </h1>
+        {title && (
+          <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", margin: "4px 0 0", color: INK }}>
+            {title}
+          </h1>
+        )}
       </div>
       {summary && (
         <div style={{ fontSize: 12, color: MUTE, textAlign: "right" }}>
@@ -5850,28 +5852,19 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
     return { worked: workedAccounts.length, evWorked, paymentCommitments };
   }, [workedAccounts]);
 
-  // Search matches — substring on AR id, patient name, or payer. Returns up
-  // to 10 matches (EV-desc), so payer searches like "Anthem" surface a list
-  // of accounts instead of just the first one. Empty / short query → empty array.
+  // Search matches — AND across whitespace-separated tokens, OR across
+  // fields (id, patient, payer, site). All matches returned, sorted by
+  // arScored's order (EV desc). User narrows by adding tokens: "Anthem
+  // Ken" matches accounts where one token hits the payer and the other
+  // hits the patient name.
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (q.length < 2) return [];
-    return arScored
-      .filter(a =>
-        (a.id || "").toLowerCase().includes(q) ||
-        (a.patient || "").toLowerCase().includes(q) ||
-        (a.payer || "").toLowerCase().includes(q)
-      )
-      .slice(0, 10);
-  }, [searchQuery, arScored]);
-  const searchTotalMatches = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (q.length < 2) return 0;
-    return arScored.filter(a =>
-      (a.id || "").toLowerCase().includes(q) ||
-      (a.patient || "").toLowerCase().includes(q) ||
-      (a.payer || "").toLowerCase().includes(q)
-    ).length;
+    const tokens = q.split(/\s+/).filter(Boolean);
+    return arScored.filter(a => {
+      const hay = `${a.id || ""} ${a.patient || ""} ${a.payer || ""} ${a.site || ""}`.toLowerCase();
+      return tokens.every(t => hay.includes(t));
+    });
   }, [searchQuery, arScored]);
 
   // Mixed sort: urgent first (priority 0), normal second (priority 1). Within
@@ -5956,13 +5949,13 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
         </div>
         <SurfaceHeader
           overline="Collections · Commercial · Carlos Mendez"
-          title="Carlos's worklist"
           summary={summary}
         />
 
-        {/* Book label — read-only stratum tag */}
+        {/* Book label — read-only stratum tag. Count omitted (duplicated in
+            SurfaceHeader's summary). */}
         <div style={{ display: "inline-block", padding: "4px 10px", background: PAPER, border: `1px solid ${LINE}`, borderRadius: 14, fontSize: 11, color: MUTE, marginBottom: 14 }}>
-          Book: commercial · EV ≥ $10K · {actionable.length + enrichedWls.length} items surfaced
+          Book: commercial · EV ≥ $10K
         </div>
 
         {/* Group 3: Site filter pills — moved to top of chrome per UX call.
@@ -6015,10 +6008,10 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
             />
             {searchQuery.trim().length >= 2 && (
               searchResults.length > 0 ? (
-                <div style={{ marginTop: 8, border: `1px solid #bfdbfe`, borderRadius: 8, background: "#eff6ff", maxHeight: 320, overflowY: "auto" }}>
+                <div style={{ marginTop: 8, border: `1px solid #bfdbfe`, borderRadius: 8, background: "#eff6ff", maxHeight: 420, overflowY: "auto" }}>
                   <div style={{ position: "sticky", top: 0, padding: "8px 12px", background: "#eff6ff", borderBottom: `1px solid #bfdbfe`, fontSize: 11, color: BLUE, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                    {searchResults.length}{searchTotalMatches > searchResults.length ? ` of ${searchTotalMatches}` : ""} match{searchResults.length === 1 ? "" : "es"} · click to open
-                    {searchTotalMatches > searchResults.length && <span style={{ color: MUTE, fontWeight: 500, marginLeft: 6, textTransform: "none", letterSpacing: 0 }}>(refine to narrow)</span>}
+                    {searchResults.length} match{searchResults.length === 1 ? "" : "es"} · click to open
+                    {searchResults.length > 15 && <span style={{ color: MUTE, fontWeight: 500, marginLeft: 6, textTransform: "none", letterSpacing: 0 }}>(add a name or site to narrow)</span>}
                   </div>
                   {searchResults.map((r, i) => (
                     <button key={r.id} onClick={() => { setExpandedId(r.id); setSearchQuery(""); }}
@@ -6034,6 +6027,22 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
                 <div style={{ marginTop: 8, padding: "8px 12px", fontSize: 12, color: MUTE, fontStyle: "italic" }}>No account found for "{searchQuery.trim()}"</div>
               )
             )}
+          </div>
+        )}
+
+        {/* Work first / Burning banner — moved above productivity per UX call.
+            Clickable to apply ≤14d filter. */}
+        {!expandedId && (
+          <div style={{ marginBottom: 14 }}>
+            <BurningBanner
+              variant="overline"
+              burningCount={burningCount}
+              burningEV={burningEV}
+              breakdown={burningBreakdown}
+              idleMessage="No deadline pressure."
+              idleSecondary={idleSecondary}
+              onClick={burningCount > 0 ? () => setTfFilter("tf14") : undefined}
+            />
           </div>
         )}
 
@@ -6074,19 +6083,6 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
           })()
         ) : (
           <>
-        {/* Burning banner — clickable to apply ≤14d filter */}
-        <div style={{ marginBottom: 14 }}>
-          <BurningBanner
-            variant="overline"
-            burningCount={burningCount}
-            burningEV={burningEV}
-            breakdown={burningBreakdown}
-            idleMessage="No deadline pressure."
-            idleSecondary={idleSecondary}
-            onClick={burningCount > 0 ? () => setTfFilter("tf14") : undefined}
-          />
-        </div>
-
         {/* TF filter pills */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
           <span style={{ fontSize: 10.5, color: FAINT, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginRight: 4 }}>Filter</span>
