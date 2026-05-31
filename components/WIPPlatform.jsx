@@ -4565,12 +4565,53 @@ function recommendAction(acc, ctx) {
     };
   }
 
-  // Denied account, no recent contact → call payer
+  // Denied account, no urgent TF → file appeal (default recovery path)
+  // The collector can override if an appeal has already been filed.
   if (isDenied) {
+    const denialCode = acc.issues?.[0]?.code || acc.denialCode;
+    const codeRef = denialCode ? `${denialCode} ` : "";
+    return {
+      outcomeId: "appeal_filed",
+      rationale: `${codeRef}denial${denialAge != null ? `, ${denialAge}d ago` : ""}. File appeal with clinical documentation; capture the appeal reference when ${acc.payer} issues it. If an appeal has already been filed, override and pick a follow-up outcome instead.`,
+      confidence: "high",
+    };
+  }
+
+  // ── Normal in-flight claim states ─────────────────────────────────────
+  // Claims actively moving through the system don't need collector action
+  // until they age past the normal window. IN_TRANSIT and AT_PAYER are
+  // different from PENDING_SUBMISSION/REJECTED above — those need an
+  // upstream area to act; these are the system working as expected.
+  if (issueCode === "AT_PAYER") {
+    if (acc.daysOut < 35) {
+      return {
+        outcomeId: null,
+        noAction: true,
+        rationale: `Claim with ${acc.payer} awaiting adjudication (${acc.daysOut}d out — within normal window). No collector action needed yet. If still no response by day 35, account will resurface for payer follow-up.`,
+        confidence: "high",
+      };
+    }
+    // Older than 35d at payer — overdue for follow-up
     return {
       outcomeId: "payer_followup",
-      rationale: `Denied ${denialAge != null ? denialAge + "d ago" : "recently"}. Call ${acc.payer} to dispute or request reconsideration; capture the rep name and reference number.`,
-      confidence: "medium",
+      rationale: `Claim has been at ${acc.payer} ${acc.daysOut}d without adjudication — past the normal window. Call to verify status, capture rep name and reference number.`,
+      confidence: "high",
+    };
+  }
+  if (issueCode === "IN_TRANSIT") {
+    if (acc.daysOut < 10) {
+      return {
+        outcomeId: null,
+        noAction: true,
+        rationale: `Claim in clearinghouse transit to ${acc.payer} (${acc.daysOut}d out). No action needed — typical clearinghouse handoff is 2-3 days. Account will resurface if it doesn't reach the payer.`,
+        confidence: "high",
+      };
+    }
+    // Stuck in transit beyond normal — needs Billing to check
+    return {
+      outcomeId: "submission_pending",
+      rationale: `Claim stuck in clearinghouse transit for ${acc.daysOut}d (typical is 2-3d). Open WorkLink to Billing/Scrubber to investigate why it hasn't reached ${acc.payer}.`,
+      confidence: "high",
     };
   }
 
@@ -4578,7 +4619,7 @@ function recommendAction(acc, ctx) {
   return {
     outcomeId: "payer_followup",
     rationale: `Call ${acc.payer} to verify current claim status and confirm next-action timing.`,
-    confidence: "low",
+    confidence: "medium",
   };
 }
 
@@ -5119,7 +5160,7 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
         originType: "AR",
         sourceArea: "Collections",
         sourceRole: "commercial_collector",
-        from: { name: "Carlos Mendez", role: "Commercial Collector" },
+        from: { name: "Carlos Mendez", role: "Collector" },
         requestType: wl.requestType,
         requestLabel: wl.requestLabel,
         requestIcon: reqIcon,
