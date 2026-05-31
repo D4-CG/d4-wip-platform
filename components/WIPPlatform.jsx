@@ -781,6 +781,14 @@ const OUTCOME_STATUSES = [
   { value: "pending_eligibility",  label: "Pending eligibility",     followUpDays: 14,   nextStatus: "awaiting_wl",      group: "Action needed", triggersWL: "eligibility" },
   { value: "physician_query",      label: "Physician query sent",    followUpDays: 2,    nextStatus: "awaiting_wl",      group: "Action needed", triggersWL: "him_deficiency" },
   { value: "coding_assigned",      label: "Coding assigned",         followUpDays: 3,    nextStatus: "awaiting_wl",      group: "Action needed" },
+  // Pre-adjudication blockers — added Q4 fix (May 31 2026). Upstream areas
+  // must act before payer follow-up makes sense. All triggersWL → outcome
+  // and WL get logged together so account history reflects the work done.
+  { value: "submission_pending",   label: "Submission pending",      followUpDays: 3,    nextStatus: "awaiting_wl",      group: "Action needed", triggersWL: "resubmit" },
+  { value: "auth_required",        label: "Auth required",           followUpDays: 5,    nextStatus: "awaiting_wl",      group: "Action needed", triggersWL: "chase_auth" },
+  { value: "recode_required",      label: "Recode required",         followUpDays: 3,    nextStatus: "awaiting_wl",      group: "Action needed", triggersWL: "recode" },
+  { value: "charge_capture_gap",   label: "Charge capture gap",      followUpDays: 2,    nextStatus: "awaiting_wl",      group: "Action needed", triggersWL: "missing_charge" },
+  { value: "cred_gap",             label: "Credentialing gap",       followUpDays: 14,   nextStatus: "awaiting_wl",      group: "Action needed", triggersWL: "cred_gap" },
   { value: "paid_full",            label: "Paid in full",            followUpDays: 7,    nextStatus: "payment_expected", group: "Resolution" },
   { value: "paid_partial",         label: "Paid partial",            followUpDays: 7,    nextStatus: "payment_expected", group: "Resolution" },
   { value: "writeoff_recommended", label: "Write-off recommended",   followUpDays: null, nextStatus: "wo_pending",       group: "Terminal", triggersWL: "write_off_request", pending: true },
@@ -792,7 +800,7 @@ const OUTCOME_GROUPS = [
   { label: "Resolution",     color: "#16a34a", ids: ["paid_full", "paid_partial"] },
   { label: "Awaiting payer", color: "#2563eb", ids: ["promised_payment", "in_adjudication", "payer_followup", "authorization_pending", "appeal_filed", "alj_appeal_filed", "resubmitted"] },
   { label: "Retry",          color: "#d97706", ids: ["left_voicemail", "no_response"] },
-  { label: "Action needed",  color: "#7c3aed", ids: ["needs_documentation", "pending_eligibility", "physician_query", "coding_assigned"] },
+  { label: "Action needed",  color: "#7c3aed", ids: ["needs_documentation", "pending_eligibility", "physician_query", "coding_assigned", "submission_pending", "auth_required", "recode_required", "charge_capture_gap", "cred_gap"] },
   { label: "Terminal",       color: "#dc2626", ids: ["escalated", "refer_specialist", "writeoff_recommended"] },
 ];
 
@@ -4480,6 +4488,58 @@ function recommendAction(acc, ctx) {
     };
   }
 
+  // ── Pre-adjudication blockers (Q4 fix May 31) ─────────────────────────
+  // Upstream-area blocks take precedence over urgent TF — the TF urgency
+  // just shapes the rationale. If an account has both an upstream block
+  // AND PENDING_SUBMISSION, the upstream block wins (root cause).
+  const upstreamHold = acc.holdCode;
+  const issueCode = acc.issues?.[0]?.code;
+  const tfTight = tf != null && tf <= 30;
+  const tfNote = tfTight ? ` Submission TF closes in ${tf}d — urgent.` : "";
+
+  if (upstreamHold === "AUTH_MISSING" || upstreamHold === "AUTH_EXPIRED") {
+    return {
+      outcomeId: "auth_required",
+      rationale: `Auth ${upstreamHold === "AUTH_MISSING" ? "not obtained" : "expired"} for ${acc.vertical || "service"} at ${acc.site}. Open WorkLink to Authorization team to chase retro-auth. ${acc.payer} retro-auth success ~45%.${tfNote}`,
+      confidence: "high",
+    };
+  }
+  if (upstreamHold === "CODING_UNASSIGNED" || upstreamHold === "CODING_COMPLEX") {
+    return {
+      outcomeId: "recode_required",
+      rationale: `${upstreamHold === "CODING_UNASSIGNED" ? "Account unassigned to a coder" : "Complex coding hold"}. Open WorkLink to Coding team to assign or release.${tfNote}`,
+      confidence: "high",
+    };
+  }
+  if (upstreamHold === "CHARGE_MISSING" || upstreamHold === "CHARGE_LAG") {
+    return {
+      outcomeId: "charge_capture_gap",
+      rationale: `Charge ${upstreamHold === "CHARGE_MISSING" ? "missing" : "entry lag"} at ${acc.site}. Open WorkLink to Charge Capture to enter and release.${tfNote}`,
+      confidence: "high",
+    };
+  }
+  if (upstreamHold === "CREDENTIALING") {
+    return {
+      outcomeId: "cred_gap",
+      rationale: `Provider not credentialed at ${acc.site} with ${acc.payer}. Open WorkLink to Credentialing — request expedited resolution and estimated date.`,
+      confidence: "high",
+    };
+  }
+  if (issueCode === "PENDING_SUBMISSION") {
+    return {
+      outcomeId: "submission_pending",
+      rationale: `Claim has not been submitted to ${acc.payer}. Open WorkLink to Billing/Scrubber to submit.${tfNote}`,
+      confidence: "high",
+    };
+  }
+  if (issueCode === "REJECTED") {
+    return {
+      outcomeId: "submission_pending",
+      rationale: `Clearinghouse rejected the claim. Open WorkLink to Billing/Scrubber to fix and resubmit.${tfNote}`,
+      confidence: "high",
+    };
+  }
+
   // Urgent binding clock → file appeal (denied) or resubmit (not yet denied)
   if (tf != null && tf <= 14) {
     if (isDenied) {
@@ -4993,6 +5053,11 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
   const [preselectOutcome, setPreselectOutcome] = useState(null);
   const [wlPreselect, setWlPreselect] = useState(null);
   const [wlContextNote, setWlContextNote] = useState(null);
+  // When an outcome's triggersWL routes us to the WL composer, we hold the
+  // outcome payload here. handleSendWL reads it on send to log the outcome
+  // alongside the WL — closing the audit gap (Q4 fix May 31). If user
+  // cancels the composer, this is discarded (no orphan outcome).
+  const [pendingOutcomeLog, setPendingOutcomeLog] = useState(null);
   const [toast, setToast] = useState(null);
 
   const showToast = (text) => { setToast(text); setTimeout(() => setToast(null), 3000); };
@@ -5016,9 +5081,22 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
     setTimeout(() => onBack(), 400);
   };
 
-  const handleTriggerWL = ({ wlType, contextNote }) => {
+  const handleTriggerWL = ({ wlType, contextNote, outcomeId, method, ...rest }) => {
     setWlPreselect(wlType); setWlContextNote(contextNote); setAction("send_wl");
     setPreselectOutcome(null);
+    // Capture the outcome payload so handleSendWL can log it alongside the WL.
+    // If user cancels the composer, this is discarded by handleCancelWL.
+    if (outcomeId) {
+      const oc = getOutcome(outcomeId);
+      setPendingOutcomeLog({
+        method, outcomeId, note: contextNote,
+        nextStatus: oc?.nextStatus,
+        sleepDays: oc?.followUpDays,
+        ...rest,
+      });
+    } else {
+      setPendingOutcomeLog(null);
+    }
   };
 
   const handleSendWL = (wl) => {
@@ -5059,11 +5137,24 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
       };
       try { onWorkLink(fullPayload); } catch {}
     }
-    // WLs put the account in "awaiting WL" state — sleeps until reply
-    try { setFollowUpDate(acc.id, new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0]); } catch {}
+    // If this WL was triggered by an outcome with triggersWL, log the outcome
+    // now (Q4 fix May 31 — closes audit gap so account history shows both).
+    // Use the outcome's followUpDays (area-appropriate timing) instead of the
+    // default 3-day "awaiting WL" sleep.
+    let fuDays = 3; // default for shortcut-WL path
+    if (pendingOutcomeLog) {
+      try {
+        if (pendingOutcomeLog.sleepDays != null && pendingOutcomeLog.sleepDays > 0) {
+          fuDays = pendingOutcomeLog.sleepDays;
+        }
+      } catch {}
+      setPendingOutcomeLog(null);
+    }
+    try { setFollowUpDate(acc.id, new Date(Date.now() + fuDays * 86400000).toISOString().split("T")[0]); } catch {}
     // Notify CFO dashboard + any other listeners that this account has been worked
     try { window.dispatchEvent(new CustomEvent("d4_account_logged", { detail: { id: acc.id } })); } catch {}
-    showToast(`${wl.requestLabel} sent to ${wl.targetArea}`);
+    const oc = pendingOutcomeLog ? getOutcome(pendingOutcomeLog.outcomeId) : null;
+    showToast(oc ? `Logged: ${oc.label} · ${wl.requestLabel} sent to ${wl.targetArea}` : `${wl.requestLabel} sent to ${wl.targetArea}`);
     setTimeout(() => onBack(), 400);
   };
 
@@ -5143,7 +5234,7 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
           preselectedType={wlPreselect}
           contextNote={wlContextNote}
           onSend={handleSendWL}
-          onCancel={() => { setAction(null); setWlPreselect(null); setWlContextNote(null); }}
+          onCancel={() => { setAction(null); setWlPreselect(null); setWlContextNote(null); setPendingOutcomeLog(null); }}
         />
       )}
       {action === "other" && (
