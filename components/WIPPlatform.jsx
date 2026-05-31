@@ -5045,6 +5045,135 @@ function OtherFlow({ acc, onSave, onCancel }) {
   );
 }
 
+// WriteOffCompose — write-off-specific composer (B.2.6). When the user picks
+// `writeoff_recommended` outcome, SendWorkLinkFlow routes here instead of the
+// standard WorkCompose. Captures the structured write-off context (recovery
+// attempts, amount, rationale, confirmation) and composes a single note that
+// goes to the write-off queue (targetRole: cfo_writeoff).
+function WriteOffCompose({ acc, contextNote, openOutbound = [], onSend, onBack }) {
+  const [amount, setAmount] = useState(acc.amount);
+  const [rationale, setRationale] = useState(contextNote || "");
+  const [confirmed, setConfirmed] = useState(false);
+
+  // Approval chain tiers — escalates by amount threshold. James (Supervisor)
+  // always required; higher tiers gate on amount.
+  const tiers = [
+    { name: "James Walker (Supervisor)",  required: true,             threshold: "all"   },
+    { name: "Collections Manager",         required: amount >= 5000,   threshold: "≥ $5K"  },
+    { name: "RCM Director",                required: amount >= 25000,  threshold: "≥ $25K" },
+    { name: "CFO",                         required: amount >= 100000, threshold: "≥ $100K"},
+  ];
+
+  // Recovery attempts — auto-derived from AR data + open WLs. The supervisor
+  // reviewing the write-off needs to see what's been tried at the collector tier.
+  const denialAge = acc.denialDate ? Math.floor((Date.now() - new Date(acc.denialDate).getTime()) / 86400000) : null;
+  const tfRemaining = acc.appealTfRemaining ?? acc.submissionTfRemaining;
+  const tfClosed = tfRemaining != null && tfRemaining <= 0;
+  const tfLabel = acc.appealTfRemaining != null ? "Appeal TF" : acc.submissionTfRemaining != null ? "Submission TF" : null;
+  const attempts = [
+    acc.lastContact && `Last payer contact ${prettyDate(acc.lastContact)}.`,
+    openOutbound.length > 0 && `${openOutbound.length} open WorkLink${openOutbound.length > 1 ? "s" : ""} pending reply.`,
+    acc.denialDate && `Denial received ${prettyDate(acc.denialDate)} (${denialAge}d ago).`,
+    tfClosed && tfLabel && `${tfLabel} window CLOSED.`,
+  ].filter(Boolean);
+
+  const canSend = confirmed && rationale.trim().length >= 20;
+
+  const handleSend = () => {
+    if (!canSend) return;
+    // Compose the note so the supervisor has full context. Embeds amount,
+    // rationale, and recovery attempts in a single structured note.
+    const partialPct = amount < acc.amount ? Math.round((amount / acc.amount) * 100) : 100;
+    const composedNote = [
+      "WRITE-OFF RECOMMENDATION",
+      "",
+      `Amount: $${amount.toLocaleString()}${amount < acc.amount ? ` (partial — ${partialPct}% of $${acc.amount.toLocaleString()} AR)` : " (full AR)"}`,
+      "",
+      "Rationale:",
+      rationale.trim(),
+      "",
+      "Recovery attempts:",
+      attempts.length > 0 ? attempts.map(a => `• ${a}`).join("\n") : "• None logged.",
+    ].join("\n");
+
+    onSend({
+      accountId: acc.id,
+      requestType: "write_off_request",
+      requestLabel: "Write-off request",
+      targetArea: "Write-off Queue",
+      note: composedNote,
+    });
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+        <button onClick={onBack} style={btnGhostLink}>← change request type</button>
+      </div>
+
+      <div style={{ padding: "12px 14px", background: PAPER, borderRadius: 10, marginBottom: 14 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Recovery attempts</div>
+        {attempts.length > 0 ? (
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: INK, lineHeight: 1.7 }}>
+            {attempts.map((a, i) => <li key={i}>{a}</li>)}
+          </ul>
+        ) : (
+          <div style={{ fontSize: 12.5, color: MUTE, fontStyle: "italic" }}>No attempts logged — write-off may be premature.</div>
+        )}
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+          <label style={{ fontSize: 10.5, fontWeight: 700, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase" }}>Write-off amount</label>
+          <span style={{ fontSize: 16, fontWeight: 700, color: INK }}>${Math.round(amount).toLocaleString()}</span>
+        </div>
+        <input type="range" min="0" max={acc.amount} step="50" value={amount} onChange={(e) => setAmount(Number(e.target.value))} style={{ width: "100%", accentColor: RED }} />
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, color: FAINT, marginTop: 2 }}>
+          <span>$0</span><span>full AR · ${Math.round(acc.amount).toLocaleString()}</span>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ fontSize: 10.5, fontWeight: 700, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase", display: "block", marginBottom: 6 }}>
+          Rationale (20+ chars)
+          <span style={{ marginLeft: 8, color: rationale.trim().length >= 20 ? GREEN : AMBER, fontWeight: 600 }}>· {rationale.trim().length}/20+ chars</span>
+        </label>
+        <textarea value={rationale} onChange={(e) => setRationale(e.target.value)}
+          placeholder="e.g. 'CO-50 medical necessity; three appeals filed and denied; peer-to-peer denied; payer final.'"
+          style={{ width: "100%", minHeight: 80, padding: "10px 12px", border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 13, color: INK, fontFamily: "inherit", lineHeight: 1.5, resize: "vertical", outline: "none", background: PAPER, boxSizing: "border-box" }} />
+      </div>
+
+      <div style={{ padding: "12px 14px", background: "#fef3c7", borderRadius: 10, marginBottom: 14 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: AMBER, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Approval chain for ${Math.round(amount).toLocaleString()}</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          {tiers.map((tier, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: tier.required ? INK : FAINT }}>
+              <span style={{ width: 14, height: 14, borderRadius: 7, background: tier.required ? AMBER : LINE, color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{tier.required ? "✓" : ""}</span>
+              <span style={{ fontWeight: tier.required ? 600 : 400 }}>{tier.name}</span>
+              <span style={{ color: FAINT, fontSize: 10.5 }}>· {tier.threshold}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: MUTE, marginTop: 8, lineHeight: 1.5 }}>Each tier must <strong>attempt to overturn</strong> before signing off. Audit trail captures every step.</div>
+      </div>
+
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14, cursor: "pointer", padding: "10px 12px", background: confirmed ? "#dcfce7" : PAPER, borderRadius: 8, border: `1px solid ${confirmed ? GREEN : LINE}` }}>
+        <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} style={{ marginTop: 2, accentColor: GREEN, cursor: "pointer" }} />
+        <span style={{ fontSize: 12.5, color: INK, lineHeight: 1.5 }}>I confirm I have <strong>exhausted recovery options at the collector tier</strong>. The attempts above are accurate and complete.</span>
+      </label>
+
+      <div style={{ padding: "10px 12px", background: PAPER, border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 12, color: MUTE, marginBottom: 14, lineHeight: 1.5 }}>
+        <strong style={{ color: INK }}>On send:</strong> Account status → Write-off pending. Account sleeps until supervisor responds via WorkLink resolution.
+      </div>
+
+      <button onClick={handleSend} disabled={!canSend}
+        style={{ width: "100%", padding: "11px 22px", background: canSend ? RED : LINE, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: canSend ? "pointer" : "not-allowed", fontFamily: "inherit" }}>
+        Send to James (Tier 2) →
+      </button>
+    </div>
+  );
+}
+
 function WorkCompose({ acc, t, contextNote, onSend, onBack }) {
   const [note, setNote] = useState(contextNote || "");
   const minLen = 10;
@@ -5088,7 +5217,7 @@ function WorkCompose({ acc, t, contextNote, onSend, onBack }) {
   );
 }
 
-function SendWorkLinkFlow({ acc, preselectedType, contextNote, onSend, onCancel }) {
+function SendWorkLinkFlow({ acc, preselectedType, contextNote, openOutbound = [], onSend, onCancel }) {
   const [type, setType] = useState(preselectedType || null);
   const t = type ? getWlType(type) : null;
 
@@ -5096,8 +5225,8 @@ function SendWorkLinkFlow({ acc, preselectedType, contextNote, onSend, onCancel 
     <div style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: "#fff", padding: "18px 20px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: FAINT, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            {t ? `Send to area · ${t.targetArea || t.targetRole}` : "Send WorkLink — pick request type"}
+          <div style={{ fontSize: 11, fontWeight: 700, color: type === "write_off_request" ? RED : FAINT, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            {type === "write_off_request" ? "Write-off chain" : t ? `Send to area · ${t.targetArea || t.targetRole}` : "Send WorkLink — pick request type"}
           </div>
           {t && <div style={{ fontSize: 15, fontWeight: 600, color: INK, marginTop: 3 }}>{t.label}</div>}
         </div>
@@ -5129,7 +5258,12 @@ function SendWorkLinkFlow({ acc, preselectedType, contextNote, onSend, onCancel 
         </div>
       )}
 
-      {type && t && <WorkCompose acc={acc} t={t} contextNote={contextNote} onSend={onSend} onBack={() => setType(null)} />}
+      {type === "write_off_request" && (
+        <WriteOffCompose acc={acc} contextNote={contextNote} openOutbound={openOutbound} onSend={onSend} onBack={() => setType(null)} />
+      )}
+      {type && type !== "write_off_request" && t && (
+        <WorkCompose acc={acc} t={t} contextNote={contextNote} onSend={onSend} onBack={() => setType(null)} />
+      )}
     </div>
   );
 }
@@ -5368,6 +5502,7 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
           acc={acc}
           preselectedType={wlPreselect}
           contextNote={wlContextNote}
+          openOutbound={openOutbound}
           onSend={handleSendWL}
           onCancel={() => { setAction(null); setWlPreselect(null); setWlContextNote(null); setPendingOutcomeLog(null); }}
         />
