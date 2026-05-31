@@ -5947,125 +5947,231 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
         <div style={{ fontSize: 11, color: FAINT, marginBottom: 10, animation: "fade 500ms ease both" }}>
           {prettyDateLong(new Date().toISOString().split("T")[0])}
         </div>
-        <SurfaceHeader
-          overline="Collections · Commercial · Carlos Mendez"
-          summary={summary}
-        />
-
-        {/* Book label — read-only stratum tag. Count omitted (duplicated in
-            SurfaceHeader's summary). */}
-        <div style={{ display: "inline-block", padding: "4px 10px", background: PAPER, border: `1px solid ${LINE}`, borderRadius: 14, fontSize: 11, color: MUTE, marginBottom: 14 }}>
-          Book: commercial · EV ≥ $10K
-        </div>
-
-        {/* Group 3: Site filter pills — moved to top of chrome per UX call.
-            Shows when collector has accounts at more than one site. Click to
-            filter; click again or "All" to clear. */}
-        {!expandedId && availableSites.length > 1 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 10.5, color: FAINT, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginRight: 4 }}>Site</span>
-            <button onClick={() => setSiteFilter(null)}
-              style={{
-                padding: "4px 10px",
-                border: `1px solid ${!siteFilter ? INK : LINE}`,
-                background: !siteFilter ? INK : "#fff",
-                color: !siteFilter ? "#fff" : INK,
-                borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
-                fontSize: 11, fontWeight: !siteFilter ? 600 : 500,
-              }}>
-              All
-            </button>
-            {availableSites.map(site => {
-              const active = siteFilter === site;
-              return (
-                <button key={site} onClick={() => setSiteFilter(active ? null : site)}
-                  style={{
-                    padding: "4px 10px",
-                    border: `1px solid ${active ? INK : LINE}`,
-                    background: active ? INK : "#fff",
-                    color: active ? "#fff" : INK,
-                    borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
-                    fontSize: 11, fontWeight: active ? 600 : 500,
-                  }}>
-                  {site}
-                </button>
-              );
-            })}
+        {/* ZONE 1 — Identity strip. Overline + book stratum on one line,
+            totals (EV / items / AR / inbound WLs) on the second. No h1,
+            no boxes — visual weight reserved for Work first below. */}
+        <div style={{ marginBottom: 18, animation: "fade 600ms ease both" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: FAINT }}>
+            Collections · Commercial · Carlos Mendez
+            <span style={{ fontWeight: 400, color: FAINT, textTransform: "none", letterSpacing: 0, marginLeft: 8 }}>· book: commercial, EV ≥ $10K</span>
           </div>
-        )}
-
-        {/* Group 3: SearchBar — moved under site filter per UX call.
-            Substring match on AR id / patient / payer; up to 10 results in
-            a scrollable list. Click a result to jump to that account. */}
-        {!expandedId && (
-          <div style={{ marginBottom: 14 }}>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by account ID, patient name, or payer..."
-              style={{ width: "100%", padding: "8px 12px", border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 13, color: INK, fontFamily: "inherit", outline: "none", background: "#fff", boxSizing: "border-box" }}
-            />
-            {searchQuery.trim().length >= 2 && (
-              searchResults.length > 0 ? (
-                <div style={{ marginTop: 8, border: `1px solid #bfdbfe`, borderRadius: 8, background: "#eff6ff", maxHeight: 420, overflowY: "auto" }}>
-                  <div style={{ position: "sticky", top: 0, padding: "8px 12px", background: "#eff6ff", borderBottom: `1px solid #bfdbfe`, fontSize: 11, color: BLUE, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                    {searchResults.length} match{searchResults.length === 1 ? "" : "es"} · click to open
-                    {searchResults.length > 15 && <span style={{ color: MUTE, fontWeight: 500, marginLeft: 6, textTransform: "none", letterSpacing: 0 }}>(add a name or site to narrow)</span>}
-                  </div>
-                  {searchResults.map((r, i) => (
-                    <button key={r.id} onClick={() => { setExpandedId(r.id); setSearchQuery(""); }}
-                      style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "transparent", border: "none", borderTop: i > 0 ? `1px solid #dbeafe` : "none", cursor: "pointer", fontFamily: "inherit" }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "#dbeafe"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
-                      <div style={{ fontSize: 13, color: INK, fontWeight: 600 }}>{r.id} · {r.patient}</div>
-                      <div style={{ fontSize: 11, color: MUTE, marginTop: 1 }}>{r.payer}{r.site ? ` · ${r.site}` : ""} · ${Math.round(r.expectedValue || 0).toLocaleString()} EV</div>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ marginTop: 8, padding: "8px 12px", fontSize: 12, color: MUTE, fontStyle: "italic" }}>No account found for "{searchQuery.trim()}"</div>
-              )
+          <div style={{ fontSize: 13, color: MUTE, marginTop: 5 }}>
+            <strong style={{ color: INK, fontSize: 14 }}>{"$" + Math.round(totalEV).toLocaleString()}</strong> EV
+            <span style={{ color: FAINT, margin: "0 6px" }}>·</span>
+            {actionable.length + enrichedWls.length} {(actionable.length + enrichedWls.length) === 1 ? "item" : "items"}
+            <span style={{ color: FAINT, margin: "0 6px" }}>·</span>
+            {"$" + Math.round(totalAR).toLocaleString()} AR
+            {enrichedWls.length > 0 && (
+              <>
+                <span style={{ color: FAINT, margin: "0 6px" }}>·</span>
+                {enrichedWls.length} inbound WL{enrichedWls.length === 1 ? "" : "s"}
+              </>
             )}
           </div>
-        )}
+        </div>
 
-        {/* Work first / Burning banner — moved above productivity per UX call.
-            Clickable to apply ≤14d filter. */}
+        {/* ZONE 2 — Work first hero. Dominant card when items are burning;
+            collapses to a thin green strip when clean. The only red element
+            on the page when burning, so it reads first. */}
         {!expandedId && (
-          <div style={{ marginBottom: 14 }}>
-            <BurningBanner
-              variant="overline"
-              burningCount={burningCount}
-              burningEV={burningEV}
-              breakdown={burningBreakdown}
-              idleMessage="No deadline pressure."
-              idleSecondary={idleSecondary}
-              onClick={burningCount > 0 ? () => setTfFilter("tf14") : undefined}
-            />
-          </div>
-        )}
-
-        {/* Group 3: Productivity metrics row — 3 cards, no $/hr per design call.
-            Daily goal counter embedded in the first card. Subtle row above the
-            queue so collector sees session progress at a glance. */}
-        {!expandedId && (
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 10, marginBottom: 14 }}>
-            {[
-              { label: "Accounts worked today", value: productivityStats.worked, sub: `${Math.max(0, DAILY_GOAL - productivityStats.worked)} remaining to goal (${DAILY_GOAL}/day)`, color: INK },
-              { label: "EV worked", value: "$" + Math.round(productivityStats.evWorked).toLocaleString(), sub: "expected recovery logged", color: BLUE },
-              { label: "Payment commitments", value: productivityStats.paymentCommitments, sub: "accounts with payment expected", color: GREEN },
-            ].map(({ label, value, sub, color }) => (
-              <div key={label} style={{ background: "#fff", border: `1px solid ${LINE}`, borderRadius: 10, padding: "12px 14px" }}>
-                <div style={{ fontSize: 10, color: FAINT, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color, letterSpacing: "-0.01em" }}>{value}</div>
-                <div style={{ fontSize: 10.5, color: FAINT, marginTop: 2 }}>{sub}</div>
+          burningCount > 0 ? (
+            <div onClick={() => setTfFilter("tf14")}
+              style={{
+                padding: "20px 24px",
+                background: "#fef2f2",
+                borderLeft: `4px solid ${RED}`,
+                border: `1px solid #fecaca`,
+                borderLeftWidth: 4,
+                borderRadius: 12,
+                marginBottom: 16,
+                cursor: "pointer",
+                transition: "transform 120ms, box-shadow 120ms",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                gap: 16, flexWrap: "wrap",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(220, 38, 38, 0.08)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
+            >
+              <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: RED, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                  Work first
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: INK, marginTop: 4, lineHeight: 1.3 }}>
+                  {burningCount} {burningCount === 1 ? "item" : "items"} need attention now
+                </div>
+                {burningBreakdown && (
+                  <div style={{ fontSize: 12.5, color: MUTE, marginTop: 5 }}>{burningBreakdown}</div>
+                )}
               </div>
-            ))}
-          </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "-0.02em" }}>
+                  {"$" + Math.round(burningEV).toLocaleString()}
+                </div>
+                <div style={{ fontSize: 10.5, color: MUTE, marginTop: 2, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                  at risk · click to filter
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              padding: "9px 14px",
+              background: "#f0fdf4",
+              border: `1px solid #bbf7d0`,
+              borderLeft: `3px solid ${GREEN}`,
+              borderRadius: 8,
+              marginBottom: 14,
+              fontSize: 12.5,
+              color: GREEN,
+              fontWeight: 600,
+            }}>
+              ✓ All clear in your book — no deadline pressure
+            </div>
+          )
         )}
 
-        {/* Search moved above productivity — old location removed; keep block placeholder removed */}
+        {/* ZONE 3 — Action toolbar. Search + site dropdown + deadline
+            dropdown + inline productivity stat + view toggle on one row.
+            Wraps on narrow viewports. Replaces the previous separate site
+            pill row, search bar, productivity card row, TF filter pill row,
+            and view toggle row (5 stacked rows -> 1 toolbar row). */}
+        {!expandedId && (
+          <>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10,
+              marginBottom: searchQuery.trim().length >= 2 ? 0 : 14,
+              flexWrap: "wrap",
+            }}>
+              {/* Search input — flex grow */}
+              <div style={{ flex: "1 1 220px", minWidth: 200, position: "relative" }}>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search account, patient, payer, site..."
+                  style={{ width: "100%", padding: "7px 12px 7px 30px", border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 12.5, color: INK, fontFamily: "inherit", outline: "none", background: "#fff", boxSizing: "border-box" }}
+                />
+                <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: FAINT, pointerEvents: "none" }}>⌕</span>
+              </div>
+
+              {/* Site dropdown (only when there is more than one site in book) */}
+              {availableSites.length > 1 && (
+                <select value={siteFilter || ""}
+                  onChange={(e) => setSiteFilter(e.target.value || null)}
+                  style={{
+                    padding: "7px 10px",
+                    border: `1px solid ${siteFilter ? INK : LINE}`,
+                    borderRadius: 8, background: "#fff",
+                    fontSize: 12, color: siteFilter ? INK : MUTE,
+                    fontFamily: "inherit", cursor: "pointer",
+                    fontWeight: siteFilter ? 600 : 500,
+                  }}>
+                  <option value="">Site: All</option>
+                  {availableSites.map(s => <option key={s} value={s}>Site: {s}</option>)}
+                </select>
+              )}
+
+              {/* TF filter dropdown */}
+              <select value={tfFilter}
+                onChange={(e) => setTfFilter(e.target.value)}
+                style={{
+                  padding: "7px 10px",
+                  border: `1px solid ${tfFilter !== "all" ? INK : LINE}`,
+                  borderRadius: 8, background: "#fff",
+                  fontSize: 12, color: tfFilter !== "all" ? INK : MUTE,
+                  fontFamily: "inherit", cursor: "pointer",
+                  fontWeight: tfFilter !== "all" ? 600 : 500,
+                }}>
+                {TF_FILTERS.map(f => {
+                  const nativeCount = actionable.filter(f.test).length;
+                  const wlCount = f.id === "all" ? enrichedWls.length : enrichedWls.filter(w => w.account ? f.test(w.account) : false).length;
+                  const count = nativeCount + wlCount;
+                  return <option key={f.id} value={f.id}>{f.id === "all" ? `Deadline: All (${count})` : `Deadline: ${f.label} (${count})`}</option>;
+                })}
+              </select>
+
+              {/* Productivity inline stat — compressed from 3 cards to a
+                  single line. Shows today's count vs goal, EV worked (in $K),
+                  and payment commitments if any. */}
+              <div style={{ fontSize: 11.5, color: MUTE, padding: "6px 12px", background: PAPER, border: `1px solid ${LINE}`, borderRadius: 8, whiteSpace: "nowrap" }}>
+                <span style={{ color: INK, fontWeight: 600 }}>{productivityStats.worked}/{DAILY_GOAL}</span>
+                <span style={{ color: FAINT, marginLeft: 4 }}>today</span>
+                <span style={{ color: FAINT, margin: "0 6px" }}>·</span>
+                <span style={{ color: INK, fontWeight: 600 }}>{"$" + (productivityStats.evWorked >= 1000 ? Math.round(productivityStats.evWorked / 1000) + "K" : Math.round(productivityStats.evWorked))}</span>
+                <span style={{ color: FAINT, marginLeft: 4 }}>EV</span>
+                {productivityStats.paymentCommitments > 0 && (
+                  <>
+                    <span style={{ color: FAINT, margin: "0 6px" }}>·</span>
+                    <span style={{ color: GREEN, fontWeight: 600 }}>{productivityStats.paymentCommitments}</span>
+                    <span style={{ color: FAINT, marginLeft: 4 }}>promise{productivityStats.paymentCommitments === 1 ? "" : "s"}</span>
+                  </>
+                )}
+              </div>
+
+              {/* View mode toggle */}
+              <div style={{ display: "inline-flex", border: `1px solid ${LINE}`, borderRadius: 8, overflow: "hidden" }}>
+                {[
+                  { id: "worklist", label: "☰", title: "Worklist — full queue" },
+                  { id: "focus",    label: "⊙", title: "Focus — top account directly" },
+                ].map(m => {
+                  const active = viewMode === m.id;
+                  return (
+                    <button key={m.id} onClick={() => {
+                      if (m.id === "focus") {
+                        const top = sorted[0];
+                        const topId = top ? (top.isInbound ? top.account?.id : top.id) : null;
+                        if (topId) {
+                          setViewMode("focus");
+                          setExpandedId(topId);
+                          if (top.isInbound) setJumpedFromWl(top);
+                        }
+                      } else {
+                        setViewMode(m.id);
+                      }
+                    }}
+                      title={m.title}
+                      style={{
+                        padding: "5px 12px",
+                        border: "none",
+                        background: active ? INK : "#fff",
+                        color: active ? "#fff" : INK,
+                        cursor: "pointer", fontFamily: "inherit",
+                        fontSize: 14, fontWeight: 500, lineHeight: 1,
+                      }}>
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Search results popover — appears below the toolbar when query
+                is ≥ 2 chars. All matches returned (no slice cap); AND across
+                whitespace tokens, OR across fields. */}
+            {searchQuery.trim().length >= 2 && (
+              <div style={{ marginBottom: 14, marginTop: 8 }}>
+                {searchResults.length > 0 ? (
+                  <div style={{ border: `1px solid #bfdbfe`, borderRadius: 8, background: "#eff6ff", maxHeight: 420, overflowY: "auto" }}>
+                    <div style={{ position: "sticky", top: 0, padding: "8px 12px", background: "#eff6ff", borderBottom: `1px solid #bfdbfe`, fontSize: 11, color: BLUE, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                      {searchResults.length} match{searchResults.length === 1 ? "" : "es"} · click to open
+                      {searchResults.length > 15 && <span style={{ color: MUTE, fontWeight: 500, marginLeft: 6, textTransform: "none", letterSpacing: 0 }}>(add a name or site to narrow)</span>}
+                    </div>
+                    {searchResults.map((r, i) => (
+                      <button key={r.id} onClick={() => { setExpandedId(r.id); setSearchQuery(""); }}
+                        style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "transparent", border: "none", borderTop: i > 0 ? `1px solid #dbeafe` : "none", cursor: "pointer", fontFamily: "inherit" }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "#dbeafe"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                        <div style={{ fontSize: 13, color: INK, fontWeight: 600 }}>{r.id} · {r.patient}</div>
+                        <div style={{ fontSize: 11, color: MUTE, marginTop: 1 }}>{r.payer}{r.site ? ` · ${r.site}` : ""} · ${Math.round(r.expectedValue || 0).toLocaleString()} EV</div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ padding: "8px 12px", fontSize: 12, color: MUTE, fontStyle: "italic" }}>No account found for "{searchQuery.trim()}"</div>
+                )}
+              </div>
+            )}
+          </>
+        )}
 
         {expandedId ? (
           (() => {
@@ -6083,86 +6189,12 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
           })()
         ) : (
           <>
-        {/* TF filter pills */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 10.5, color: FAINT, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginRight: 4 }}>Filter</span>
-          {TF_FILTERS.map(f => {
-            const active = tfFilter === f.id;
-            const nativeCount = actionable.filter(f.test).length;
-            const wlCount = f.id === "all" ? enrichedWls.length : enrichedWls.filter(w => w.account ? f.test(w.account) : false).length;
-            const count = nativeCount + wlCount;
-            return (
-              <button key={f.id} onClick={() => setTfFilter(f.id)}
-                style={{
-                  padding: "5px 11px",
-                  border: `1px solid ${active ? INK : LINE}`,
-                  background: active ? INK : "#fff",
-                  color: active ? "#fff" : INK,
-                  borderRadius: 14, cursor: "pointer", fontFamily: "inherit",
-                  fontSize: 11.5, fontWeight: active ? 600 : 500,
-                  display: "inline-flex", alignItems: "center", gap: 5,
-                }}>
-                {f.label}
-                <span style={{ color: active ? "#fff" : FAINT, fontWeight: 400, fontSize: 10.5 }}>{count}</span>
-              </button>
-            );
-          })}
-          {tfFilter !== "all" && (
-            <button onClick={() => setTfFilter("all")} style={{ ...btnGhostLink, marginLeft: 4 }}>clear filter</button>
-          )}
-        </div>
-
-        {/* Site filter moved to top of chrome (above productivity metrics) */}
-
-        {/* Group 3: View mode toggle — Worklist (full queue) vs Focus (one
-            account at a time, top of queue). Focus mode is collector-pref;
-            removes visual noise during deep work sessions. */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
-          <div style={{ fontSize: 10.5, color: FAINT, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-            View
-          </div>
-          <div style={{ display: "inline-flex", border: `1px solid ${LINE}`, borderRadius: 8, overflow: "hidden" }}>
-            {[
-              { id: "worklist", label: "☰ Worklist" },
-              { id: "focus",    label: "⊙ Focus" },
-            ].map(m => {
-              const active = viewMode === m.id;
-              return (
-                <button key={m.id} onClick={() => {
-                  if (m.id === "focus") {
-                    // Focus → open the top item's detail page directly.
-                    // For inbound WL rows, expand the referenced account.
-                    const top = sorted[0];
-                    const topId = top ? (top.isInbound ? top.account?.id : top.id) : null;
-                    if (topId) {
-                      setViewMode("focus");
-                      setExpandedId(topId);
-                      if (top.isInbound) setJumpedFromWl(top);
-                    }
-                  } else {
-                    setViewMode(m.id);
-                  }
-                }}
-                  style={{
-                    padding: "5px 12px",
-                    border: "none",
-                    background: active ? INK : "#fff",
-                    color: active ? "#fff" : INK,
-                    cursor: "pointer", fontFamily: "inherit",
-                    fontSize: 11, fontWeight: active ? 600 : 500,
-                  }}>
-                  {m.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Sort note */}
-        <div style={{ fontSize: 11, color: FAINT, marginBottom: 14 }}>
-          Sorted by expected value · {sorted.length} {sorted.length === 1 ? "item" : "items"}
+        {/* ZONE 4 — Queue header. One thin line; all filters and toggles
+            live in the action toolbar above. */}
+        <div style={{ fontSize: 11, color: FAINT, marginBottom: 10 }}>
+          {sorted.length} {sorted.length === 1 ? "item" : "items"} · sorted by expected value
           {enrichedWls.length > 0 && <> ({filteredNative.length} native · {filteredInbound.length} inbound WL{filteredInbound.length === 1 ? "" : "s"})</>}
-          {tfFilter !== "all" && <> · filter active</>}
+          {(tfFilter !== "all" || siteFilter) && <> · filter active</>}
         </div>
 
         {/* Queue */}
