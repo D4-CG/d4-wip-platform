@@ -5259,6 +5259,12 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
         </div>
       </div>
 
+      {/* B.2.4 — Account summary prose block (collapsed by default, expands on
+          click; real /api/claude call pulls SAMPLE_NOTES if any exist). Stays
+          visible above the action panel so the user can reference work history
+          while logging an outcome. */}
+      <AccountSummary acc={acc} />
+
       {/* Action panels — swap in based on action state */}
       {action === "log_outcome" && (
         <CarlosLogOutcomeFlow
