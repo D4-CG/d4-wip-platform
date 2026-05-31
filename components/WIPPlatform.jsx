@@ -4798,24 +4798,57 @@ function CarlosLogOutcomeFlow({ acc, onSave, onTriggerWL, onCancel, preselectOut
     setOriginalScratch("");
   };
 
-  const polish = () => {
+  const polish = async () => {
     if (!note.trim()) return;
     setPolishing(true);
     setOriginalScratch(note);
-    setTimeout(() => {
-      const todayIso = new Date().toISOString().split("T")[0];
-      const header = `${todayIso} · ${method} · ${outcome.label} · ${acc.id} (${acc.patient}, ${acc.payer})`;
-      const body = note.trim().charAt(0).toUpperCase() + note.trim().slice(1) + (/[.!?]$/.test(note.trim()) ? "" : ".");
+    try {
+      const today = new Date().toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
       const triggersWL = outcome.triggersWL;
       const wlCfg = triggersWL ? getWlType(triggersWL) : null;
-      const footer =
-        wlCfg ? `Next step: opening ${wlCfg.label} WorkLink to ${wlCfg.targetArea || wlCfg.targetRole}.` :
-        effectiveSleep != null ? `Next follow-up in ${effectiveSleep}d.` :
-        "Next step per outcome status.";
-      setNote(`${header}\n\n${body}\n\n${footer}`);
-      setPolished(true);
-      setPolishing(false);
-    }, 600);
+      const followUpClause = wlCfg
+        ? `Opens ${wlCfg.label} WorkLink to ${wlCfg.targetArea || wlCfg.targetRole}; account sleeps until reply.`
+        : effectiveSleep != null
+          ? `Follow-up in ${effectiveSleep} business day${effectiveSleep === 1 ? "" : "s"}.`
+          : "Status updated per outcome.";
+      const prompt = `You are a healthcare revenue cycle documentation specialist. Convert the following scratch notes into a single professional work note for posting to an EHR account record.
+
+Account: ${acc.id} | ${acc.patient} | ${acc.payer}
+Balance: $${(acc.amount || 0).toLocaleString()} | ${acc.daysOut || 0} days outstanding
+Touch method: ${method}
+Outcome logged: ${outcome.label}
+Next step: ${followUpClause}
+
+Scratch notes: "${note.trim()}"
+
+Requirements:
+- Start with today's date: ${today}
+- Include account ID, patient, and payer name
+- Describe the action taken based on the scratch notes (preserve all reference numbers, rep names, dollar amounts, and dates from the scratch)
+- State the outcome and the next step (use the "Next step" line above)
+- 3-5 sentences maximum
+- Professional clinical billing language — no bullet points, no markdown
+- Do not invent information not present in the scratch notes or account context above`;
+
+      const res = await fetch("/api/claude", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 350, messages: [{ role: "user", content: prompt }] })
+      });
+      const data = await res.json();
+      const polishedNote = data.content?.filter(b => b.type === "text").map(b => b.text).join("").trim() || "";
+      if (polishedNote) {
+        setNote(polishedNote);
+        setPolished(true);
+      } else {
+        // Empty response — leave note alone, surface gracefully (user can still save scratch as-is)
+        setOriginalScratch("");
+      }
+    } catch {
+      // Network or API error — leave the user's note untouched so they can save manually
+      setOriginalScratch("");
+    }
+    setPolishing(false);
   };
 
   const handleSave = () => {
