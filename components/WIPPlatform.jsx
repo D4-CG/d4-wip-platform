@@ -224,7 +224,14 @@ function CollectorAccountRow({ acc, onSelect, idx }) {
         </div>
         <div style={{ fontSize: 12, color: MUTE, display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span>{acc.patient}</span><span style={{ color: FAINT }}>·</span>
-          <span>{acc.payer}</span><span style={{ color: FAINT }}>·</span>
+          <span>{acc.payer}</span>
+          {acc.site && (
+            <>
+              <span style={{ color: FAINT }}>·</span>
+              <span>{acc.site}</span>
+            </>
+          )}
+          <span style={{ color: FAINT }}>·</span>
           <span style={{ color: FAINT }}>{acc.id}</span>
           {acc.followUpDate && acc.followUpDaysAway > 0 && (
             <>
@@ -386,7 +393,14 @@ function InboundWorkLinkRow({ wl, idx, onOpen, variant = "card" }) {
           {acc ? (
             <>
               <span>{acc.patient}</span><span style={{ color: FAINT }}>·</span>
-              <span>{acc.payer}</span><span style={{ color: FAINT }}>·</span>
+              <span>{acc.payer}</span>
+              {acc.site && (
+                <>
+                  <span style={{ color: FAINT }}>·</span>
+                  <span>{acc.site}</span>
+                </>
+              )}
+              <span style={{ color: FAINT }}>·</span>
               <span style={{ color: FAINT }}>{acc.id}</span>
             </>
           ) : (
@@ -5836,16 +5850,28 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
     return { worked: workedAccounts.length, evWorked, paymentCommitments };
   }, [workedAccounts]);
 
-  // Search match — substring on AR id, patient name, or payer. Returns the
-  // first matching account from arScored. Empty / short query → null.
-  const searchResult = useMemo(() => {
+  // Search matches — substring on AR id, patient name, or payer. Returns up
+  // to 10 matches (EV-desc), so payer searches like "Anthem" surface a list
+  // of accounts instead of just the first one. Empty / short query → empty array.
+  const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (q.length < 2) return null;
-    return arScored.find(a =>
+    if (q.length < 2) return [];
+    return arScored
+      .filter(a =>
+        (a.id || "").toLowerCase().includes(q) ||
+        (a.patient || "").toLowerCase().includes(q) ||
+        (a.payer || "").toLowerCase().includes(q)
+      )
+      .slice(0, 10);
+  }, [searchQuery, arScored]);
+  const searchTotalMatches = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q.length < 2) return 0;
+    return arScored.filter(a =>
       (a.id || "").toLowerCase().includes(q) ||
       (a.patient || "").toLowerCase().includes(q) ||
       (a.payer || "").toLowerCase().includes(q)
-    ) || null;
+    ).length;
   }, [searchQuery, arScored]);
 
   // Mixed sort: urgent first (priority 0), normal second (priority 1). Within
@@ -5939,6 +5965,78 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
           Book: commercial · EV ≥ $10K · {actionable.length + enrichedWls.length} items surfaced
         </div>
 
+        {/* Group 3: Site filter pills — moved to top of chrome per UX call.
+            Shows when collector has accounts at more than one site. Click to
+            filter; click again or "All" to clear. */}
+        {!expandedId && availableSites.length > 1 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 10.5, color: FAINT, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginRight: 4 }}>Site</span>
+            <button onClick={() => setSiteFilter(null)}
+              style={{
+                padding: "4px 10px",
+                border: `1px solid ${!siteFilter ? INK : LINE}`,
+                background: !siteFilter ? INK : "#fff",
+                color: !siteFilter ? "#fff" : INK,
+                borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
+                fontSize: 11, fontWeight: !siteFilter ? 600 : 500,
+              }}>
+              All
+            </button>
+            {availableSites.map(site => {
+              const active = siteFilter === site;
+              return (
+                <button key={site} onClick={() => setSiteFilter(active ? null : site)}
+                  style={{
+                    padding: "4px 10px",
+                    border: `1px solid ${active ? INK : LINE}`,
+                    background: active ? INK : "#fff",
+                    color: active ? "#fff" : INK,
+                    borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
+                    fontSize: 11, fontWeight: active ? 600 : 500,
+                  }}>
+                  {site}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Group 3: SearchBar — moved under site filter per UX call.
+            Substring match on AR id / patient / payer; up to 10 results in
+            a scrollable list. Click a result to jump to that account. */}
+        {!expandedId && (
+          <div style={{ marginBottom: 14 }}>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by account ID, patient name, or payer..."
+              style={{ width: "100%", padding: "8px 12px", border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 13, color: INK, fontFamily: "inherit", outline: "none", background: "#fff", boxSizing: "border-box" }}
+            />
+            {searchQuery.trim().length >= 2 && (
+              searchResults.length > 0 ? (
+                <div style={{ marginTop: 8, border: `1px solid #bfdbfe`, borderRadius: 8, background: "#eff6ff", maxHeight: 320, overflowY: "auto" }}>
+                  <div style={{ position: "sticky", top: 0, padding: "8px 12px", background: "#eff6ff", borderBottom: `1px solid #bfdbfe`, fontSize: 11, color: BLUE, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                    {searchResults.length}{searchTotalMatches > searchResults.length ? ` of ${searchTotalMatches}` : ""} match{searchResults.length === 1 ? "" : "es"} · click to open
+                    {searchTotalMatches > searchResults.length && <span style={{ color: MUTE, fontWeight: 500, marginLeft: 6, textTransform: "none", letterSpacing: 0 }}>(refine to narrow)</span>}
+                  </div>
+                  {searchResults.map((r, i) => (
+                    <button key={r.id} onClick={() => { setExpandedId(r.id); setSearchQuery(""); }}
+                      style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "transparent", border: "none", borderTop: i > 0 ? `1px solid #dbeafe` : "none", cursor: "pointer", fontFamily: "inherit" }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = "#dbeafe"}
+                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                      <div style={{ fontSize: 13, color: INK, fontWeight: 600 }}>{r.id} · {r.patient}</div>
+                      <div style={{ fontSize: 11, color: MUTE, marginTop: 1 }}>{r.payer}{r.site ? ` · ${r.site}` : ""} · ${Math.round(r.expectedValue || 0).toLocaleString()} EV</div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ marginTop: 8, padding: "8px 12px", fontSize: 12, color: MUTE, fontStyle: "italic" }}>No account found for "{searchQuery.trim()}"</div>
+              )
+            )}
+          </div>
+        )}
+
         {/* Group 3: Productivity metrics row — 3 cards, no $/hr per design call.
             Daily goal counter embedded in the first card. Subtle row above the
             queue so collector sees session progress at a glance. */}
@@ -5958,32 +6056,7 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
           </div>
         )}
 
-        {/* Group 3: SearchBar — substring match on AR id / patient / payer.
-            Shows a single result card below the input if matched; click to
-            jump straight to that account's detail. */}
-        {!expandedId && (
-          <div style={{ marginBottom: 14 }}>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by account ID, patient name, or payer..."
-              style={{ width: "100%", padding: "8px 12px", border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 13, color: INK, fontFamily: "inherit", outline: "none", background: "#fff", boxSizing: "border-box" }}
-            />
-            {searchQuery.trim().length >= 2 && (
-              searchResult ? (
-                <button onClick={() => { setExpandedId(searchResult.id); setSearchQuery(""); }}
-                  style={{ marginTop: 8, width: "100%", textAlign: "left", padding: "10px 12px", background: "#eff6ff", border: `1px solid #bfdbfe`, borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>
-                  <div style={{ fontSize: 11, color: BLUE, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 2 }}>Match · click to open</div>
-                  <div style={{ fontSize: 13, color: INK, fontWeight: 600 }}>{searchResult.id} · {searchResult.patient}</div>
-                  <div style={{ fontSize: 11, color: MUTE, marginTop: 1 }}>{searchResult.payer}{searchResult.site ? ` · ${searchResult.site}` : ""} · ${Math.round(searchResult.expectedValue || 0).toLocaleString()} EV</div>
-                </button>
-              ) : (
-                <div style={{ marginTop: 8, padding: "8px 12px", fontSize: 12, color: MUTE, fontStyle: "italic" }}>No account found for "{searchQuery.trim()}"</div>
-              )
-            )}
-          </div>
-        )}
+        {/* Search moved above productivity — old location removed; keep block placeholder removed */}
 
         {expandedId ? (
           (() => {
@@ -6043,41 +6116,7 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
           )}
         </div>
 
-        {/* Group 3: Site filter pills — shows when collector has accounts at
-            more than one site. Click to filter; click again or "All sites"
-            to clear. Carlos is a multi-site book by default. */}
-        {availableSites.length > 1 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 10.5, color: FAINT, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginRight: 4 }}>Site</span>
-            <button onClick={() => setSiteFilter(null)}
-              style={{
-                padding: "4px 10px",
-                border: `1px solid ${!siteFilter ? INK : LINE}`,
-                background: !siteFilter ? INK : "#fff",
-                color: !siteFilter ? "#fff" : INK,
-                borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
-                fontSize: 11, fontWeight: !siteFilter ? 600 : 500,
-              }}>
-              All
-            </button>
-            {availableSites.map(site => {
-              const active = siteFilter === site;
-              return (
-                <button key={site} onClick={() => setSiteFilter(active ? null : site)}
-                  style={{
-                    padding: "4px 10px",
-                    border: `1px solid ${active ? INK : LINE}`,
-                    background: active ? INK : "#fff",
-                    color: active ? "#fff" : INK,
-                    borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
-                    fontSize: 11, fontWeight: active ? 600 : 500,
-                  }}>
-                  {site}
-                </button>
-              );
-            })}
-          </div>
-        )}
+        {/* Site filter moved to top of chrome (above productivity metrics) */}
 
         {/* Group 3: View mode toggle — Worklist (full queue) vs Focus (one
             account at a time, top of queue). Focus mode is collector-pref;
@@ -6093,7 +6132,21 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
             ].map(m => {
               const active = viewMode === m.id;
               return (
-                <button key={m.id} onClick={() => setViewMode(m.id)}
+                <button key={m.id} onClick={() => {
+                  if (m.id === "focus") {
+                    // Focus → open the top item's detail page directly.
+                    // For inbound WL rows, expand the referenced account.
+                    const top = sorted[0];
+                    const topId = top ? (top.isInbound ? top.account?.id : top.id) : null;
+                    if (topId) {
+                      setViewMode("focus");
+                      setExpandedId(topId);
+                      if (top.isInbound) setJumpedFromWl(top);
+                    }
+                  } else {
+                    setViewMode(m.id);
+                  }
+                }}
                   style={{
                     padding: "5px 12px",
                     border: "none",
@@ -6125,7 +6178,7 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
           </div>
         ) : (
           <div>
-            {(viewMode === "focus" ? sorted.slice(0, 1) : sorted).map((item, idx) => {
+            {sorted.map((item, idx) => {
               if (item.isInbound) {
                 return (
                   <InboundWorkLinkRow key={item.id} wl={item} idx={idx} variant="card" onOpen={handleSelectInbound} />
@@ -6135,11 +6188,6 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
                 <CollectorAccountRow key={item.id} acc={item} idx={idx} onSelect={handleSelectRow} />
               );
             })}
-            {viewMode === "focus" && sorted.length > 1 && (
-              <div style={{ marginTop: 10, padding: "8px 12px", fontSize: 11, color: FAINT, textAlign: "center", fontStyle: "italic" }}>
-                {sorted.length - 1} more {sorted.length - 1 === 1 ? "account" : "accounts"} in queue · work this one, next appears when complete
-              </div>
-            )}
           </div>
         )}
 
