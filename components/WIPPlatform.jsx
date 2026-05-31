@@ -4570,6 +4570,382 @@ function RecommendedActionCard({ rec, onApprove, onOverride, onOther }) {
   );
 }
 
+const CONTACT_METHODS = ["Phone", "Portal", "Fax", "Email", "Manual"];
+
+// Work request types Carlos can send via SendWorkLinkFlow.
+// Filtered subset of WORKLINK_REQUEST_CONFIG — only "work" requests
+// (chase_auth / recode / etc.). Write-off + escalations go through
+// Log Outcome → Terminal group, not bare WorkLinks. B.2.6 adds write-off
+// compose path when triggered from outcome flow.
+const CARLOS_WORK_WL_TYPES = ["chase_auth", "recode", "him_deficiency", "physician_query", "resubmit", "missing_charge", "cred_gap"];
+
+// Lookup helper for outcome metadata. Carlos's standalone uses dict access
+// (OUTCOMES[id]); platform uses an array (OUTCOME_STATUSES). This bridges.
+const getOutcome = (id) => OUTCOME_STATUSES.find(o => o.value === id) || null;
+
+function CarlosLogOutcomeFlow({ acc, onSave, onTriggerWL, onCancel, preselectOutcome }) {
+  const [method, setMethod] = useState("Phone");
+  const [outcomeId, setOutcomeId] = useState(preselectOutcome || null);
+  const [note, setNote] = useState("");
+  const [overrideSleep, setOverrideSleep] = useState(null);
+  const [fieldValue, setFieldValue] = useState("");
+  const [polished, setPolished] = useState(false);
+  const [polishing, setPolishing] = useState(false);
+  const [originalScratch, setOriginalScratch] = useState("");
+
+  const outcome = outcomeId ? getOutcome(outcomeId) : null;
+  const effectiveSleep = overrideSleep != null ? overrideSleep : (outcome ? outcome.followUpDays : null);
+  const isHandoff = outcomeId === "escalated" || outcomeId === "refer_specialist";
+  const handoffTarget = outcomeId === "escalated" ? "Amara" : outcomeId === "refer_specialist" ? "Renata" : null;
+  const minNoteLen = isHandoff ? 20 : 5;
+  const fieldRequired = !!outcome?.requiresField;
+  const fieldFilled = !fieldRequired || fieldValue.trim().length > 2;
+  const canSave = outcomeId && note.trim().length > minNoteLen && fieldFilled;
+
+  const pickOutcome = (id) => {
+    setOutcomeId(id);
+    setOverrideSleep(null);
+    setFieldValue("");
+    setPolished(false);
+    setOriginalScratch("");
+  };
+
+  const polish = () => {
+    if (!note.trim()) return;
+    setPolishing(true);
+    setOriginalScratch(note);
+    setTimeout(() => {
+      const todayIso = new Date().toISOString().split("T")[0];
+      const header = `${todayIso} · ${method} · ${outcome.label} · ${acc.id} (${acc.patient}, ${acc.payer})`;
+      const body = note.trim().charAt(0).toUpperCase() + note.trim().slice(1) + (/[.!?]$/.test(note.trim()) ? "" : ".");
+      const triggersWL = outcome.triggersWL;
+      const wlCfg = triggersWL ? WORKLINK_REQUEST_CONFIG[triggersWL] : null;
+      const footer =
+        wlCfg ? `Next step: opening ${wlCfg.requestLabel} WorkLink to ${wlCfg.targetArea}.` :
+        effectiveSleep != null ? `Next follow-up in ${effectiveSleep}d.` :
+        "Next step per outcome status.";
+      setNote(`${header}\n\n${body}\n\n${footer}`);
+      setPolished(true);
+      setPolishing(false);
+    }, 600);
+  };
+
+  const handleSave = () => {
+    const fieldPayload = fieldRequired ? { [outcome.requiresField]: fieldValue.trim() } : {};
+    const polishMeta = polished ? { polished: true, scratchOriginal: originalScratch } : { polished: false };
+    if (outcome.triggersWL) {
+      onTriggerWL({ wlType: outcome.triggersWL, contextNote: note, outcomeId, method, ...fieldPayload, ...polishMeta });
+    } else {
+      onSave({
+        method, outcomeId, note,
+        nextStatus: outcome.nextStatus,
+        sleepDays: effectiveSleep,
+        ...fieldPayload,
+        ...polishMeta,
+      });
+    }
+  };
+
+  const placeholderForOutcome =
+    outcomeId === "escalated"
+      ? "Why are you escalating? What's blocking you that Amara can unblock? Be specific — this is the only context she has."
+      : outcomeId === "refer_specialist"
+      ? "Why does this need Renata? Describe the complexity (multi-payer, contested denial, unusual coding). She picks this up cold — give her the context."
+      : method === "Phone" ? "Rep name, reference numbers, commitments... (you can polish with AI after)" : `What was the result of the ${method.toLowerCase()} touch?`;
+
+  return (
+    <div style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: "#fff", padding: "18px 20px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: FAINT, letterSpacing: "0.08em", textTransform: "uppercase" }}>Log outcome</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginTop: 3 }}>{acc.payer} · {acc.patient}</div>
+        </div>
+        <button onClick={onCancel} style={btnGhost}>cancel</button>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Touch method</div>
+        <div style={{ display: "flex", gap: 5 }}>
+          {CONTACT_METHODS.map(m => (
+            <button key={m} onClick={() => setMethod(m)}
+              style={{ padding: "6px 12px", border: `1px solid ${method === m ? INK : LINE}`, background: method === m ? INK : "#fff", color: method === m ? "#fff" : INK, borderRadius: 16, cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, fontWeight: 500 }}>
+              {m}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Outcome</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {OUTCOME_GROUPS.map(g => (
+            <div key={g.label}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: FAINT, marginBottom: 4 }}>{g.label.toUpperCase()}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 4 }}>
+                {g.ids.map(id => {
+                  const o = getOutcome(id);
+                  if (!o) return null;
+                  const active = outcomeId === id;
+                  return (
+                    <button key={id} onClick={() => pickOutcome(id)}
+                      style={{ padding: "7px 10px", textAlign: "left", border: `1px solid ${active ? g.color : LINE}`, borderLeft: `3px solid ${g.color}`, background: active ? PAPER : "#fff", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", fontSize: 12, color: INK, fontWeight: active ? 600 : 400 }}>
+                      {o.label}
+                      {o.followUpDays != null && <span style={{ color: FAINT, fontWeight: 400, marginLeft: 6 }}>· {o.followUpDays}d</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {outcomeId && outcome && (
+        <>
+          {fieldRequired && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
+                {outcome.requiresFieldLabel || outcome.requiresField}
+                <span style={{ marginLeft: 8, color: fieldFilled ? GREEN : AMBER, fontWeight: 600 }}>
+                  · {fieldFilled ? "captured" : "required"}
+                </span>
+              </div>
+              <input
+                value={fieldValue}
+                onChange={(e) => setFieldValue(e.target.value)}
+                placeholder={`Enter ${(outcome.requiresFieldLabel || outcome.requiresField).toLowerCase()}`}
+                style={{ width: "100%", padding: "10px 12px", border: `1px solid ${fieldFilled ? LINE : AMBER}`, borderRadius: 8, fontSize: 13, color: INK, fontFamily: "inherit", outline: "none", background: PAPER, boxSizing: "border-box" }}
+              />
+              <div style={{ fontSize: 10.5, color: FAINT, marginTop: 4 }}>
+                Required — captured for reporting and tracking.
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span>
+                Note
+                {isHandoff && (
+                  <span style={{ marginLeft: 8, color: note.trim().length > minNoteLen ? GREEN : AMBER, fontWeight: 600 }}>
+                    · {note.trim().length}/{minNoteLen + 1}+ chars (travels to {handoffTarget})
+                  </span>
+                )}
+                {polished && <span style={{ marginLeft: 8, color: PURPLE, fontWeight: 600 }}>· AI-POLISHED</span>}
+              </span>
+              {!polished && (
+                <button onClick={polish} disabled={polishing || !note.trim()}
+                  style={{ padding: "4px 10px", border: `1px solid ${LINE}`, background: note.trim() && !polishing ? "#fff" : PAPER, color: note.trim() && !polishing ? INK : FAINT, borderRadius: 6, cursor: note.trim() && !polishing ? "pointer" : "not-allowed", fontFamily: "inherit", fontSize: 11, fontWeight: 600 }}>
+                  {polishing ? "Polishing..." : "Polish with AI →"}
+                </button>
+              )}
+              {polished && (
+                <button onClick={() => { setNote(originalScratch); setPolished(false); setOriginalScratch(""); }}
+                  style={{ padding: "4px 10px", border: `1px solid ${LINE}`, background: "#fff", color: MUTE, borderRadius: 6, cursor: "pointer", fontFamily: "inherit", fontSize: 11, fontWeight: 600 }}>
+                  ↩ Revert to scratch
+                </button>
+              )}
+            </div>
+            <textarea value={note} onChange={(e) => { setNote(e.target.value); if (polished) setPolished(false); }}
+              placeholder={placeholderForOutcome}
+              style={{ width: "100%", minHeight: polished ? 120 : 64, padding: "10px 12px", border: `1px solid ${polished ? PURPLE : LINE}`, borderRadius: 8, fontSize: 13, color: INK, fontFamily: "inherit", lineHeight: 1.5, resize: "vertical", outline: "none", background: polished ? "#faf5ff" : PAPER, boxSizing: "border-box" }} />
+            {polished && (
+              <div style={{ fontSize: 10.5, color: FAINT, marginTop: 4 }}>
+                AI-structured from your scratch · edit further or save as is · original scratch preserved on the record
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginBottom: 14, padding: "12px 14px", background: outcome.triggersWL ? "#f3e8ff" : "#dcfce7", borderRadius: 10, border: `1px solid ${outcome.triggersWL ? PURPLE : GREEN}` }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: outcome.triggersWL ? PURPLE : GREEN, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>On save</div>
+            {outcome.triggersWL ? (
+              <div style={{ fontSize: 13, color: INK, lineHeight: 1.5 }}>
+                Opens <strong>{WORKLINK_REQUEST_CONFIG[outcome.triggersWL]?.requestLabel || outcome.triggersWL}</strong> WorkLink → <strong>{WORKLINK_REQUEST_CONFIG[outcome.triggersWL]?.targetArea || "—"}</strong>. Status will become <strong>{STATUS[outcome.nextStatus]?.label || outcome.nextStatus}</strong> after send.
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: INK, lineHeight: 1.5 }}>
+                Status → <strong>{STATUS[outcome.nextStatus]?.label || outcome.nextStatus}</strong>.
+                {effectiveSleep != null && <> Sleeps <strong>{effectiveSleep} day{effectiveSleep !== 1 ? "s" : ""}</strong>.</>}
+                {outcome.nextStatus === "payment_expected" && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: MUTE, fontStyle: "italic" }}>
+                    Account closes when cash posts (backend). If cash hasn't arrived by the follow-up date, it resurfaces in your queue.
+                  </div>
+                )}
+                {effectiveSleep != null && (
+                  <div style={{ marginTop: 8, display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10.5, color: FAINT, marginRight: 2 }}>override:</span>
+                    {[1, 3, 7, 14, 30, 60].map(d => (
+                      <button key={d} onClick={() => setOverrideSleep(d)}
+                        style={{ padding: "3px 9px", border: `1px solid ${effectiveSleep === d ? INK : LINE}`, background: effectiveSleep === d ? INK : "#fff", color: effectiveSleep === d ? "#fff" : INK, borderRadius: 12, cursor: "pointer", fontFamily: "inherit", fontSize: 10.5, fontWeight: 500 }}>
+                        {d}d
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button onClick={onCancel} style={btnGhost}>cancel</button>
+            <button onClick={handleSave} disabled={!canSave}
+              style={{ padding: "10px 22px", background: canSave ? (outcome.triggersWL ? PURPLE : INK) : LINE, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: canSave ? "pointer" : "not-allowed", fontFamily: "inherit" }}>
+              {outcome.triggersWL ? "Open WorkLink composer →" : "Save & apply"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function OtherFlow({ acc, onSave, onCancel }) {
+  const [reason, setReason] = useState("");
+  const [actionText, setActionText] = useState("");
+  const canSave = reason.trim().length >= 10 && actionText.trim().length >= 10;
+
+  const handleSave = () => {
+    if (!canSave) return;
+    onSave({
+      method: "Manual",
+      outcomeId: "other",
+      outcomeLabel: "Other (flagged for review)",
+      note: `WHY NO CANONICAL OUTCOME FITS:\n${reason.trim()}\n\nACTION TAKEN:\n${actionText.trim()}`,
+      nextStatus: "in_progress",
+      sleepDays: 1,
+      needsReview: true,
+    });
+  };
+
+  return (
+    <div style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: "#fff", padding: "18px 20px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: AMBER, letterSpacing: "0.08em", textTransform: "uppercase" }}>Other · flagged for review</div>
+          <div style={{ fontSize: 13, color: MUTE, marginTop: 4, lineHeight: 1.5 }}>
+            None of the 17 canonical outcomes fits this situation. Capture what you're seeing — your team lead will review and decide whether this needs a new canonical outcome.
+          </div>
+        </div>
+        <button onClick={onCancel} style={btnGhost}>cancel</button>
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
+          Why doesn't a canonical outcome fit?
+          <span style={{ marginLeft: 8, color: reason.trim().length >= 10 ? GREEN : AMBER, fontWeight: 600 }}>· {reason.trim().length}/10+ chars</span>
+        </div>
+        <textarea value={reason} onChange={(e) => setReason(e.target.value)}
+          placeholder="Describe what the payer / portal / situation is doing that doesn't map to any of the 17 outcomes."
+          style={{ width: "100%", minHeight: 60, padding: "10px 12px", border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 13, color: INK, fontFamily: "inherit", lineHeight: 1.5, resize: "vertical", outline: "none", background: PAPER, boxSizing: "border-box" }} />
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
+          What action are you taking?
+          <span style={{ marginLeft: 8, color: actionText.trim().length >= 10 ? GREEN : AMBER, fontWeight: 600 }}>· {actionText.trim().length}/10+ chars</span>
+        </div>
+        <textarea value={actionText} onChange={(e) => setActionText(e.target.value)}
+          placeholder="What are you doing for this account right now? What's the next step you expect?"
+          style={{ width: "100%", minHeight: 60, padding: "10px 12px", border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 13, color: INK, fontFamily: "inherit", lineHeight: 1.5, resize: "vertical", outline: "none", background: PAPER, boxSizing: "border-box" }} />
+      </div>
+      <div style={{ padding: "10px 12px", background: "#fffbeb", border: `1px solid ${AMBER}`, borderRadius: 8, fontSize: 12, color: INK, marginBottom: 14, lineHeight: 1.5 }}>
+        <strong>On save:</strong> Account stays in your queue (1d sleep). A flag is set for team lead review. If this pattern repeats across accounts, it becomes a candidate for a new canonical outcome.
+      </div>
+      <button onClick={handleSave} disabled={!canSave}
+        style={{ padding: "9px 18px", background: canSave ? INK : LINE, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: canSave ? "pointer" : "not-allowed", fontFamily: "inherit" }}>
+        Save & flag for review
+      </button>
+    </div>
+  );
+}
+
+function WorkCompose({ acc, t, contextNote, onSend, onBack }) {
+  const [note, setNote] = useState(contextNote || "");
+  const minLen = 10;
+  const canSend = note.trim().length >= minLen;
+
+  const handleSend = () => {
+    if (!canSend) return;
+    onSend({
+      accountId: acc.id,
+      requestType: t.requestType,
+      requestLabel: t.requestLabel,
+      targetArea: t.targetArea,
+      note: note.trim(),
+    });
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+        <button onClick={onBack} style={btnGhostLink}>← pick different request</button>
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
+          Note to {t.targetArea}
+          <span style={{ marginLeft: 8, color: canSend ? GREEN : AMBER, fontWeight: 600 }}>· {note.trim().length}/{minLen}+ chars</span>
+        </div>
+        <textarea value={note} onChange={(e) => setNote(e.target.value)}
+          placeholder={`What does ${t.targetArea} need to do? Include payer detail, dates, references.`}
+          style={{ width: "100%", minHeight: 100, padding: "10px 12px", border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 13, color: INK, fontFamily: "inherit", lineHeight: 1.5, resize: "vertical", outline: "none", background: PAPER, boxSizing: "border-box" }} />
+      </div>
+      <div style={{ padding: "10px 12px", background: PAPER, border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 12, color: MUTE, marginBottom: 14, lineHeight: 1.5 }}>
+        <strong style={{ color: INK }}>On send:</strong> Account status → Awaiting WorkLink. Sits in queue with WL pending indicator until {t.targetArea} responds.
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <button onClick={handleSend} disabled={!canSend}
+          style={{ padding: "10px 22px", background: canSend ? INK : LINE, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: canSend ? "pointer" : "not-allowed", fontFamily: "inherit" }}>
+          Send WorkLink →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SendWorkLinkFlow({ acc, preselectedType, contextNote, onSend, onCancel }) {
+  const [type, setType] = useState(preselectedType || null);
+  const t = type ? WORKLINK_REQUEST_CONFIG[type] : null;
+
+  return (
+    <div style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: "#fff", padding: "18px 20px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: FAINT, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            {t ? `Send to area · ${t.targetArea}` : "Send WorkLink — pick request type"}
+          </div>
+          {t && <div style={{ fontSize: 15, fontWeight: 600, color: INK, marginTop: 3 }}>{t.requestLabel}</div>}
+        </div>
+        <button onClick={onCancel} style={btnGhost}>cancel</button>
+      </div>
+
+      {!type && (
+        <div>
+          <div style={{ fontSize: 10.5, fontWeight: 700, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Work request</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 12 }}>
+            {CARLOS_WORK_WL_TYPES.map(wId => {
+              const w = WORKLINK_REQUEST_CONFIG[wId];
+              if (!w) return null;
+              const sla = WORKLINK_REQUEST_SLA_HRS[wId] || 48;
+              return (
+                <button key={wId} onClick={() => setType(wId)}
+                  style={{ padding: "12px 10px", border: `1px solid ${LINE}`, borderRadius: 8, background: "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = INK; e.currentTarget.style.background = PAPER; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = LINE; e.currentTarget.style.background = "#fff"; }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: INK }}>{w.requestLabel}</div>
+                  <div style={{ fontSize: 10, color: MUTE, marginTop: 2 }}>→ {w.targetArea} · {sla}h</div>
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: MUTE, padding: "10px 12px", background: PAPER, border: `1px solid ${LINE}`, borderRadius: 8, lineHeight: 1.5 }}>
+            <strong style={{ color: INK }}>Escalating, handing off to Renata, or recommending write-off?</strong> Those go through <strong>Log outcome</strong> → Terminal group. Anything that changes the account's state needs a logged outcome, not a bare WorkLink.
+          </div>
+        </div>
+      )}
+
+      {type && t && <WorkCompose acc={acc} t={t} contextNote={contextNote} onSend={onSend} onBack={() => setType(null)} />}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // PHASE B.2.1: CarlosDetailView — Header card slice
 // ═══════════════════════════════════════════════════════════════════════════
@@ -4584,7 +4960,7 @@ function RecommendedActionCard({ rec, onApprove, onOverride, onOther }) {
 // (platform shape) instead of bindingClock (standalone shape, which collapsed
 // both into one numeric field); (2) STATUS[acc.status] guarded with ?. since
 // platform data may have statuses the standalone didn't have.
-function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [] }) {
+function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onWorkLink }) {
   const tf = acc.appealTfRemaining ?? acc.submissionTfRemaining;
   const urgent = tf != null && tf <= 14;
   const borderColor = urgent ? RED : (STATUS[acc.status]?.color || MUTE);
@@ -4600,10 +4976,52 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [] }) {
 
   const rec = recommendAction(acc, { openOutbound, followUpDate, followUpDaysAway });
 
-  // B.2.2 button handlers — no-op stubs until B.2.3 lands LogOutcomeFlow + Other flow.
-  const handleApprove = () => {};
-  const handleOverride = () => {};
-  const handleOther = () => {};
+  // Action state — null | "log_outcome" | "send_wl" | "other"
+  const [action, setAction] = useState(null);
+  const [preselectOutcome, setPreselectOutcome] = useState(null);
+  const [wlPreselect, setWlPreselect] = useState(null);
+  const [wlContextNote, setWlContextNote] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (text) => { setToast(text); setTimeout(() => setToast(null), 3000); };
+
+  const handleApprove = () => { setPreselectOutcome(rec.outcomeId); setAction("log_outcome"); };
+  const handleOverride = () => { setPreselectOutcome(null); setAction("log_outcome"); };
+  const handleOther = () => setAction("other");
+  const handleSendWLShortcut = () => { setWlPreselect(null); setWlContextNote(null); setAction("send_wl"); };
+
+  const handleLogSave = (log) => {
+    setAction(null); setPreselectOutcome(null);
+    // Persist follow-up date to platform store (account resurfaces at that date)
+    if (log.sleepDays != null && log.sleepDays > 0) {
+      const fuDate = new Date(Date.now() + log.sleepDays * 86400000).toISOString().split("T")[0];
+      try { setFollowUpDate(acc.id, fuDate); } catch {}
+    }
+    const outcome = getOutcome(log.outcomeId);
+    showToast(`Logged: ${outcome?.label || log.outcomeId}${log.sleepDays ? `. Sleeps ${log.sleepDays}d.` : ""}`);
+  };
+
+  const handleTriggerWL = ({ wlType, contextNote }) => {
+    setWlPreselect(wlType); setWlContextNote(contextNote); setAction("send_wl");
+    setPreselectOutcome(null);
+  };
+
+  const handleSendWL = (wl) => {
+    setAction(null); setWlPreselect(null); setWlContextNote(null);
+    if (typeof onWorkLink === "function") {
+      try { onWorkLink(wl); } catch {}
+    }
+    showToast(`${wl.requestLabel} sent to ${wl.targetArea}`);
+  };
+
+  const handleOtherSave = (log) => {
+    setAction(null);
+    if (log.sleepDays != null && log.sleepDays > 0) {
+      const fuDate = new Date(Date.now() + log.sleepDays * 86400000).toISOString().split("T")[0];
+      try { setFollowUpDate(acc.id, fuDate); } catch {}
+    }
+    showToast("Logged as Other — flagged for team lead review");
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -4653,16 +5071,59 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [] }) {
         </div>
       </div>
 
-      {/* B.2.2: Recommended Action card */}
-      <RecommendedActionCard rec={rec} onApprove={handleApprove} onOverride={handleOverride} onOther={handleOther} />
+      {/* Action panels — swap in based on action state */}
+      {action === "log_outcome" && (
+        <CarlosLogOutcomeFlow
+          acc={acc}
+          preselectOutcome={preselectOutcome}
+          onSave={handleLogSave}
+          onTriggerWL={handleTriggerWL}
+          onCancel={() => { setAction(null); setPreselectOutcome(null); }}
+        />
+      )}
+      {action === "send_wl" && (
+        <SendWorkLinkFlow
+          acc={acc}
+          preselectedType={wlPreselect}
+          contextNote={wlContextNote}
+          onSend={handleSendWL}
+          onCancel={() => { setAction(null); setWlPreselect(null); setWlContextNote(null); }}
+        />
+      )}
+      {action === "other" && (
+        <OtherFlow
+          acc={acc}
+          onSave={handleOtherSave}
+          onCancel={() => setAction(null)}
+        />
+      )}
 
-      {/* Placeholder for remaining slices */}
-      <div style={{ padding: "14px 18px", background: "#fffbeb", border: `1px solid #fde68a`, borderRadius: 10, fontSize: 12, color: "#92400e", lineHeight: 1.6 }}>
-        <strong style={{ color: AMBER, letterSpacing: "0.04em" }}>B.2.2 shipped: Recommended Action card visual.</strong>{" "}
-        Buttons are present and styled but no-op until B.2.3 wires the log-outcome flow. Coming next:
-        B.2.3 Send WorkLink shortcut + LogOutcomeFlow + Other flow · B.2.4 Account Summary prose ·
-        B.2.5 Payer Contact block · B.2.6 Write-off flow + sleeping state.
-      </div>
+      {!action && (
+        <>
+          {/* Recommended Action card */}
+          <RecommendedActionCard rec={rec} onApprove={handleApprove} onOverride={handleOverride} onOther={handleOther} />
+
+          {/* Send WorkLink shortcut */}
+          <div style={{ padding: "10px 14px", background: PAPER, border: `1px solid ${LINE}`, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, color: MUTE }}>Or send a work request to another area directly →</span>
+            <button onClick={handleSendWLShortcut}
+              style={{ padding: "6px 14px", background: "#fff", color: INK, border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              Send WorkLink
+            </button>
+          </div>
+
+          {/* Placeholder for remaining slices */}
+          <div style={{ padding: "14px 18px", background: "#fffbeb", border: `1px solid #fde68a`, borderRadius: 10, fontSize: 12, color: "#92400e", lineHeight: 1.6 }}>
+            <strong style={{ color: AMBER, letterSpacing: "0.04em" }}>B.2.3 shipped: outcome logging + WorkLink send.</strong>{" "}
+            Coming next: B.2.4 Account Summary prose · B.2.5 Payer Contact block ·
+            B.2.6 Write-off flow + sleeping state.
+          </div>
+        </>
+      )}
+
+      {toast && (
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", padding: "12px 22px", background: INK, color: "#fff", borderRadius: 10, fontSize: 13, fontWeight: 500, zIndex: 100, boxShadow: "0 8px 24px rgba(0,0,0,0.2)" }}>{toast}</div>
+      )}
     </div>
   );
 }
@@ -4857,6 +5318,7 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
                 onBack={() => { setExpandedId(null); setJumpedFromWl(null); }}
                 jumpFromInbound={jumpedFromWl}
                 openOutbound={openOutboundByAcc[acc.id] || []}
+                onWorkLink={onWorkLink}
               />
             );
           })()
