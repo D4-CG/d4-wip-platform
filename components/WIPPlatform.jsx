@@ -5970,63 +5970,22 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
           </div>
         </div>
 
-        {/* ZONE 2 — Work first hero. Dominant card when items are burning;
-            collapses to a thin green strip when clean. The only red element
-            on the page when burning, so it reads first. */}
+        {/* ZONE 2 — Work first. Restored to the prior BurningBanner styling
+            (white card, red 3px left border, headline + breakdown + clickable
+            to apply ≤14d filter). When clean: green border, "All clear" idle
+            message. */}
         {!expandedId && (
-          burningCount > 0 ? (
-            <div onClick={() => setTfFilter("tf14")}
-              style={{
-                padding: "20px 24px",
-                background: "#fef2f2",
-                borderLeft: `4px solid ${RED}`,
-                border: `1px solid #fecaca`,
-                borderLeftWidth: 4,
-                borderRadius: 12,
-                marginBottom: 16,
-                cursor: "pointer",
-                transition: "transform 120ms, box-shadow 120ms",
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                gap: 16, flexWrap: "wrap",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(220, 38, 38, 0.08)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
-            >
-              <div style={{ minWidth: 0, flex: "1 1 auto" }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: RED, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                  Work first
-                </div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: INK, marginTop: 4, lineHeight: 1.3 }}>
-                  {burningCount} {burningCount === 1 ? "item" : "items"} need attention now
-                </div>
-                {burningBreakdown && (
-                  <div style={{ fontSize: 12.5, color: MUTE, marginTop: 5 }}>{burningBreakdown}</div>
-                )}
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "-0.02em" }}>
-                  {"$" + Math.round(burningEV).toLocaleString()}
-                </div>
-                <div style={{ fontSize: 10.5, color: MUTE, marginTop: 2, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                  at risk · click to filter
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div style={{
-              padding: "9px 14px",
-              background: "#f0fdf4",
-              border: `1px solid #bbf7d0`,
-              borderLeft: `3px solid ${GREEN}`,
-              borderRadius: 8,
-              marginBottom: 14,
-              fontSize: 12.5,
-              color: GREEN,
-              fontWeight: 600,
-            }}>
-              ✓ All clear in your book — no deadline pressure
-            </div>
-          )
+          <div style={{ marginBottom: 16 }}>
+            <BurningBanner
+              variant="overline"
+              burningCount={burningCount}
+              burningEV={burningEV}
+              breakdown={burningBreakdown}
+              idleMessage="No deadline pressure."
+              idleSecondary={idleSecondary}
+              onClick={burningCount > 0 ? () => setTfFilter("tf14") : undefined}
+            />
+          </div>
         )}
 
         {/* ZONE 3 — Action toolbar. Search + site dropdown + deadline
@@ -6085,7 +6044,7 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
                   const nativeCount = actionable.filter(f.test).length;
                   const wlCount = f.id === "all" ? enrichedWls.length : enrichedWls.filter(w => w.account ? f.test(w.account) : false).length;
                   const count = nativeCount + wlCount;
-                  return <option key={f.id} value={f.id}>{f.id === "all" ? `Deadline: All (${count})` : `Deadline: ${f.label} (${count})`}</option>;
+                  return <option key={f.id} value={f.id}>{f.label} ({count})</option>;
                 })}
               </select>
 
@@ -7886,41 +7845,6 @@ Keep every item to one line. Limit pointers to 2-3.`;
             <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 600, color: "#0f172a" }}>WIP Intelligence Platform <span style={{ fontSize: 11, color: "#2563eb", marginLeft: 6 }}>v2.1</span></div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {/* Notification bell */}
-            <div style={{ position: "relative" }}>
-              <button onClick={() => setShowNotifications(s => !s)}
-                style={{ background: showNotifications ? "#f1f5f9" : "none", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
-                <span style={{ fontSize: 16 }}>🔔</span>
-                {unreadCount > 0 && (
-                  <span style={{ background: notifications.some(n=>n.urgency==="critical" && !readNotifications.has(n.id)) ? "#dc2626" : "#d97706", color: "#fff", borderRadius: 10, padding: "0 6px", fontSize: 10, fontWeight: 700 }}>{unreadCount}</span>
-                )}
-              </button>
-              {showNotifications && (
-                <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 320, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 200, overflow: "hidden" }}>
-                  <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Notifications {unreadCount > 0 && <span style={{ fontSize: 10, color: "#2563eb", fontWeight: 400, marginLeft: 4 }}>{unreadCount} unread</span>}</span>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      {unreadCount > 0 && <button onClick={() => markAllRead()} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 10 }}>Mark all read</button>}
-                      <button onClick={() => setShowNotifications(false)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 12 }}>✕</button>
-                    </div>
-                  </div>
-                  {notifications.length === 0 ? (
-                    <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 12, color: "#94a3b8" }}>No active notifications</div>
-                  ) : notifications.map(n => (
-                    <div key={n.id} onClick={() => { markRead(n.id); setShowNotifications(false); if (n.role) setRoleAndPersist(n.role); if (n.tab) setTab(n.tab); }}
-                      style={{ padding: "12px 16px", borderBottom: "1px solid #f8fafc", cursor: "pointer", background: urgencyBg[n.urgency] + "40", display: "flex", gap: 10 }}
-                      onMouseEnter={e => e.currentTarget.style.background = urgencyBg[n.urgency]}
-                      onMouseLeave={e => e.currentTarget.style.background = urgencyBg[n.urgency] + "40"}>
-                      <span style={{ fontSize: 14, flexShrink: 0 }}>{urgencyIcon[n.urgency]}</span>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: urgencyColor[n.urgency], marginBottom: 2 }}>{n.title}</div>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>{n.body}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
             {/* Role switcher */}
             {!showRoleSwitcher ? (
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -7997,41 +7921,6 @@ Keep every item to one line. Limit pointers to 2-3.`;
             <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 600, color: "#0f172a" }}>WIP Intelligence Platform <span style={{ fontSize: 11, color: "#2563eb", marginLeft: 6 }}>v2.1</span></div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {/* Notification bell */}
-            <div style={{ position: "relative" }}>
-              <button onClick={() => setShowNotifications(s => !s)}
-                style={{ background: showNotifications ? "#f1f5f9" : "none", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
-                <span style={{ fontSize: 16 }}>🔔</span>
-                {unreadCount > 0 && (
-                  <span style={{ background: notifications.some(n=>n.urgency==="critical" && !readNotifications.has(n.id)) ? "#dc2626" : "#d97706", color: "#fff", borderRadius: 10, padding: "0 6px", fontSize: 10, fontWeight: 700 }}>{unreadCount}</span>
-                )}
-              </button>
-              {showNotifications && (
-                <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 320, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 200, overflow: "hidden" }}>
-                  <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Notifications {unreadCount > 0 && <span style={{ fontSize: 10, color: "#2563eb", fontWeight: 400, marginLeft: 4 }}>{unreadCount} unread</span>}</span>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      {unreadCount > 0 && <button onClick={() => markAllRead()} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 10 }}>Mark all read</button>}
-                      <button onClick={() => setShowNotifications(false)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 12 }}>✕</button>
-                    </div>
-                  </div>
-                  {notifications.length === 0 ? (
-                    <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 12, color: "#94a3b8" }}>No active notifications</div>
-                  ) : notifications.map(n => (
-                    <div key={n.id} onClick={() => { markRead(n.id); setShowNotifications(false); if (n.role) setRoleAndPersist(n.role); if (n.tab) setTab(n.tab); }}
-                      style={{ padding: "12px 16px", borderBottom: "1px solid #f8fafc", cursor: "pointer", background: urgencyBg[n.urgency] + "40", display: "flex", gap: 10 }}
-                      onMouseEnter={e => e.currentTarget.style.background = urgencyBg[n.urgency]}
-                      onMouseLeave={e => e.currentTarget.style.background = urgencyBg[n.urgency] + "40"}>
-                      <span style={{ fontSize: 14, flexShrink: 0 }}>{urgencyIcon[n.urgency]}</span>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: urgencyColor[n.urgency], marginBottom: 2 }}>{n.title}</div>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>{n.body}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
             {/* Role switcher */}
             {!showRoleSwitcher ? (
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -8119,39 +8008,6 @@ Keep every item to one line. Limit pointers to 2-3.`;
           <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 600, color: "#0f172a" }}>WIP Intelligence Platform <span style={{ fontSize: 11, color: "#2563eb", marginLeft: 6 }}>v2.1</span></div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {/* Notification bell */}
-          <div style={{ position: "relative" }}>
-            <button onClick={() => setShowNotifications(s => !s)}
-              style={{ background: showNotifications ? "#f1f5f9" : "none", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
-              <span style={{ fontSize: 16 }}>🔔</span>
-              {notifications.length > 0 && (
-                <span style={{ background: notifications.some(n=>n.urgency==="critical") ? "#dc2626" : "#d97706", color: "#fff", borderRadius: 10, padding: "0 6px", fontSize: 10, fontWeight: 700, minWidth: 16, textAlign: "center" }}>{notifications.length}</span>
-              )}
-            </button>
-            {showNotifications && (
-              <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 340, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 200, overflow: "hidden" }}>
-                <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Notifications</span>
-                  <button onClick={() => setShowNotifications(false)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 12 }}>✕</button>
-                </div>
-                {notifications.length === 0 ? (
-                  <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 12, color: "#94a3b8" }}>No active notifications</div>
-                ) : notifications.map(n => (
-                  <div key={n.id} onClick={() => { markRead(n.id); setShowNotifications(false); if (n.role) setRoleAndPersist(n.role); if (n.tab) setTab(n.tab); }}
-                    style={{ padding: "12px 16px", borderBottom: "1px solid #f8fafc", cursor: "pointer", background: urgencyBg[n.urgency] + "40", display: "flex", gap: 10, alignItems: "flex-start" }}
-                    onMouseEnter={e => e.currentTarget.style.background = urgencyBg[n.urgency]}
-                    onMouseLeave={e => e.currentTarget.style.background = urgencyBg[n.urgency] + "40"}>
-                    <span style={{ fontSize: 14, flexShrink: 0 }}>{urgencyIcon[n.urgency]}</span>
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: urgencyColor[n.urgency], marginBottom: 2 }}>{n.title}</div>
-                      <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.5 }}>{n.body}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
           {/* Collapsed role display */}
           {!showRoleSwitcher ? (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
