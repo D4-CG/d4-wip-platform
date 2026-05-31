@@ -848,6 +848,46 @@ const PAYER_PORTALS = {
   "Buckeye Health Plan": "https://www.buckeyehealthplan.com/providers",
   "Worker Comp": "https://www.availity.com",
 };
+
+// Client-level capability flags for the PayerContactBlock. Reference data
+// (phone, portal, fax, email) is always shown when the payer has it;
+// CLIENT_CAPS gates what's actionable. autoDial enables a click-to-dial
+// pill on the phone row (requires telephony integration). autoFax/autoEmail
+// would gate send affordances when those flows are added.
+const CLIENT_CAPS = { autoFax: true, autoEmail: true, autoDial: false };
+
+// Payer contact directory — phone / fax / email. Portal URLs come from the
+// existing PAYER_PORTALS dict above (it has broader coverage and is already
+// used by other surfaces). contactFor() merges both. Keyed by exact payer
+// names that appear in AR data (verified May 31 2026). Government payers
+// (Medicare/Medicaid) and Self-Pay are not in Carlos's commercial book by
+// filter, so they're intentionally omitted — contactFor returns null and
+// the block won't render for them.
+const PAYER_DIR = {
+  "Aetna":              { phone: "800-872-3862", fax: null,           email: "providers@aetna.com" },
+  "Anthem":             { phone: "800-676-2583", fax: "800-345-0823", email: null },
+  "Blue Cross":         { phone: "800-676-2583", fax: "877-291-3504", email: null },
+  "Blue Shield":        { phone: "800-676-2583", fax: "877-291-3504", email: null },
+  "Cigna":              { phone: "800-882-4462", fax: null,           email: null },
+  "Humana":             { phone: "800-457-4708", fax: null,           email: null },
+  "United Health":      { phone: "877-842-3210", fax: "888-559-0625", email: "providers@uhc.com" },
+};
+
+// Returns merged contact info for a payer, or null if no data exists.
+// Merges PAYER_DIR (phone/fax/email) with PAYER_PORTALS (portal URL).
+function contactFor(payer) {
+  if (!payer) return null;
+  const dir = PAYER_DIR[payer];
+  const portal = PAYER_PORTALS[payer];
+  // No data anywhere — skip rendering (no fake BCBS fallback like standalone)
+  if (!dir && !portal) return null;
+  return {
+    phone:  dir?.phone || null,
+    portal: portal || null,
+    fax:    dir?.fax || null,
+    email:  dir?.email || null,
+  };
+}
 // Green starts where the payer benchmark minimum starts — internally consistent
 const PROB_THRESHOLDS = {
   medicare:     { green: 82, amber: 55 },
@@ -1767,6 +1807,48 @@ Notes:\n${noteText}`;
       </div>
       {loading ? <div style={{ fontSize: 12, color: "#94a3b8" }}>Generating summary...</div>
         : <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.75 }}>{summary}</div>}
+    </div>
+  );
+}
+
+// PayerContactBlock — phone / portal / fax / email reference card. Always shown
+// when the payer has any data. Renders nothing if contactFor() returns null
+// (government payers, Self-Pay, or any payer without data). CLIENT_CAPS gates
+// the click-to-dial pill on phone. Fax/email shown as reference-only until
+// transmit flows land. Ported from Carlos's standalone (B.2.5).
+function PayerContactBlock({ payer }) {
+  const c = contactFor(payer);
+  if (!c) return null;
+  const methods = [
+    c.phone  && { icon: "☎", label: "Phone",  value: c.phone,  href: "tel:" + c.phone },
+    c.portal && { icon: "🔗", label: "Portal", value: c.portal.replace(/^https?:\/\//, ""), href: c.portal },
+    c.fax    && { icon: "📠", label: "Fax",    value: c.fax,    href: null },
+    c.email  && { icon: "✉", label: "Email",  value: c.email,  href: "mailto:" + c.email },
+  ].filter(Boolean);
+  if (methods.length === 0) return null;
+  return (
+    <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 16px", background: "#fff", marginBottom: 12 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Reach {payer}</div>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${methods.length}, 1fr)`, gap: 10 }}>
+        {methods.map((m, i) => {
+          const showDial = m.label === "Phone" && CLIENT_CAPS.autoDial;
+          return (
+            <div key={i} style={{ padding: "8px 10px", background: "#f8fafc", borderRadius: 8 }}>
+              <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 2 }}>{m.icon} {m.label}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                {m.href ? (
+                  <a href={m.href} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#0f172a", fontWeight: 500, textDecoration: "none", wordBreak: "break-all" }}>{m.value}</a>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#0f172a", fontWeight: 500 }}>{m.value}</div>
+                )}
+                {showDial && (
+                  <span style={{ fontSize: 10, color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 6, padding: "1px 7px", cursor: "pointer", fontWeight: 600, letterSpacing: "0.04em" }}>DIAL</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -5264,6 +5346,12 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
           visible above the action panel so the user can reference work history
           while logging an outcome. */}
       <AccountSummary acc={acc} />
+
+      {/* B.2.5 — Payer contact reference (phone / portal / fax / email). Always
+          visible when the payer has data. Skipped for government payers and
+          Self-Pay (contactFor returns null). Click-to-dial gated by CLIENT_CAPS
+          (currently false — reference-only until telephony integration). */}
+      <PayerContactBlock payer={acc.payer} />
 
       {/* Action panels — swap in based on action state */}
       {action === "log_outcome" && (
