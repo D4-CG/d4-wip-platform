@@ -5608,13 +5608,6 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
               Send WorkLink
             </button>
           </div>
-
-          {/* Placeholder for remaining slices */}
-          <div style={{ padding: "14px 18px", background: "#fffbeb", border: `1px solid #fde68a`, borderRadius: 10, fontSize: 12, color: "#92400e", lineHeight: 1.6 }}>
-            <strong style={{ color: AMBER, letterSpacing: "0.04em" }}>B.2.3 shipped: outcome logging + WorkLink send.</strong>{" "}
-            Coming next: B.2.4 Account Summary prose · B.2.5 Payer Contact block ·
-            B.2.6 Write-off flow + sleeping state.
-          </div>
         </>
       )}
 
