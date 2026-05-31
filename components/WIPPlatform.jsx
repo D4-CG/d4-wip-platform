@@ -4974,7 +4974,14 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
   const followUpDate = (typeof followUpRaw === "string" && followUpRaw !== "closed" && followUpRaw !== "pending_cfo") ? followUpRaw : null;
   const followUpDaysAway = followUpDate ? Math.round((new Date(followUpDate + "T00:00:00Z").getTime() - Date.now()) / 86400000) : null;
 
-  const rec = recommendAction(acc, { openOutbound, followUpDate, followUpDaysAway });
+  // Filter openOutbound to WLs Carlos originated. Other roles' WLs on this
+  // account (e.g., Diane's chase_auth, auth team escalations) aren't his
+  // to wait on — they're parallel tracks. Without this filter recommendAction
+  // incorrectly says "Awaiting response from auth_team_lead" on accounts where
+  // the WL came from a different role.
+  const carlosOpenOutbound = openOutbound.filter(wl => wl.sourceRole === "commercial_collector");
+
+  const rec = recommendAction(acc, { openOutbound: carlosOpenOutbound, followUpDate, followUpDaysAway });
 
   // Action state — null | "log_outcome" | "send_wl" | "other"
   const [action, setAction] = useState(null);
@@ -4999,6 +5006,7 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
     }
     const outcome = getOutcome(log.outcomeId);
     showToast(`Logged: ${outcome?.label || log.outcomeId}${log.sleepDays ? `. Sleeps ${log.sleepDays}d.` : ""}`);
+    setTimeout(() => onBack(), 400);
   };
 
   const handleTriggerWL = ({ wlType, contextNote }) => {
@@ -5009,9 +5017,45 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
   const handleSendWL = (wl) => {
     setAction(null); setWlPreselect(null); setWlContextNote(null);
     if (typeof onWorkLink === "function") {
-      try { onWorkLink(wl); } catch {}
+      // Build full platform WL payload — WorkCompose only sends partial.
+      // Reference shape: CollectorAccountCard onWorkLink call (line ~4002).
+      const slaHrs = WORKLINK_REQUEST_SLA_HRS[wl.requestType] || 48;
+      const reqIcon = WORKLINK_REQUEST_CONFIG[wl.requestType]?.requestIcon || "📋";
+      const targetRole = WORKLINK_REQUEST_CONFIG[wl.requestType]?.targetRole || null;
+      const fullPayload = {
+        id: `WL-OUT-${Date.now()}-${acc.id}`,
+        accountId: acc.id,
+        patient: acc.patient,
+        payer: acc.payer,
+        vertical: acc.vertical,
+        site: acc.site,
+        amount: acc.amount,
+        expectedValue: acc.expectedValue,
+        originType: "AR",
+        sourceArea: "Collections",
+        sourceRole: "commercial_collector",
+        from: { name: "Carlos Mendez", role: "Commercial Collector" },
+        requestType: wl.requestType,
+        requestLabel: wl.requestLabel,
+        requestIcon: reqIcon,
+        targetRole,
+        targetArea: wl.targetArea,
+        note: wl.note,
+        status: "open",
+        sentAt: new Date(),
+        slaHrs,
+        slaDue: new Date(Date.now() + slaHrs * 3600 * 1000),
+        slaSeverity: "MODERATE",
+        slaTier: "medium",
+        slaLabel: `${slaHrs}h`,
+        createdAt: new Date().toISOString(),
+      };
+      try { onWorkLink(fullPayload); } catch {}
     }
+    // WLs put the account in "awaiting WL" state — sleeps until reply
+    try { setFollowUpDate(acc.id, new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0]); } catch {}
     showToast(`${wl.requestLabel} sent to ${wl.targetArea}`);
+    setTimeout(() => onBack(), 400);
   };
 
   const handleOtherSave = (log) => {
@@ -5021,6 +5065,7 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
       try { setFollowUpDate(acc.id, fuDate); } catch {}
     }
     showToast("Logged as Other — flagged for team lead review");
+    setTimeout(() => onBack(), 400);
   };
 
   return (
