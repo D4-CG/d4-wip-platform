@@ -5457,8 +5457,10 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
       const fuDate = new Date(Date.now() + log.sleepDays * 86400000).toISOString().split("T")[0];
       try { setFollowUpDate(acc.id, fuDate); } catch {}
     }
-    // Notify CFO dashboard + any other listeners that this account has been worked
-    try { window.dispatchEvent(new CustomEvent("d4_account_logged", { detail: { id: acc.id } })); } catch {}
+    // Notify CFO dashboard + any other listeners that this account has been worked.
+    // Include outcomeId + expectedValue so the productivity metrics row can
+    // compute EV worked and payment-commitment count.
+    try { window.dispatchEvent(new CustomEvent("d4_account_logged", { detail: { id: acc.id, outcomeId: log.outcomeId, expectedValue: acc.expectedValue || 0 } })); } catch {}
     const outcome = getOutcome(log.outcomeId);
     showToast(`Logged: ${outcome?.label || log.outcomeId}${log.sleepDays ? `. Sleeps ${log.sleepDays}d.` : ""}`);
     setTimeout(() => onBack(), 400);
@@ -5536,8 +5538,8 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
     }
     setAutoDraft(false);
     try { setFollowUpDate(acc.id, new Date(Date.now() + fuDays * 86400000).toISOString().split("T")[0]); } catch {}
-    // Notify CFO dashboard + any other listeners that this account has been worked
-    try { window.dispatchEvent(new CustomEvent("d4_account_logged", { detail: { id: acc.id } })); } catch {}
+    // Notify CFO dashboard + productivity metrics listener
+    try { window.dispatchEvent(new CustomEvent("d4_account_logged", { detail: { id: acc.id, outcomeId: pendingOutcomeLog?.outcomeId || null, expectedValue: acc.expectedValue || 0 } })); } catch {}
     const oc = pendingOutcomeLog ? getOutcome(pendingOutcomeLog.outcomeId) : null;
     showToast(oc ? `Logged: ${oc.label} · ${wl.requestLabel} sent to ${wl.targetArea}` : `${wl.requestLabel} sent to ${wl.targetArea}`);
     setTimeout(() => onBack(), 400);
@@ -5549,8 +5551,8 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
       const fuDate = new Date(Date.now() + log.sleepDays * 86400000).toISOString().split("T")[0];
       try { setFollowUpDate(acc.id, fuDate); } catch {}
     }
-    // Notify CFO dashboard + any other listeners that this account has been worked
-    try { window.dispatchEvent(new CustomEvent("d4_account_logged", { detail: { id: acc.id } })); } catch {}
+    // Notify CFO dashboard + productivity metrics listener
+    try { window.dispatchEvent(new CustomEvent("d4_account_logged", { detail: { id: acc.id, outcomeId: "other", expectedValue: acc.expectedValue || 0 } })); } catch {}
     showToast("Logged as Other — flagged for team lead review");
     setTimeout(() => onBack(), 400);
   };
@@ -5586,7 +5588,13 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
               </div>
             )}
             <div style={{ fontSize: 13, color: MUTE, marginTop: 4 }}>
-              {acc.patient} · {acc.payer}{acc.site ? ` · ${acc.site}` : ""}
+              {acc.patient} · {acc.payer}
+              {PAYER_PORTALS[acc.payer] && (
+                <a href={PAYER_PORTALS[acc.payer]} target="_blank" rel="noopener noreferrer"
+                   style={{ color: BLUE, fontSize: 12, marginLeft: 4, textDecoration: "none", fontWeight: 600 }}
+                   title={`Open ${acc.payer} portal`}>↗</a>
+              )}
+              {acc.site ? ` · ${acc.site}` : ""}
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
@@ -5691,8 +5699,12 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
   const STRATUM_FLOOR = 10000;
+  const DAILY_GOAL = 50; // Configurable per user later; default matches platform CollectorView
 
   const [tfFilter, setTfFilter] = useState("all");
+  const [siteFilter, setSiteFilter] = useState(null);   // null = all sites
+  const [viewMode, setViewMode] = useState("worklist");  // "worklist" | "focus"
+  const [searchQuery, setSearchQuery] = useState("");
   const [expandedId, setExpandedId] = useState(null);
   const [workedAccounts, setWorkedAccounts] = useState([]);
 
@@ -5700,11 +5712,16 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
   // (CarlosDetailView dispatches it from handleLogSave / handleSendWL / handleOtherSave).
   // Adding the account to workedAccounts triggers workedSet → actionable memo re-run,
   // so the worked account drops from the queue without a page refresh.
+  // The event detail also carries outcomeId + expectedValue so the productivity
+  // metrics row can compute EV worked and payment-commitment count.
   useEffect(() => {
     const handler = (e) => {
-      const id = e?.detail?.id;
+      const detail = e?.detail || {};
+      const id = detail.id;
       if (!id) return;
-      setWorkedAccounts(prev => prev.some(w => w.id === id) ? prev : [...prev, { id }]);
+      setWorkedAccounts(prev => prev.some(w => w.id === id)
+        ? prev
+        : [...prev, { id, outcomeId: detail.outcomeId || null, expectedValue: detail.expectedValue || 0 }]);
     };
     window.addEventListener("d4_account_logged", handler);
     return () => window.removeEventListener("d4_account_logged", handler);
@@ -5783,12 +5800,53 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
   ];
   const activeFilter = TF_FILTERS.find(f => f.id === tfFilter) || TF_FILTERS[0];
 
-  // Filtered subsets.
-  const filteredNative = useMemo(() => actionable.filter(activeFilter.test), [actionable, tfFilter]);
+  // Sites Carlos's commercial book includes (sorted). Used by site filter pills.
+  const availableSites = useMemo(() => {
+    const sites = new Set();
+    arScored.forEach(a => { if (a.site) sites.add(a.site); });
+    return Array.from(sites).sort((a, b) => {
+      // Natural sort: "Site 2" before "Site 10"
+      const numA = parseInt((a.match(/\d+/) || ["0"])[0], 10);
+      const numB = parseInt((b.match(/\d+/) || ["0"])[0], 10);
+      return numA - numB;
+    });
+  }, [arScored]);
+
+  // Site filter test — passes everything when siteFilter is null.
+  const siteTest = (a) => !siteFilter || a.site === siteFilter;
+
+  // Filtered subsets — apply TF + site filters together.
+  const filteredNative = useMemo(() => actionable.filter(a => activeFilter.test(a) && siteTest(a)), [actionable, tfFilter, siteFilter]);
   const filteredInbound = useMemo(() => {
-    if (tfFilter === "all") return enrichedWls;
-    return enrichedWls.filter(w => w.account ? activeFilter.test(w.account) : true);
-  }, [enrichedWls, tfFilter]);
+    const base = tfFilter === "all" ? enrichedWls : enrichedWls.filter(w => w.account ? activeFilter.test(w.account) : true);
+    if (!siteFilter) return base;
+    return base.filter(w => w.account ? w.account.site === siteFilter : false);
+  }, [enrichedWls, tfFilter, siteFilter]);
+
+  // Productivity stats — derived from workedAccounts. Payment commitments
+  // counted via outcome labels containing "promis" or "paid" (matches platform
+  // CollectorView convention at line 6013).
+  const productivityStats = useMemo(() => {
+    const evWorked = workedAccounts.reduce((s, w) => s + (w.expectedValue || 0), 0);
+    const paymentCommitments = workedAccounts.filter(w => {
+      const oc = w.outcomeId ? getOutcome(w.outcomeId) : null;
+      const label = oc?.label?.toLowerCase() || "";
+      return label.includes("promis") || label.includes("paid");
+    }).length;
+    return { worked: workedAccounts.length, evWorked, paymentCommitments };
+  }, [workedAccounts]);
+
+  // Search match — substring on AR id, patient name, or payer. Returns the
+  // first matching account from arScored. Empty / short query → null.
+  const searchResult = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q.length < 2) return null;
+    return arScored.find(a =>
+      (a.id || "").toLowerCase().includes(q) ||
+      (a.patient || "").toLowerCase().includes(q) ||
+      (a.payer || "").toLowerCase().includes(q)
+    ) || null;
+  }, [searchQuery, arScored]);
 
   // Mixed sort: urgent first (priority 0), normal second (priority 1). Within
   // each, EV descending. WL EV = referenced account's EV.
@@ -5881,6 +5939,52 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
           Book: commercial · EV ≥ $10K · {actionable.length + enrichedWls.length} items surfaced
         </div>
 
+        {/* Group 3: Productivity metrics row — 3 cards, no $/hr per design call.
+            Daily goal counter embedded in the first card. Subtle row above the
+            queue so collector sees session progress at a glance. */}
+        {!expandedId && (
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 10, marginBottom: 14 }}>
+            {[
+              { label: "Accounts worked today", value: productivityStats.worked, sub: `${Math.max(0, DAILY_GOAL - productivityStats.worked)} remaining to goal (${DAILY_GOAL}/day)`, color: INK },
+              { label: "EV worked", value: "$" + Math.round(productivityStats.evWorked).toLocaleString(), sub: "expected recovery logged", color: BLUE },
+              { label: "Payment commitments", value: productivityStats.paymentCommitments, sub: "accounts with payment expected", color: GREEN },
+            ].map(({ label, value, sub, color }) => (
+              <div key={label} style={{ background: "#fff", border: `1px solid ${LINE}`, borderRadius: 10, padding: "12px 14px" }}>
+                <div style={{ fontSize: 10, color: FAINT, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color, letterSpacing: "-0.01em" }}>{value}</div>
+                <div style={{ fontSize: 10.5, color: FAINT, marginTop: 2 }}>{sub}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Group 3: SearchBar — substring match on AR id / patient / payer.
+            Shows a single result card below the input if matched; click to
+            jump straight to that account's detail. */}
+        {!expandedId && (
+          <div style={{ marginBottom: 14 }}>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by account ID, patient name, or payer..."
+              style={{ width: "100%", padding: "8px 12px", border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 13, color: INK, fontFamily: "inherit", outline: "none", background: "#fff", boxSizing: "border-box" }}
+            />
+            {searchQuery.trim().length >= 2 && (
+              searchResult ? (
+                <button onClick={() => { setExpandedId(searchResult.id); setSearchQuery(""); }}
+                  style={{ marginTop: 8, width: "100%", textAlign: "left", padding: "10px 12px", background: "#eff6ff", border: `1px solid #bfdbfe`, borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>
+                  <div style={{ fontSize: 11, color: BLUE, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 2 }}>Match · click to open</div>
+                  <div style={{ fontSize: 13, color: INK, fontWeight: 600 }}>{searchResult.id} · {searchResult.patient}</div>
+                  <div style={{ fontSize: 11, color: MUTE, marginTop: 1 }}>{searchResult.payer}{searchResult.site ? ` · ${searchResult.site}` : ""} · ${Math.round(searchResult.expectedValue || 0).toLocaleString()} EV</div>
+                </button>
+              ) : (
+                <div style={{ marginTop: 8, padding: "8px 12px", fontSize: 12, color: MUTE, fontStyle: "italic" }}>No account found for "{searchQuery.trim()}"</div>
+              )
+            )}
+          </div>
+        )}
+
         {expandedId ? (
           (() => {
             const acc = accountById[expandedId];
@@ -5939,6 +6043,72 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
           )}
         </div>
 
+        {/* Group 3: Site filter pills — shows when collector has accounts at
+            more than one site. Click to filter; click again or "All sites"
+            to clear. Carlos is a multi-site book by default. */}
+        {availableSites.length > 1 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 10.5, color: FAINT, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginRight: 4 }}>Site</span>
+            <button onClick={() => setSiteFilter(null)}
+              style={{
+                padding: "4px 10px",
+                border: `1px solid ${!siteFilter ? INK : LINE}`,
+                background: !siteFilter ? INK : "#fff",
+                color: !siteFilter ? "#fff" : INK,
+                borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
+                fontSize: 11, fontWeight: !siteFilter ? 600 : 500,
+              }}>
+              All
+            </button>
+            {availableSites.map(site => {
+              const active = siteFilter === site;
+              return (
+                <button key={site} onClick={() => setSiteFilter(active ? null : site)}
+                  style={{
+                    padding: "4px 10px",
+                    border: `1px solid ${active ? INK : LINE}`,
+                    background: active ? INK : "#fff",
+                    color: active ? "#fff" : INK,
+                    borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
+                    fontSize: 11, fontWeight: active ? 600 : 500,
+                  }}>
+                  {site}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Group 3: View mode toggle — Worklist (full queue) vs Focus (one
+            account at a time, top of queue). Focus mode is collector-pref;
+            removes visual noise during deep work sessions. */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+          <div style={{ fontSize: 10.5, color: FAINT, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+            View
+          </div>
+          <div style={{ display: "inline-flex", border: `1px solid ${LINE}`, borderRadius: 8, overflow: "hidden" }}>
+            {[
+              { id: "worklist", label: "☰ Worklist" },
+              { id: "focus",    label: "⊙ Focus" },
+            ].map(m => {
+              const active = viewMode === m.id;
+              return (
+                <button key={m.id} onClick={() => setViewMode(m.id)}
+                  style={{
+                    padding: "5px 12px",
+                    border: "none",
+                    background: active ? INK : "#fff",
+                    color: active ? "#fff" : INK,
+                    cursor: "pointer", fontFamily: "inherit",
+                    fontSize: 11, fontWeight: active ? 600 : 500,
+                  }}>
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Sort note */}
         <div style={{ fontSize: 11, color: FAINT, marginBottom: 14 }}>
           Sorted by expected value · {sorted.length} {sorted.length === 1 ? "item" : "items"}
@@ -5955,7 +6125,7 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
           </div>
         ) : (
           <div>
-            {sorted.map((item, idx) => {
+            {(viewMode === "focus" ? sorted.slice(0, 1) : sorted).map((item, idx) => {
               if (item.isInbound) {
                 return (
                   <InboundWorkLinkRow key={item.id} wl={item} idx={idx} variant="card" onOpen={handleSelectInbound} />
@@ -5965,6 +6135,11 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
                 <CollectorAccountRow key={item.id} acc={item} idx={idx} onSelect={handleSelectRow} />
               );
             })}
+            {viewMode === "focus" && sorted.length > 1 && (
+              <div style={{ marginTop: 10, padding: "8px 12px", fontSize: 11, color: FAINT, textAlign: "center", fontStyle: "italic" }}>
+                {sorted.length - 1} more {sorted.length - 1 === 1 ? "account" : "accounts"} in queue · work this one, next appears when complete
+              </div>
+            )}
           </div>
         )}
 
