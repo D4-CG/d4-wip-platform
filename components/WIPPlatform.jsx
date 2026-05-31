@@ -5004,6 +5004,8 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
       const fuDate = new Date(Date.now() + log.sleepDays * 86400000).toISOString().split("T")[0];
       try { setFollowUpDate(acc.id, fuDate); } catch {}
     }
+    // Notify CFO dashboard + any other listeners that this account has been worked
+    try { window.dispatchEvent(new CustomEvent("d4_account_logged", { detail: { id: acc.id } })); } catch {}
     const outcome = getOutcome(log.outcomeId);
     showToast(`Logged: ${outcome?.label || log.outcomeId}${log.sleepDays ? `. Sleeps ${log.sleepDays}d.` : ""}`);
     setTimeout(() => onBack(), 400);
@@ -5054,6 +5056,8 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
     }
     // WLs put the account in "awaiting WL" state — sleeps until reply
     try { setFollowUpDate(acc.id, new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0]); } catch {}
+    // Notify CFO dashboard + any other listeners that this account has been worked
+    try { window.dispatchEvent(new CustomEvent("d4_account_logged", { detail: { id: acc.id } })); } catch {}
     showToast(`${wl.requestLabel} sent to ${wl.targetArea}`);
     setTimeout(() => onBack(), 400);
   };
@@ -5064,6 +5068,8 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
       const fuDate = new Date(Date.now() + log.sleepDays * 86400000).toISOString().split("T")[0];
       try { setFollowUpDate(acc.id, fuDate); } catch {}
     }
+    // Notify CFO dashboard + any other listeners that this account has been worked
+    try { window.dispatchEvent(new CustomEvent("d4_account_logged", { detail: { id: acc.id } })); } catch {}
     showToast("Logged as Other — flagged for team lead review");
     setTimeout(() => onBack(), 400);
   };
@@ -5181,6 +5187,20 @@ function CarlosCollectorView({ arScored, worklinks, onWorkLink }) {
   const [tfFilter, setTfFilter] = useState("all");
   const [expandedId, setExpandedId] = useState(null);
   const [workedAccounts, setWorkedAccounts] = useState([]);
+
+  // Listen for d4_account_logged window event — fires when an outcome is logged
+  // (CarlosDetailView dispatches it from handleLogSave / handleSendWL / handleOtherSave).
+  // Adding the account to workedAccounts triggers workedSet → actionable memo re-run,
+  // so the worked account drops from the queue without a page refresh.
+  useEffect(() => {
+    const handler = (e) => {
+      const id = e?.detail?.id;
+      if (!id) return;
+      setWorkedAccounts(prev => prev.some(w => w.id === id) ? prev : [...prev, { id }]);
+    };
+    window.addEventListener("d4_account_logged", handler);
+    return () => window.removeEventListener("d4_account_logged", handler);
+  }, []);
 
   // Open inbound WLs targeting commercial_collector. Index by account for
   // suppression + by ID for fast lookup.
