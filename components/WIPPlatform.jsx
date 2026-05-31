@@ -4573,11 +4573,16 @@ function RecommendedActionCard({ rec, onApprove, onOverride, onOther }) {
 const CONTACT_METHODS = ["Phone", "Portal", "Fax", "Email", "Manual"];
 
 // Work request types Carlos can send via SendWorkLinkFlow.
-// Filtered subset of WORKLINK_REQUEST_CONFIG — only "work" requests
+// Filtered subset of WORKLINK_REQUEST_TYPES — only "work" requests
 // (chase_auth / recode / etc.). Write-off + escalations go through
 // Log Outcome → Terminal group, not bare WorkLinks. B.2.6 adds write-off
 // compose path when triggered from outcome flow.
 const CARLOS_WORK_WL_TYPES = ["chase_auth", "recode", "him_deficiency", "physician_query", "resubmit", "missing_charge", "cred_gap"];
+
+// Lookup helper: maps a WL request type value to its config entry from
+// WORKLINK_REQUEST_TYPES. Translates between the value-based ID and the
+// label/icon/targetArea/targetRole metadata. Returns null if not found.
+const getWlType = (value) => WORKLINK_REQUEST_TYPES.find(t => t.value === value) || null;
 
 // Lookup helper for outcome metadata. Carlos's standalone uses dict access
 // (OUTCOMES[id]); platform uses an array (OUTCOME_STATUSES). This bridges.
@@ -4619,9 +4624,9 @@ function CarlosLogOutcomeFlow({ acc, onSave, onTriggerWL, onCancel, preselectOut
       const header = `${todayIso} · ${method} · ${outcome.label} · ${acc.id} (${acc.patient}, ${acc.payer})`;
       const body = note.trim().charAt(0).toUpperCase() + note.trim().slice(1) + (/[.!?]$/.test(note.trim()) ? "" : ".");
       const triggersWL = outcome.triggersWL;
-      const wlCfg = triggersWL ? WORKLINK_REQUEST_CONFIG[triggersWL] : null;
+      const wlCfg = triggersWL ? getWlType(triggersWL) : null;
       const footer =
-        wlCfg ? `Next step: opening ${wlCfg.requestLabel} WorkLink to ${wlCfg.targetArea}.` :
+        wlCfg ? `Next step: opening ${wlCfg.label} WorkLink to ${wlCfg.targetArea || wlCfg.targetRole}.` :
         effectiveSleep != null ? `Next follow-up in ${effectiveSleep}d.` :
         "Next step per outcome status.";
       setNote(`${header}\n\n${body}\n\n${footer}`);
@@ -4760,7 +4765,7 @@ function CarlosLogOutcomeFlow({ acc, onSave, onTriggerWL, onCancel, preselectOut
             <div style={{ fontSize: 10.5, fontWeight: 700, color: outcome.triggersWL ? PURPLE : GREEN, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>On save</div>
             {outcome.triggersWL ? (
               <div style={{ fontSize: 13, color: INK, lineHeight: 1.5 }}>
-                Opens <strong>{WORKLINK_REQUEST_CONFIG[outcome.triggersWL]?.requestLabel || outcome.triggersWL}</strong> WorkLink → <strong>{WORKLINK_REQUEST_CONFIG[outcome.triggersWL]?.targetArea || "—"}</strong>. Status will become <strong>{STATUS[outcome.nextStatus]?.label || outcome.nextStatus}</strong> after send.
+                Opens <strong>{getWlType(outcome.triggersWL)?.label || outcome.triggersWL}</strong> WorkLink → <strong>{getWlType(outcome.triggersWL)?.targetArea || getWlType(outcome.triggersWL)?.targetRole || "—"}</strong>. Status will become <strong>{STATUS[outcome.nextStatus]?.label || outcome.nextStatus}</strong> after send.
               </div>
             ) : (
               <div style={{ fontSize: 13, color: INK, lineHeight: 1.5 }}>
@@ -4902,16 +4907,16 @@ function WorkCompose({ acc, t, contextNote, onSend, onBack }) {
 
 function SendWorkLinkFlow({ acc, preselectedType, contextNote, onSend, onCancel }) {
   const [type, setType] = useState(preselectedType || null);
-  const t = type ? WORKLINK_REQUEST_CONFIG[type] : null;
+  const t = type ? getWlType(type) : null;
 
   return (
     <div style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: "#fff", padding: "18px 20px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: FAINT, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            {t ? `Send to area · ${t.targetArea}` : "Send WorkLink — pick request type"}
+            {t ? `Send to area · ${t.targetArea || t.targetRole}` : "Send WorkLink — pick request type"}
           </div>
-          {t && <div style={{ fontSize: 15, fontWeight: 600, color: INK, marginTop: 3 }}>{t.requestLabel}</div>}
+          {t && <div style={{ fontSize: 15, fontWeight: 600, color: INK, marginTop: 3 }}>{t.label}</div>}
         </div>
         <button onClick={onCancel} style={btnGhost}>cancel</button>
       </div>
@@ -4921,7 +4926,7 @@ function SendWorkLinkFlow({ acc, preselectedType, contextNote, onSend, onCancel 
           <div style={{ fontSize: 10.5, fontWeight: 700, color: FAINT, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Work request</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 12 }}>
             {CARLOS_WORK_WL_TYPES.map(wId => {
-              const w = WORKLINK_REQUEST_CONFIG[wId];
+              const w = getWlType(wId);
               if (!w) return null;
               const sla = WORKLINK_REQUEST_SLA_HRS[wId] || 48;
               return (
@@ -4929,7 +4934,7 @@ function SendWorkLinkFlow({ acc, preselectedType, contextNote, onSend, onCancel 
                   style={{ padding: "12px 10px", border: `1px solid ${LINE}`, borderRadius: 8, background: "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = INK; e.currentTarget.style.background = PAPER; }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = LINE; e.currentTarget.style.background = "#fff"; }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: INK }}>{w.requestLabel}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: INK }}>{w.label}</div>
                   <div style={{ fontSize: 10, color: MUTE, marginTop: 2 }}>→ {w.targetArea} · {sla}h</div>
                 </button>
               );
@@ -5022,8 +5027,8 @@ function CarlosDetailView({ acc, onBack, jumpFromInbound, openOutbound = [], onW
       // Build full platform WL payload — WorkCompose only sends partial.
       // Reference shape: CollectorAccountCard onWorkLink call (line ~4002).
       const slaHrs = WORKLINK_REQUEST_SLA_HRS[wl.requestType] || 48;
-      const reqIcon = WORKLINK_REQUEST_CONFIG[wl.requestType]?.requestIcon || "📋";
-      const targetRole = WORKLINK_REQUEST_CONFIG[wl.requestType]?.targetRole || null;
+      const reqIcon = getWlType(wl.requestType)?.icon || "📋";
+      const targetRole = getWlType(wl.requestType)?.targetRole || null;
       const fullPayload = {
         id: `WL-OUT-${Date.now()}-${acc.id}`,
         accountId: acc.id,
